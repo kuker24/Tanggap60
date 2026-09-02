@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -46,8 +48,10 @@ class Orchestrator:
         }
         planned: list[str] | None = None
         planned_mode = "deterministic"
+        seq_ms = 0
         seq_fn = getattr(self.hermes, "propose_sequence", None)
         if seq_fn is not None:
+            started = time.perf_counter()
             try:
                 raw = seq_fn(case.state.value, summary0)
                 if raw is not None:
@@ -55,6 +59,7 @@ class Orchestrator:
                     planned_mode = mode_from_hermes(self.hermes)
             except Exception:
                 planned = None
+            seq_ms = int((time.perf_counter() - started) * 1000)
         for _ in range(16):
             case = self.case_repo.get(case_id)
             if self._should_pause(case.state, trace):
@@ -66,14 +71,19 @@ class Orchestrator:
                 "handoff_prepared": "prepare_official_handoff" in trace,
             }
             source_mode = planned_mode
+            pick_ms = 0
             if planned:
                 tool = planned.pop(0)
                 if tool not in allowed_tools(case.state.value):
                     planned = None
+                    started = time.perf_counter()
                     tool = self.hermes.propose_tool(case.state.value, summary)
+                    pick_ms = int((time.perf_counter() - started) * 1000)
                     source_mode = mode_from_hermes(self.hermes)
             else:
+                started = time.perf_counter()
                 tool = self.hermes.propose_tool(case.state.value, summary)
+                pick_ms = int((time.perf_counter() - started) * 1000)
                 source_mode = mode_from_hermes(self.hermes)
             if tool is None:
                 break
@@ -111,6 +121,10 @@ class Orchestrator:
                 self.cases.set_state(case, State.VERIFYING, event_type="GENERATING_DONE", run_id=run_id)
             if tool == "verify_artifacts" and case.state == State.VERIFYING:
                 self.cases.set_state(case, State.HANDOFF_READY, event_type="HANDOFF_READY", run_id=run_id)
+            duration = int(result.get("duration_ms") or 0) + pick_ms
+            if seq_ms:
+                duration += seq_ms
+                seq_ms = 0
             self._trace(
                 case_id,
                 run_id,
@@ -118,7 +132,7 @@ class Orchestrator:
                 case.state.value,
                 "OK",
                 None,
-                int(result.get("duration_ms") or 0),
+                duration,
                 source_mode,
             )
             if self._should_pause(self.case_repo.get(case_id).state, trace):
