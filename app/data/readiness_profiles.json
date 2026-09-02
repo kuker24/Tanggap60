@@ -1,0 +1,45 @@
+{
+  "profile_version": "2026-09-02.mvp1",
+  "last_reviewed_at": "2026-09-02",
+  "source_urls": [
+    "https://iasc.ojk.go.id/",
+    "https://www.ojk.go.id/"
+  ],
+  "disclaimer": "Pemeriksaan internal, bukan jaminan penerimaan laporan.",
+  "channels": {
+    "BANK_PJP": {
+      "label": "Bank/PJP",
+      "checks": [
+        {"check_id": "BANK_AMOUNT_REVIEWED", "label": "Nominal transfer sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "BANK_DESTINATION_REVIEWED", "label": "Rekening atau identitas tujuan sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "BANK_TIME_REVIEWED", "label": "Waktu transaksi sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "BANK_TRANSFER_EVIDENCE", "label": "Bukti transfer tersedia", "level": "REQUIRED"},
+        {"check_id": "BANK_CHANNEL_OR_PJP", "label": "Kanal atau PJP tujuan diketahui", "level": "RECOMMENDED"},
+        {"check_id": "BANK_IDENTITY_EXTERNAL", "label": "Identitas pemilik disiapkan di kanal resmi", "level": "PREPARE_EXTERNALLY"}
+      ]
+    },
+    "IASC": {
+      "label": "IASC",
+      "checks": [
+        {"check_id": "IASC_AMOUNT_REVIEWED", "label": "Nominal sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "IASC_DESTINATION_REVIEWED", "label": "Rekening tujuan sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "IASC_TIME_REVIEWED", "label": "Waktu transaksi sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "IASC_TRANSFER_EVIDENCE", "label": "Bukti transfer tersedia", "level": "REQUIRED"},
+        {"check_id": "IASC_COMMUNICATION_EVIDENCE", "label": "Bukti komunikasi tersedia atau ditandai tidak ada", "level": "REQUIRED"},
+        {"check_id": "IASC_CHRONOLOGY", "label": "Kronologi dapat disusun dari fakta yang ditinjau", "level": "REQUIRED"},
+        {"check_id": "IASC_VICTIM_DATA_EXTERNAL", "label": "Data korban diisi langsung di portal resmi", "level": "PREPARE_EXTERNALLY"}
+      ]
+    },
+    "POLICE": {
+      "label": "Kepolisian",
+      "checks": [
+        {"check_id": "POLICE_CHRONOLOGY", "label": "Kronologi sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "POLICE_TRANSACTION", "label": "Transaksi sudah ditinjau", "level": "REQUIRED"},
+        {"check_id": "POLICE_COMMUNICATION", "label": "Bukti komunikasi tersedia atau ditandai tidak ada", "level": "REQUIRED"},
+        {"check_id": "POLICE_EVIDENCE_INDEX", "label": "Indeks barang bukti tersedia", "level": "REQUIRED"},
+        {"check_id": "POLICE_PROVENANCE", "label": "Setiap klaim penting punya sumber bukti", "level": "REQUIRED"},
+        {"check_id": "POLICE_IDENTITY_EXTERNAL", "label": "Identitas resmi disiapkan di kanal resmi", "level": "PREPARE_EXTERNALLY"}
+      ]
+    }
+  }
+}

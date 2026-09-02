@@ -7,6 +7,7 @@ REASONING_TOOLS = frozenset(
         "validate_case_facts",
         "build_preincident_brief",
         "build_postincident_plan",
+        "assess_handoff_readiness",
     }
 )
 MECHANICAL_TOOLS = frozenset(

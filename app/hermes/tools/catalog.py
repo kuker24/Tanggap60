@@ -24,6 +24,10 @@ TOOL_SPECS: tuple[dict[str, str], ...] = (
         "description": "Susun Emergency Action Plan pascainsiden.",
     },
     {
+        "name": "assess_handoff_readiness",
+        "description": "Hitung kesiapan handoff Bank/PJP, IASC, dan Kepolisian dari aturan lokal.",
+    },
+    {
         "name": "compile_artifacts",
         "description": "Render PDF/JSON/ZIP dari snapshot persetujuan.",
     },

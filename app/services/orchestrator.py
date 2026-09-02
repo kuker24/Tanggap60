@@ -44,8 +44,10 @@ class Orchestrator:
             "route": case.route.value,
             "candidates_done": bool(self.facts.list_for_case(case_id)),
             "allowed_tools": list(allowed_tools(case.state.value)),
-            "handoff_prepared": False,
-        }
+                "handoff_prepared": False,
+                "plan_done": False,
+                "readiness_assessed": False,
+            }
         planned: list[str] | None = None
         planned_mode = "deterministic"
         seq_ms = 0
@@ -69,6 +71,8 @@ class Orchestrator:
                 "candidates_done": bool(self.facts.list_for_case(case_id)),
                 "allowed_tools": list(allowed_tools(case.state.value)),
                 "handoff_prepared": "prepare_official_handoff" in trace,
+                "plan_done": "build_postincident_plan" in trace or "build_preincident_brief" in trace,
+                "readiness_assessed": "assess_handoff_readiness" in trace,
             }
             source_mode = planned_mode
             pick_ms = 0
@@ -85,6 +89,14 @@ class Orchestrator:
                 tool = self.hermes.propose_tool(case.state.value, summary)
                 pick_ms = int((time.perf_counter() - started) * 1000)
                 source_mode = mode_from_hermes(self.hermes)
+            if (
+                case.state == State.READY_FOR_ACTION
+                and case.route.value == "POST_INCIDENT_RESPONSE"
+                and "build_postincident_plan" in trace
+                and "assess_handoff_readiness" not in trace
+                and tool != "assess_handoff_readiness"
+            ):
+                tool = "assess_handoff_readiness"
             if tool is None:
                 break
             if tool == "validate_case_facts" and case.state == State.REVIEW_REQUIRED and tool in trace:
@@ -114,9 +126,10 @@ class Orchestrator:
                 }
             trace.append(tool)
             case = self.case_repo.get(case_id)
-            if tool == "build_postincident_plan" or tool == "build_preincident_brief":
-                if case.state == State.READY_FOR_ACTION:
-                    self.cases.set_state(case, State.WAITING_APPROVAL, event_type="WAITING_APPROVAL", run_id=run_id)
+            if tool == "build_preincident_brief" and case.state == State.READY_FOR_ACTION:
+                self.cases.set_state(case, State.WAITING_APPROVAL, event_type="WAITING_APPROVAL", run_id=run_id)
+            if tool == "assess_handoff_readiness" and case.state == State.READY_FOR_ACTION:
+                self.cases.set_state(case, State.WAITING_APPROVAL, event_type="WAITING_APPROVAL", run_id=run_id)
             if tool == "compile_artifacts" and case.state == State.GENERATING:
                 self.cases.set_state(case, State.VERIFYING, event_type="GENERATING_DONE", run_id=run_id)
             if tool == "verify_artifacts" and case.state == State.VERIFYING:

@@ -104,6 +104,37 @@ def _pre_brief(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     }
 
 
+def _assess(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    from app.infrastructure.repositories import ConflictRepository, TransactionRepository
+    from app.services.readiness import assess, public_report
+
+    case_id = str(args["case_id"])
+    case = CaseRepository(ctx.inspect.session).get(case_id)
+    report = assess(
+        case_id=case_id,
+        route=case.route,
+        facts=FactRepository(ctx.inspect.session).list_for_case(case_id),
+        conflicts=ConflictRepository(ctx.inspect.session).list_for_case(case_id),
+        evidence=EvidenceRepository(ctx.inspect.session).list_for_case(case_id),
+        transactions=TransactionRepository(ctx.inspect.session).list_for_case(case_id),
+    )
+    public = public_report(report)
+    return {
+        "overall_status": public["overall_status"],
+        "profile_version": public["profile_version"],
+        "official_status": "NOT_VERIFIED",
+        "channels": [
+            {
+                "channel": ch["channel"],
+                "status": ch["status"],
+                "checks_met": ch["checks_met"],
+                "checks_total": ch["checks_total"],
+            }
+            for ch in public["channels"]
+        ],
+    }
+
+
 def _post_plan(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     case_id = str(args["case_id"])
     case = CaseRepository(ctx.inspect.session).get(case_id)
@@ -174,6 +205,7 @@ HANDLERS: dict[str, Callable[[dict[str, Any], ToolContext], dict[str, Any]]] = {
     "validate_case_facts": _validate,
     "build_preincident_brief": _pre_brief,
     "build_postincident_plan": _post_plan,
+    "assess_handoff_readiness": _assess,
     "compile_artifacts": _compile,
     "verify_artifacts": _verify,
     "prepare_official_handoff": _handoff,

@@ -48,7 +48,11 @@ class DeterministicHermes:
         if state == "READY_FOR_ACTION":
             if summary.get("route") == "PRE_INCIDENT_CHECK":
                 return "build_preincident_brief"
-            return "build_postincident_plan"
+            if not summary.get("plan_done"):
+                return "build_postincident_plan"
+            if not summary.get("readiness_assessed"):
+                return "assess_handoff_readiness"
+            return None
         if state == "HANDOFF_READY" and summary.get("handoff_prepared"):
             return None
         return self.ORDER.get(state)
@@ -118,7 +122,8 @@ def sequence_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> 
         "List tools to run in order until the next human pause "
         "(REVIEW_REQUIRED or WAITING_APPROVAL). Empty list means pause now.\n"
         "INGESTING typically: inspect_evidence, extract_candidate_facts, validate_case_facts.\n"
-        "READY_FOR_ACTION typically: build_postincident_plan or build_preincident_brief.\n"
+        "READY_FOR_ACTION typically: build_postincident_plan then assess_handoff_readiness, "
+        "or build_preincident_brief for CekDulu.\n"
         "GENERATING typically: compile_artifacts, verify_artifacts, prepare_official_handoff.\n"
     )
 

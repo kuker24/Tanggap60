@@ -17,10 +17,13 @@ from app.infrastructure.repositories import (
     ApprovalRepository,
     CaseRepository,
     ConflictRepository,
+    EvidenceRepository,
     FactRepository,
+    TransactionRepository,
 )
 from app.services.cases import CaseService, now_utc
 from app.services.ids import new_id
+from app.services.readiness import assess, snapshot_readiness
 
 
 def fact_dict(fact: FactRecord) -> dict[str, object]:
@@ -45,6 +48,8 @@ class ApprovalService:
         self.conflicts = ConflictRepository(session)
         self.actions = ActionRepository(session)
         self.approvals = ApprovalRepository(session)
+        self.evidence = EvidenceRepository(session)
+        self.transactions = TransactionRepository(session)
 
     def current_snapshot(self, case_id: str) -> tuple[dict[str, object], str]:
         case = self.case_repo.get(case_id)
@@ -74,6 +79,14 @@ class ApprovalService:
             }
             for a in self.actions.list_for_case(case_id)
         ]
+        report = assess(
+            case_id=case_id,
+            route=case.route,
+            facts=self.facts.list_for_case(case_id),
+            conflicts=self.conflicts.list_for_case(case_id),
+            evidence=self.evidence.list_for_case(case_id),
+            transactions=self.transactions.list_for_case(case_id),
+        )
         payload = snapshot_payload(
             facts=facts,
             conflicts=conflicts,
@@ -81,6 +94,7 @@ class ApprovalService:
             actions=actions,
             notice_version=NOTICE_VERSION,
             template_version=TEMPLATE_VERSION,
+            readiness=snapshot_readiness(report),
         )
         digest = sha256_text(canonical_json(payload))
         return payload, digest
