@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 import statistics
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +32,8 @@ def main() -> None:
     max_queue = 0
     tool_ms: dict[str, list[int]] = {}
     for index in range(runs):
+        if index > 0:
+            time.sleep(1.5)
         try:
             result = run_hero(base)
         except SystemExit as exc:
