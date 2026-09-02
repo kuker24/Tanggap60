@@ -650,6 +650,13 @@ def list_events(case_id: str, request: Request) -> dict[str, Any]:
                 "state_after": e.state_after,
                 "planner": e.planner,
                 "execution": e.execution,
+                # separated latency (no breaking, additive)
+                "planner_ms": getattr(e, "planner_ms", None),
+                "handler_ms": getattr(e, "handler_ms", None),
+                "hermes_attempt_1_ms": getattr(e, "hermes_attempt_1_ms", None),
+                "hermes_attempt_2_ms": getattr(e, "hermes_attempt_2_ms", None),
+                "hermes_sequence_ms": getattr(e, "hermes_sequence_ms", None),
+                "ocr_total_ms": getattr(e, "ocr_total_ms", None),
             }
             for e in events
         ]
@@ -669,10 +676,26 @@ def agent_trace(case_id: str, request: Request) -> dict[str, Any]:
             "planner": e.planner or "DETERMINISTIC_SAFE",
             "execution": e.execution or "LOCAL_TOOL",
             "duration_ms": e.duration_ms or 0,
+            # separated breakdown (additive, no breaking)
+            "planner_ms": getattr(e, "planner_ms", None) or 0,
+            "handler_ms": getattr(e, "handler_ms", None) or (e.duration_ms or 0),
+            "hermes_attempt_1_ms": getattr(e, "hermes_attempt_1_ms", None) or 0,
+            "hermes_attempt_2_ms": getattr(e, "hermes_attempt_2_ms", None) or 0,
+            "hermes_sequence_ms": getattr(e, "hermes_sequence_ms", None) or 0,
+            "ocr_total_ms": getattr(e, "ocr_total_ms", None) or 0,
+            "local_processing_ms": getattr(e, "handler_ms", None) or (e.duration_ms or 0),
         }
         for e in events
         if e.event_type == "TOOL_CALLED" and e.tool_name
     ]
+    # aggregates for investigation
+    ocr_total_ms = sum(int(s.get("ocr_total_ms") or 0) for s in steps)  # type: ignore
+    hermes_sequence_ms = sum(int(s.get("hermes_sequence_ms") or 0) for s in steps)  # type: ignore
+    hermes_picker_ms = sum(int(s.get("planner_ms") or 0) for s in steps) - hermes_sequence_ms  # type: ignore
+    local_processing_ms = sum(int(s.get("handler_ms") or 0) for s in steps)  # type: ignore
+    hermes_attempt_1_ms = sum(int(s.get("hermes_attempt_1_ms") or 0) for s in steps)  # type: ignore
+    hermes_attempt_2_ms = sum(int(s.get("hermes_attempt_2_ms") or 0) for s in steps)  # type: ignore
+    per_tool_ms = {s["tool_name"]: {"handler_ms": s["handler_ms"], "planner_ms": s["planner_ms"], "total_ms": s["duration_ms"]} for s in steps}
     reasoning_steps = [s for s in steps if s["tool_name"] in REASONING_TOOLS]
     reasoning_fallback = [s for s in reasoning_steps if s["planner"] != "HERMES_CLI"]
     hermes_cli_used = any(step["planner"] == "HERMES_CLI" for step in steps)
@@ -689,6 +712,14 @@ def agent_trace(case_id: str, request: Request) -> dict[str, Any]:
         "hermes_reasoning_success": len(reasoning_fallback) == 0 and hermes_cli_used,
         "reasoning_fallback_count": len(reasoning_fallback),
         "official_status": "NOT_VERIFIED",
+        # separated aggregates
+        "ocr_total_ms": ocr_total_ms,
+        "hermes_sequence_ms": hermes_sequence_ms,
+        "hermes_picker_ms": hermes_picker_ms,
+        "hermes_attempt_1_ms": hermes_attempt_1_ms,
+        "hermes_attempt_2_ms": hermes_attempt_2_ms,
+        "local_processing_ms": local_processing_ms,
+        "per_tool_ms": per_tool_ms,
     }
 
 

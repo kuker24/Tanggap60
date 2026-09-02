@@ -616,6 +616,12 @@ class EventRepository:
                 created_at=event.created_at,
                 planner=event.planner,
                 execution=event.execution,
+                planner_ms=event.planner_ms,
+                handler_ms=event.handler_ms,
+                hermes_attempt_1_ms=event.hermes_attempt_1_ms,
+                hermes_attempt_2_ms=event.hermes_attempt_2_ms,
+                hermes_sequence_ms=event.hermes_sequence_ms,
+                ocr_total_ms=event.ocr_total_ms,
             )
         )
 
@@ -642,6 +648,12 @@ class EventRepository:
                 created_at=_dt(r.created_at),  # type: ignore[arg-type]
                 planner=r.planner,
                 execution=r.execution,
+                planner_ms=getattr(r, "planner_ms", None),
+                handler_ms=getattr(r, "handler_ms", None),
+                hermes_attempt_1_ms=getattr(r, "hermes_attempt_1_ms", None),
+                hermes_attempt_2_ms=getattr(r, "hermes_attempt_2_ms", None),
+                hermes_sequence_ms=getattr(r, "hermes_sequence_ms", None),
+                ocr_total_ms=getattr(r, "ocr_total_ms", None),
             )
             for r in rows
         ]

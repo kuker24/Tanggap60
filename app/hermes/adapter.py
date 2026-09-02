@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -41,6 +42,10 @@ class DeterministicHermes:
     hermes_cli_succeeded = False
     hermes_fallback_used = False
     hermes_failure_reason: str | None = None
+    last_attempt_1_ms: int = 0
+    last_attempt_2_ms: int = 0
+    last_total_ms: int = 0
+    last_hermes_sequence_ms: int = 0
     ORDER = {
         "INGESTING": "inspect_evidence",
         "EXTRACTING": "extract_candidate_facts",
@@ -132,23 +137,84 @@ def picker_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> st
 
 
 def sequence_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> str:
+    route = str(summary.get("route") or "")
+    # Agentic but tight: 2 sequence calls, Hermes chooses ordered subset from allowed
+    if state == "INGESTING":
+        return (
+            "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+            f"state={state}\n"
+            f"route={route}\n"
+            f"allowed_now={allowed}\n"
+            "Phase goal: REVIEW_REQUIRED. Progression in state order: "
+            'INGESTING ["inspect_evidence"] -> EXTRACTING ["extract_candidate_facts","validate_case_facts"].\n'
+            "Task: Choose only from allowed progression tools "
+            '["inspect_evidence","extract_candidate_facts","validate_case_facts"] that will be valid in order. '
+            "Select the minimal ordered sequence required to reach REVIEW_REQUIRED. "
+            "Keep execution order, do not include mechanical tools that local policy owns. Return JSON only.\n"
+        )
+    if state == "EXTRACTING":
+        return (
+            "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+            f"state={state}\n"
+            f"allowed_now={allowed}\n"
+            f"candidates_done={bool(summary.get('candidates_done'))}\n"
+            "Phase goal: REVIEW_REQUIRED.\n"
+            "Task: Choose only from [\"extract_candidate_facts\",\"validate_case_facts\"] in order. "
+            "If candidates_done, minimal is [\"validate_case_facts\"]; else need both in order. "
+            "Select minimal ordered sequence to reach REVIEW_REQUIRED. Return JSON only.\n"
+        )
+    if state == "READY_FOR_ACTION":
+        if route == "PRE_INCIDENT_CHECK":
+            return (
+                "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+                f"state={state} route={route} allowed_now={allowed}\n"
+                "Phase goal: WAITING_APPROVAL.\n"
+                "Task: Choose only from allowed_now. For PRE_INCIDENT_CHECK select the minimal ordered "
+                'sequence ["build_preincident_brief"] to reach WAITING_APPROVAL. Return JSON only.\n'
+            )
+        # POST_INCIDENT_RESPONSE: build ordered remaining list, let Hermes choose
+        remaining: list[str] = []
+        if not summary.get("plan_done"):
+            remaining.append("build_postincident_plan")
+        if not summary.get("units_compiled"):
+            remaining.append("compile_reporting_units")
+        if not summary.get("readiness_assessed"):
+            remaining.append("assess_handoff_readiness")
+        if not summary.get("next_action_done"):
+            remaining.append("recommend_next_action")
+        if not remaining:
+            return (
+                "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+                f"state={state} route={route} allowed_now={allowed}\n"
+                "All steps done, return [] to pause.\n"
+            )
+        return (
+            "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+            f"state={state}\n"
+            f"route={route}\n"
+            f"allowed_now={allowed}\n"
+            f"plan_done={bool(summary.get('plan_done'))} "
+            f"units_compiled={bool(summary.get('units_compiled'))} "
+            f"readiness_assessed={bool(summary.get('readiness_assessed'))} "
+            f"next_action_done={bool(summary.get('next_action_done'))}\n"
+            f"Remaining candidates in order to reach WAITING_APPROVAL: {remaining}\n"
+            "Task: Choose only from allowed_now. Select the minimal ordered sequence from the remaining "
+            "candidates that reaches WAITING_APPROVAL. Keep execution order, do not include mechanical "
+            "tools that local policy owns. Return JSON only.\n"
+        )
     return (
         "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
         f"state={state}\n"
         f"allowed_now={allowed}\n"
-        f"route={summary.get('route')}\n"
+        f"route={route}\n"
         f"candidates_done={bool(summary.get('candidates_done'))}\n"
         f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
         f"plan_done={bool(summary.get('plan_done'))}\n"
         f"units_compiled={bool(summary.get('units_compiled'))}\n"
         f"readiness_assessed={bool(summary.get('readiness_assessed'))}\n"
         f"next_action_done={bool(summary.get('next_action_done'))}\n"
-        "List tools to run in order until the next human pause "
-        "(REVIEW_REQUIRED or WAITING_APPROVAL). Empty list means pause now.\n"
-        "INGESTING typically: inspect_evidence, extract_candidate_facts, validate_case_facts.\n"
-        "READY_FOR_ACTION typically: build_postincident_plan, compile_reporting_units, assess_handoff_readiness, recommend_next_action, "
-        "or build_preincident_brief for CekDulu.\n"
-        "GENERATING typically: compile_artifacts, verify_artifacts, prepare_official_handoff.\n"
+        "Task: Choose only from allowed_now. Select minimal ordered sequence to reach next human pause "
+        "(REVIEW_REQUIRED or WAITING_APPROVAL). Return JSON only.\n"
     )
 
 
@@ -161,6 +227,10 @@ class HttpHermes:
     hermes_cli_succeeded = False
     hermes_fallback_used = False
     hermes_failure_reason: str | None = None
+    last_attempt_1_ms: int = 0
+    last_attempt_2_ms: int = 0
+    last_total_ms: int = 0
+    last_hermes_sequence_ms: int = 0
 
     def __init__(self, endpoint: str) -> None:
         self.endpoint = endpoint.rstrip("/")
@@ -207,6 +277,12 @@ class CliHermes:
         self.timeout = timeout
         self.runner = runner
         self.last_reason: str | None = None
+        # separated hermes latency for investigation (no cache across cases)
+        self.last_attempt_1_ms: int = 0
+        self.last_attempt_2_ms: int = 0
+        self.last_total_ms: int = 0
+        self.last_sequence_ms: int = 0
+        self.last_picker_ms: int = 0
 
     def _run_once(self, prompt: str) -> str:
         try:
@@ -238,21 +314,39 @@ class CliHermes:
 
     def _invoke(self, prompt: str, parser: Callable[[str], Any]) -> Any:
         last: HermesPlannerError | None = None
+        self.last_attempt_1_ms = 0
+        self.last_attempt_2_ms = 0
+        self.last_total_ms = 0
+        total_start = time.perf_counter()
         for attempt in range(2):
+            start = time.perf_counter()
             try:
                 result = parser(self._run_once(prompt))
                 self.last_reason = None
+                elapsed = int((time.perf_counter() - start) * 1000)
+                if attempt == 0:
+                    self.last_attempt_1_ms = elapsed
+                else:
+                    self.last_attempt_2_ms = elapsed
+                self.last_total_ms = int((time.perf_counter() - total_start) * 1000)
                 return result
             except HermesPlannerError as exc:
                 wrapped = exc
             except ValueError as exc:
                 wrapped = self._parse_failure(exc)
+            elapsed = int((time.perf_counter() - start) * 1000)
+            if attempt == 0:
+                self.last_attempt_1_ms = elapsed
+            else:
+                self.last_attempt_2_ms = elapsed
             self.last_reason = wrapped.code
             last = wrapped
             if attempt == 0 and wrapped.retryable:
                 continue
+            self.last_total_ms = int((time.perf_counter() - total_start) * 1000)
             raise wrapped
         assert last is not None
+        self.last_total_ms = int((time.perf_counter() - total_start) * 1000)
         raise last
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
@@ -292,12 +386,22 @@ class FallbackHermes:
         self.hermes_cli_succeeded = False
         self.hermes_fallback_used = False
         self.hermes_failure_reason: str | None = None
+        # separated latency (no cross-case cache)
+        self.last_attempt_1_ms: int = 0
+        self.last_attempt_2_ms: int = 0
+        self.last_total_ms: int = 0
+        self.last_hermes_sequence_ms: int = 0
 
     def _mark_primary_success(self) -> None:
         # called only when primary succeeded (no exception)
         self.last_mode = getattr(self.primary, "last_mode", "http")
         self.last_planner_mode = self.last_mode
         self.last_reason = getattr(self.primary, "last_reason", None)
+        # propagate separated latency
+        self.last_attempt_1_ms = int(getattr(self.primary, "last_attempt_1_ms", 0) or 0)
+        self.last_attempt_2_ms = int(getattr(self.primary, "last_attempt_2_ms", 0) or 0)
+        self.last_total_ms = int(getattr(self.primary, "last_total_ms", 0) or 0)
+        self.last_hermes_sequence_ms = self.last_total_ms
         # success semantics: cli_used true only on actual CLI success
         if self.last_mode in ("cli", "http"):
             self.cli_used = True
@@ -326,6 +430,11 @@ class FallbackHermes:
         self.last_mode = fallback_mode
         self.last_planner_mode = fallback_mode
         self.hermes_cli_attempted = True
+        # capture attempted latency even on failure
+        self.last_attempt_1_ms = int(getattr(self.primary, "last_attempt_1_ms", 0) or 0)
+        self.last_attempt_2_ms = int(getattr(self.primary, "last_attempt_2_ms", 0) or 0)
+        self.last_total_ms = int(getattr(self.primary, "last_total_ms", 0) or 0)
+        self.last_hermes_sequence_ms = self.last_total_ms
         # do NOT set cli_used on failure — success only
         self.hermes_fallback_used = True
         self.hermes_failure_reason = getattr(self.primary, "last_reason", None)
@@ -361,6 +470,10 @@ class FallbackHermes:
             self.hermes_fallback_used = True
             self.hermes_failure_reason = getattr(self.primary, "last_reason", None)
             self.last_reason = self.hermes_failure_reason
+            self.last_attempt_1_ms = int(getattr(self.primary, "last_attempt_1_ms", 0) or 0)
+            self.last_attempt_2_ms = int(getattr(self.primary, "last_attempt_2_ms", 0) or 0)
+            self.last_total_ms = int(getattr(self.primary, "last_total_ms", 0) or 0)
+            self.last_hermes_sequence_ms = self.last_total_ms
             # do not set cli_used
             fallback_mode = getattr(self.fallback, "last_mode", "deterministic")
             self.last_mode = fallback_mode

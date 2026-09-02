@@ -198,6 +198,12 @@ class AuditEventRow(Base):
     created_at: Mapped[str] = mapped_column(DateTime)
     planner: Mapped[str | None] = mapped_column(String(40), nullable=True)
     execution: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    planner_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    handler_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hermes_attempt_1_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hermes_attempt_2_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    hermes_sequence_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    ocr_total_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class JobRow(Base):
@@ -267,6 +273,18 @@ def _migrate_audit_events(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE audit_events ADD COLUMN planner VARCHAR(40)"))
         if "execution" not in names:
             conn.execute(text("ALTER TABLE audit_events ADD COLUMN execution VARCHAR(40)"))
+        if "planner_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN planner_ms INTEGER"))
+        if "handler_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN handler_ms INTEGER"))
+        if "hermes_attempt_1_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN hermes_attempt_1_ms INTEGER"))
+        if "hermes_attempt_2_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN hermes_attempt_2_ms INTEGER"))
+        if "hermes_sequence_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN hermes_sequence_ms INTEGER"))
+        if "ocr_total_ms" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN ocr_total_ms INTEGER"))
 
 
 def _migrate_approvals(engine: Engine) -> None:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+
 from sqlalchemy.orm import Session
 
 from app.config import Settings
@@ -69,6 +71,7 @@ class InspectService:
     def inspect_evidence(self, case_id: str) -> dict[str, object]:
         items = self.evidence.list_for_case(case_id)
         results: list[dict[str, object]] = []
+        ocr_total_ms = 0
         for item in items:
             data = self.storage.read_bytes(case_id, item.storage_key)
             pages: list[PageText] = []
@@ -82,10 +85,13 @@ class InspectService:
                         warning = "MANUAL_REVIEW_REQUIRED"
                 else:
                     try:
+                        ocr_start = time.perf_counter()
                         text = self.ocr.recognize(data)
+                        ocr_total_ms += int((time.perf_counter() - ocr_start) * 1000)
                         boxes = []
                         recognize_boxes = getattr(self.ocr, "recognize_boxes", None)
                         if callable(recognize_boxes):
+                            # recognize_boxes already cached, not timed doubly (cache hit 0ms)
                             boxes = list(recognize_boxes(data))
                         pages = [PageText(page=1, text=text, boxes=boxes)]
                     except Exception:
@@ -119,13 +125,14 @@ class InspectService:
         case = self.case_repo.get(case_id)
         if case.state == State.INGESTING:
             self.cases.set_state(case, State.EXTRACTING, event_type="INSPECT_DONE")
-        return {"evidence": results}
+        return {"evidence": results, "ocr_total_ms": ocr_total_ms}
 
     def extract_candidate_facts(self, case_id: str) -> dict[str, object]:
         items = self.evidence.list_for_case(case_id)
         created = 0
         unauthorized_tool = False
         used_model = False
+        model_total_ms = 0
         for item in items:
             if not item.extracted_text_ref:
                 continue
@@ -153,7 +160,9 @@ class InspectService:
                 self.facts.add(fact)
                 created += 1
                 continue
+            m_start = time.perf_counter()
             extras = extract_with_model(text_all, self.settings)
+            model_total_ms += int((time.perf_counter() - m_start) * 1000)
             if extras:
                 used_model = True
             for page in pages:
@@ -184,7 +193,7 @@ class InspectService:
             case = self.case_repo.get(case_id)
             case.route_reason = "MANUAL_REVIEW_REQUIRED"
             self.cases.touch(case)
-        return {"candidates": created, "unauthorized_tool": unauthorized_tool, "model_used": used_model}
+        return {"candidates": created, "unauthorized_tool": unauthorized_tool, "model_used": used_model, "model_total_ms": model_total_ms}
 
     def validate_case_facts(self, case_id: str) -> dict[str, object]:
         facts = self.facts.list_for_case(case_id)

@@ -51,6 +51,9 @@ class Orchestrator:
         planned: list[str] | None = None
         planned_mode = "deterministic"
         seq_ms = 0
+        seq_attempt_1_ms = 0
+        seq_attempt_2_ms = 0
+        seq_total_ms = 0
         seq_fn = getattr(self.hermes, "propose_sequence", None)
         if seq_fn is not None:
             started = time.perf_counter()
@@ -62,6 +65,10 @@ class Orchestrator:
             except Exception:
                 planned = None
             seq_ms = int((time.perf_counter() - started) * 1000)
+            # capture separated hermes attempt timings (no cross-case cache)
+            seq_attempt_1_ms = int(getattr(self.hermes, "last_attempt_1_ms", 0) or 0)
+            seq_attempt_2_ms = int(getattr(self.hermes, "last_attempt_2_ms", 0) or 0)
+            seq_total_ms = int(getattr(self.hermes, "last_total_ms", seq_ms) or seq_ms)
         for _ in range(16):
             case = self.case_repo.get(case_id)
             if self._should_pause(case.state, trace):
@@ -86,10 +93,15 @@ class Orchestrator:
                     forced = "recommend_next_action"
             source_mode = planned_mode
             pick_ms = 0
+            pick_attempt_1_ms = 0
+            pick_attempt_2_ms = 0
             tool: str | None = None
             if forced and forced in allowed_tools(case.state.value):
                 tool = forced
                 source_mode = "deterministic"
+                # keep planned sequence in sync to avoid duplicate/redundant Hermes picker after forced deterministic step
+                if planned and planned[0] == forced:
+                    planned.pop(0)
             elif planned:
                 tool = planned.pop(0)
                 if tool not in allowed_tools(case.state.value):
@@ -98,11 +110,15 @@ class Orchestrator:
                     tool = self.hermes.propose_tool(case.state.value, summary)
                     pick_ms = int((time.perf_counter() - started) * 1000)
                     source_mode = mode_from_hermes(self.hermes)
+                    pick_attempt_1_ms = int(getattr(self.hermes, "last_attempt_1_ms", 0) or 0)
+                    pick_attempt_2_ms = int(getattr(self.hermes, "last_attempt_2_ms", 0) or 0)
             else:
                 started = time.perf_counter()
                 tool = self.hermes.propose_tool(case.state.value, summary)
                 pick_ms = int((time.perf_counter() - started) * 1000)
                 source_mode = mode_from_hermes(self.hermes)
+                pick_attempt_1_ms = int(getattr(self.hermes, "last_attempt_1_ms", 0) or 0)
+                pick_attempt_2_ms = int(getattr(self.hermes, "last_attempt_2_ms", 0) or 0)
             if tool is None:
                 break
             if tool == "validate_case_facts" and case.state == State.REVIEW_REQUIRED and tool in trace:
@@ -149,10 +165,33 @@ class Orchestrator:
                 self.cases.set_state(case, State.VERIFYING, event_type="GENERATING_DONE", run_id=run_id)
             if tool == "verify_artifacts" and case.state == State.VERIFYING:
                 self.cases.set_state(case, State.HANDOFF_READY, event_type="HANDOFF_READY", run_id=run_id)
-            duration = int(result.get("duration_ms") or 0) + pick_ms
-            if seq_ms:
-                duration += seq_ms
+            handler_ms = int(result.get("duration_ms") or 0)
+            # ocr vs model latency (both external, not local)
+            ocr_ms = 0
+            if tool == "inspect_evidence":
+                ocr_ms = int(result.get("ocr_total_ms") or 0)
+            elif tool == "extract_candidate_facts":
+                ocr_ms = int(result.get("model_total_ms") or 0)
+            # separated planner vs handler (do not misattribute Hermes to build_postincident_plan)
+            is_first = (seq_ms != 0)
+            planner_ms = pick_ms + (seq_ms if is_first else 0)
+            # attempt breakdown: sequence attempts for first tool, picker attempts otherwise
+            if is_first and seq_total_ms:
+                hermes_attempt_1_ms = seq_attempt_1_ms if seq_attempt_1_ms else pick_attempt_1_ms
+                hermes_attempt_2_ms = seq_attempt_2_ms if seq_attempt_2_ms else pick_attempt_2_ms
+                hermes_sequence_ms = seq_ms
+            else:
+                hermes_attempt_1_ms = pick_attempt_1_ms
+                hermes_attempt_2_ms = pick_attempt_2_ms
+                hermes_sequence_ms = 0
+            # keep total duration for backward compat but store separated
+            duration = handler_ms + planner_ms
+            # consume sequence only once
+            if is_first:
                 seq_ms = 0
+                seq_attempt_1_ms = 0
+                seq_attempt_2_ms = 0
+                seq_total_ms = 0
             self._trace(
                 case_id,
                 run_id,
@@ -162,6 +201,12 @@ class Orchestrator:
                 None,
                 duration,
                 source_mode,
+                planner_ms=planner_ms,
+                handler_ms=handler_ms,
+                hermes_attempt_1_ms=hermes_attempt_1_ms,
+                hermes_attempt_2_ms=hermes_attempt_2_ms,
+                hermes_sequence_ms=hermes_sequence_ms,
+                ocr_total_ms=ocr_ms if ocr_ms else None,
             )
             if self._should_pause(self.case_repo.get(case_id).state, trace):
                 break
@@ -214,6 +259,12 @@ class Orchestrator:
         error: str | None,
         duration: int | None,
         source_mode: str = "deterministic",
+        planner_ms: int | None = None,
+        handler_ms: int | None = None,
+        hermes_attempt_1_ms: int | None = None,
+        hermes_attempt_2_ms: int | None = None,
+        hermes_sequence_ms: int | None = None,
+        ocr_total_ms: int | None = None,
     ) -> None:
         self.events.add(
             AuditEventRecord(
@@ -232,5 +283,11 @@ class Orchestrator:
                 created_at=now_utc(),
                 planner=planner_for(tool, source_mode),
                 execution=execution_for(tool),
+                planner_ms=planner_ms,
+                handler_ms=handler_ms,
+                hermes_attempt_1_ms=hermes_attempt_1_ms,
+                hermes_attempt_2_ms=hermes_attempt_2_ms,
+                hermes_sequence_ms=hermes_sequence_ms,
+                ocr_total_ms=ocr_total_ms,
             )
         )

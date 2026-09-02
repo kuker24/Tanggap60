@@ -45,6 +45,13 @@ def main() -> None:
     min_disk = 10**9
     max_queue = 0
     tool_ms: dict[str, list[int]] = {}
+    tool_handler_ms: dict[str, list[int]] = {}
+    tool_planner_ms: dict[str, list[int]] = {}
+    ocr_ms_list: list[int] = []
+    hermes_seq_ms_list: list[int] = []
+    hermes_attempt_1_list: list[int] = []
+    hermes_attempt_2_list: list[int] = []
+    local_ms_list: list[int] = []
     hermes_configured_count = 0
     hermes_attempted_count = 0
     hermes_reasoning_success = 0
@@ -75,11 +82,29 @@ def main() -> None:
         if disk:
             min_disk = min(min_disk, disk)
         max_queue = max(max_queue, _metric(metrics, "job_queue_depth"))
+        # separated metrics per run
+        ocr_sum = 0
+        seq_sum = 0
+        att1_sum = 0
+        att2_sum = 0
+        local_sum = 0
         for step in result.get("trace_steps") or []:
             name = str(step.get("tool_name") or "")
             if not name:
                 continue
             tool_ms.setdefault(name, []).append(int(step.get("duration_ms") or 0))
+            tool_handler_ms.setdefault(name, []).append(int(step.get("handler_ms") or step.get("local_processing_ms") or step.get("duration_ms") or 0))
+            tool_planner_ms.setdefault(name, []).append(int(step.get("planner_ms") or 0))
+            ocr_sum += int(step.get("ocr_total_ms") or 0)
+            seq_sum += int(step.get("hermes_sequence_ms") or 0)
+            att1_sum += int(step.get("hermes_attempt_1_ms") or 0)
+            att2_sum += int(step.get("hermes_attempt_2_ms") or 0)
+            local_sum += int(step.get("handler_ms") or step.get("local_processing_ms") or 0)
+        ocr_ms_list.append(ocr_sum)
+        hermes_seq_ms_list.append(seq_sum)
+        hermes_attempt_1_list.append(att1_sum)
+        hermes_attempt_2_list.append(att2_sum)
+        local_ms_list.append(local_sum)
         # Hermes telemetry
         configured = bool(result.get("hermes_cli_configured") or result.get("hermes_cli_used"))
         reasoning_fb = int(result.get("hermes_reasoning_fallback", 0))
@@ -100,7 +125,8 @@ def main() -> None:
         print(
             f"run={index + 1}/{runs} elapsed_s={result['elapsed_s']} "
             f"hermes_cli_used={result.get('hermes_cli_used')} configured={configured} reason_fb={reasoning_fb} "
-            f"rss={metrics.get('process_rss_mb')} ram={metrics.get('available_ram_mb')} disk={metrics.get('disk_free_mb')}"
+            f"rss={metrics.get('process_rss_mb')} ram={metrics.get('available_ram_mb')} disk={metrics.get('disk_free_mb')} "
+            f"ocr_ms={ocr_sum} seq_ms={seq_sum} att1={att1_sum} att2={att2_sum} local_ms={local_sum}"
         )
     success = runs - failed
     if not times:
@@ -137,8 +163,17 @@ def main() -> None:
     print(f"Hermes CLI used   {'YES' if cli_count == runs and success == runs else 'NO'} ({cli_count}/{runs} cli)")
     print(f"Hermes reasoning  {hermes_reasoning_success}/{runs}")
     print(f"fallback          {reasoning_fallback_count}")
+    # separated aggregates
+    if ocr_ms_list:
+        print(f"ocr_total_ms      p50={int(statistics.median(ocr_ms_list))} max={max(ocr_ms_list)}")
+        print(f"hermes_sequence_ms p50={int(statistics.median(hermes_seq_ms_list))} max={max(hermes_seq_ms_list)}")
+        print(f"hermes_attempt_1_ms p50={int(statistics.median(hermes_attempt_1_list))} max={max(hermes_attempt_1_list)}")
+        print(f"hermes_attempt_2_ms p50={int(statistics.median(hermes_attempt_2_list))} max={max(hermes_attempt_2_list)}")
+        print(f"local_processing_ms p50={int(statistics.median(local_ms_list))} max={max(local_ms_list)}")
     for name, samples in sorted(tool_ms.items()):
-        print(f"tool {name} p50_ms={int(statistics.median(samples))} max_ms={max(samples)}")
+        h_samples = tool_handler_ms.get(name, [])
+        p_samples = tool_planner_ms.get(name, [])
+        print(f"tool {name} p50_total={int(statistics.median(samples))} max_total={max(samples)} p50_handler={int(statistics.median(h_samples)) if h_samples else 0} p50_planner={int(statistics.median(p_samples)) if p_samples else 0}")
     # Strict acceptance when hermes configured
     hermes_strict_required = hermes_configured_count > 0
     if hermes_strict_required:

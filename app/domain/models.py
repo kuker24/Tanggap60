@@ -384,3 +384,10 @@ class AuditEventRecord:
     created_at: datetime
     planner: str | None = None
     execution: str | None = None
+    # separated latency (no cross-case cache, per-tool)
+    planner_ms: int | None = None
+    handler_ms: int | None = None
+    hermes_attempt_1_ms: int | None = None
+    hermes_attempt_2_ms: int | None = None
+    hermes_sequence_ms: int | None = None
+    ocr_total_ms: int | None = None
