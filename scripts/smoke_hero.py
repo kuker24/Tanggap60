@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import time
 import uuid
 from pathlib import Path
 
@@ -45,19 +46,28 @@ def main() -> None:
         ],
     )
     up.raise_for_status()
+    _keep_session(client, up)
     run = client.post(
         f"/api/v1/cases/{case_id}/runs",
         headers={"Idempotency-Key": f"smoke-{uuid.uuid4().hex[:8]}"},
     )
     run.raise_for_status()
-    body = run.json()
-    tools = body.get("trace") or []
-    print(
-        f"HERO_SMOKE_PASS state={body.get('state')} tools={len(tools)} "
-        f"hermes={body.get('hermes_mode')} trace={tools}"
-    )
-    if body.get("state") not in {"REVIEW_REQUIRED", "READY_FOR_ACTION", "WAITING_APPROVAL", "HANDOFF_READY"}:
-        raise SystemExit(f"unexpected state {body.get('state')}")
+    _keep_session(client, run)
+    state = run.json().get("state")
+    tools = run.json().get("trace") or []
+    deadline = time.time() + 30
+    while state in {"NEW", "INGESTING", "EXTRACTING", "queued"} and time.time() < deadline:
+        time.sleep(0.4)
+        status = client.get(f"/api/v1/cases/{case_id}")
+        status.raise_for_status()
+        _keep_session(client, status)
+        state = status.json().get("state")
+        events = client.get(f"/api/v1/cases/{case_id}/events")
+        if events.status_code == 200:
+            tools = [e.get("tool_name") for e in events.json().get("events", []) if e.get("tool_name")]
+    print(f"HERO_SMOKE_PASS state={state} tools={len(tools)} trace={tools}")
+    if state not in {"REVIEW_REQUIRED", "READY_FOR_ACTION", "WAITING_APPROVAL", "HANDOFF_READY"}:
+        raise SystemExit(f"unexpected state {state}")
 
 
 if __name__ == "__main__":
