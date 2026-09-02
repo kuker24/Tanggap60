@@ -377,12 +377,12 @@ def run_rescue_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     if state not in {"REVIEW_REQUIRED", "READY_FOR_ACTION"}:
         raise SystemExit(f"unexpected state after ingest {state} tools={_tools(client, case_id)}")
     _resolve_conflicts(client, case_id)
-    # Human fact review: confirm only Unit A facts, leave Unit B time as CANDIDATE to make it INCOMPLETE initially
-    # Confirm all facts for A, plus chat claim? Chat not critical, but we confirm A only
+    # Human fact review: confirm Unit A fully, and Unit B partially (dest+amount) leaving time CANDIDATE to make B INCOMPLETE
     if evid_a:
         _confirm_facts_for_evidence(client, case_id, evid_a)
-    # Also confirm chat? Not needed for READY check but we keep shared evidence available via image already
-    # Do not confirm B yet — leave its time/dest/amount as CANDIDATE for now to create INCOMPLETE
+    if evid_b:
+        _confirm_facts_for_evidence(client, case_id, evid_b, only_types={"ACCOUNT", "PJP", "AMOUNT"})
+    # chat communication already available as image, no need to confirm
     # Call draft to trigger compile_reporting_units, assess, recommend
     draft = _call(client, "POST", f"/api/v1/cases/{case_id}/draft")
     draft.raise_for_status()
