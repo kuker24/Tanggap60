@@ -55,3 +55,9 @@ textarea { min-height: 90px; }
 table { width: 100%; border-collapse: collapse; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; }
 th, td { text-align: left; padding: 8px; border-bottom: 1px solid var(--line); }
 .live { min-height: 1.5em; }
+.cards-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 768px) { .cards-3 { grid-template-columns: 1fr; } }
+.card.status-ready { border-color: var(--green); }
+.card.status-needs_action { border-color: var(--amber); }
+.card.status-blocked { border-color: var(--red); }
+.gaps { padding-left: 1.1rem; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 14px; }

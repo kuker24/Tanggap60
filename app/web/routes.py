@@ -19,6 +19,7 @@ from app.infrastructure.repositories import (
     EvidenceRepository,
     FactRepository,
     ReceiptRepository,
+    TransactionRepository,
 )
 from app.infrastructure.resources import available_ram_mb, process_rss_mb
 
@@ -125,6 +126,27 @@ def review(case_id: str, request: Request):
             "evidence_names": {e.evidence_id: e.original_name_display for e in evidence},
             "conflicts": [conflict_public(c) for c in conflicts],
         },
+    )
+
+
+@web.get("/cases/{case_id}/readiness")
+def readiness_page(case_id: str, request: Request):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    from app.services.readiness import assess, public_report
+
+    report = public_report(
+        assess(
+            case_id=case_id,
+            route=case.route,
+            facts=FactRepository(request.state.db).list_for_case(case_id),
+            conflicts=ConflictRepository(request.state.db).list_for_case(case_id),
+            evidence=EvidenceRepository(request.state.db).list_for_case(case_id),
+            transactions=TransactionRepository(request.state.db).list_for_case(case_id),
+        )
+    )
+    return TEMPLATES.TemplateResponse(
+        "readiness.html",
+        {"request": request, "case": case, "report": report},
     )
 
 

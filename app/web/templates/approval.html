@@ -6,6 +6,7 @@
 <p class="card block">Selesaikan {{ blocking|length }} konflik nominal terlebih dahulu.</p>
 <a class="btn" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a>
 {% else %}
+<p><a href="/cases/{{ case.case_id }}/readiness">Lihat kesiapan Bank/PJP, IASC, dan Kepolisian</a></p>
 <p>Snapshot: <code>{{ snapshot_hash }}</code></p>
 <label>
   <input id="notice" type="checkbox">

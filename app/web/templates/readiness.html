@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Kesiapan handoff{% endblock %}
+{% block content %}
+<h1>Cek kelengkapan sebelum ke kanal resmi</h1>
+<p class="lede">{{ report.disclaimer }} Status resmi tetap NOT_VERIFIED. Tanggap60 tidak mengirim laporan.</p>
+<p class="muted">Profil {{ report.profile_version }} · {{ report.overall_label }}</p>
+<div class="cards-3">
+  {% for channel in report.channels %}
+  <article class="card status-{{ channel.status|lower }}">
+    <h2>{{ channel.label }}</h2>
+    <p><span class="badge {% if channel.status == 'READY' %}ok{% elif channel.status == 'BLOCKED' %}err{% endif %}">{{ channel.status_label }}</span></p>
+    <p>{{ channel.checks_met }}/{{ channel.checks_total }} pemeriksaan terpenuhi</p>
+    <ul class="gaps">
+      {% for check in channel.checks if check.status in ['MISSING', 'CONFLICT'] %}
+      <li>{{ check.label }} — {{ check.action or check.reason }}</li>
+      {% endfor %}
+      {% for check in channel.checks if check.status == 'PREPARE_EXTERNALLY' %}
+      <li class="muted">{{ check.label }}</li>
+      {% endfor %}
+    </ul>
+    <p><a class="btn ghost" href="/cases/{{ case.case_id }}/review">Perbaiki kekurangan</a></p>
+  </article>
+  {% endfor %}
+</div>
+<p class="row">
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/review">Kembali ke fakta</a>
+  <a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana</a>
+</p>
+{% endblock %}
+{% block rail %}
+<h2>{{ case.state.value }}</h2>
+<p class="muted">Pemeriksaan internal. Bukan jaminan laporan diterima.</p>
+{% endblock %}

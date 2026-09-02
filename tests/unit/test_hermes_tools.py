@@ -9,6 +9,7 @@ from app.hermes.adapter import (
     CliHermes,
     DeterministicHermes,
     FallbackHermes,
+    HermesPlannerError,
     MechanicalPlan,
     build_hermes,
     parse_tool_reply,
@@ -25,6 +26,7 @@ def test_tool_catalog_covers_hero_loop() -> None:
         "extract_candidate_facts",
         "validate_case_facts",
         "build_postincident_plan",
+        "assess_handoff_readiness",
         "compile_artifacts",
         "verify_artifacts",
         "prepare_official_handoff",
@@ -32,7 +34,7 @@ def test_tool_catalog_covers_hero_loop() -> None:
         "purge_case",
     }:
         assert required in names
-    assert len(TOOL_SPECS) == 10
+    assert len(TOOL_SPECS) == 11
 
 
 def test_deterministic_handoff_after_verify() -> None:
@@ -100,6 +102,43 @@ def test_fallback_uses_deterministic_when_cli_fails() -> None:
     hermes = FallbackHermes(CliHermes(command=["hermes"], runner=boom), DeterministicHermes())
     assert hermes.propose_tool("INGESTING", {}) == "inspect_evidence"
     assert hermes.last_mode == "deterministic"
+    assert hermes.last_reason == "HERMES_NONZERO"
+
+
+def test_cli_retries_once_then_succeeds() -> None:
+    calls = {"n": 0}
+
+    def flaky(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return subprocess.CompletedProcess(args=["hermes"], returncode=1, stdout="", stderr="secret")
+        return subprocess.CompletedProcess(
+            args=["hermes"],
+            returncode=0,
+            stdout='{"tool": "inspect_evidence"}',
+            stderr="",
+        )
+
+    hermes = CliHermes(command=["hermes"], runner=flaky)
+    assert hermes.propose_tool("INGESTING", {"allowed_tools": ["inspect_evidence"]}) == "inspect_evidence"
+    assert calls["n"] == 2
+    assert hermes.last_reason is None
+    assert not hasattr(hermes, "last_stderr")
+
+
+def test_cli_reason_code_without_stderr() -> None:
+    def boom(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(cmd="hermes", timeout=1)
+
+    hermes = CliHermes(command=["hermes"], runner=boom)
+    try:
+        hermes.propose_tool("INGESTING", {"allowed_tools": ["inspect_evidence"]})
+    except HermesPlannerError as exc:
+        assert exc.code == "HERMES_TIMEOUT"
+        assert hermes.last_reason == "HERMES_TIMEOUT"
+        assert "secret" not in str(exc)
+        return
+    raise AssertionError("expected HermesPlannerError")
 
 
 def test_planner_labels() -> None:

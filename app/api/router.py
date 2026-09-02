@@ -68,6 +68,28 @@ def get_case(case_id: str, request: Request) -> dict[str, Any]:
     return case_summary(request.state.db, case)
 
 
+@api.get("/cases/{case_id}/readiness")
+def get_readiness(case_id: str, request: Request) -> dict[str, Any]:
+    case = svc(request)["cases"].get_owned(case_id, sid(request))
+    from app.infrastructure.repositories import (
+        ConflictRepository,
+        EvidenceRepository,
+        FactRepository,
+        TransactionRepository,
+    )
+    from app.services.readiness import assess, public_report
+
+    report = assess(
+        case_id=case_id,
+        route=case.route,
+        facts=FactRepository(request.state.db).list_for_case(case_id),
+        conflicts=ConflictRepository(request.state.db).list_for_case(case_id),
+        evidence=EvidenceRepository(request.state.db).list_for_case(case_id),
+        transactions=TransactionRepository(request.state.db).list_for_case(case_id),
+    )
+    return public_report(report)
+
+
 @api.delete("/cases/{case_id}")
 def delete_case(case_id: str, request: Request, payload: dict[str, str] | None = None) -> dict[str, str]:
     confirmation = (payload or {}).get("confirmation", "")

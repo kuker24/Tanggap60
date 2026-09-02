@@ -102,7 +102,11 @@ TOOLS_BY_STATE: dict[State, tuple[str, ...]] = {
     State.INGESTING: ("inspect_evidence",),
     State.EXTRACTING: ("extract_candidate_facts", "validate_case_facts"),
     State.REVIEW_REQUIRED: ("validate_case_facts",),
-    State.READY_FOR_ACTION: ("build_preincident_brief", "build_postincident_plan"),
+    State.READY_FOR_ACTION: (
+        "build_preincident_brief",
+        "build_postincident_plan",
+        "assess_handoff_readiness",
+    ),
     State.WAITING_APPROVAL: (),
     State.GENERATING: ("compile_artifacts",),
     State.VERIFYING: ("verify_artifacts",),

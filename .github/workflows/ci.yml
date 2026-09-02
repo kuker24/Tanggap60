@@ -15,5 +15,5 @@ jobs:
       - run: python -m pip install -e ".[dev,ocr]"
       - run: python scripts/make_demo_fixtures.py
       - run: pytest -q
-      - run: ruff check app tests
+      - run: ruff check app tests scripts/smoke_*.py scripts/benchmark_vps.py
       - run: mypy app

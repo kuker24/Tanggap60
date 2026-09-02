@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import zipfile
-from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -25,7 +24,9 @@ from app.infrastructure.repositories import (
 )
 from app.infrastructure.storage import CaseStorage
 from app.services.approval import ApprovalService
+from app.services.cases import now_utc
 from app.services.ids import new_id
+from app.services.readiness import assess, public_report
 from app.templates.pdf import render_lines
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "case.schema.json"
@@ -61,7 +62,7 @@ class ArtifactService:
         payload, digest = self.approval.current_snapshot(case_id)
         if digest != snapshot_hash:
             raise ArtifactVerifyFailed("snapshot berubah")
-        generated_at = datetime(2026, 9, 23, 9, 1, tzinfo=UTC).isoformat()
+        generated_at = now_utc().isoformat()
         existing = self.artifacts.list_for_case(case_id)
         if existing and all(a.source_snapshot_hash == snapshot_hash for a in existing):
             return existing
@@ -69,8 +70,32 @@ class ArtifactService:
         if case.route == Route.PRE_INCIDENT_CHECK:
             built.append(self._store_pdf(case_id, ArtifactType.VERIFICATION_BRIEF, self._brief_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
         else:
+            report = self._readiness(case_id)
             built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
             built.append(self._store_pdf(case_id, ArtifactType.EVIDENCE_PACK, self._pack_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
+            built.append(
+                self._store_pdf(
+                    case_id,
+                    ArtifactType.READINESS_REPORT,
+                    self._readiness_lines(case_id, snapshot_hash, report),
+                    generated_at,
+                    snapshot_hash,
+                )
+            )
+            for artifact_type, channel in (
+                (ArtifactType.BANK_HANDOFF_PACK, "BANK_PJP"),
+                (ArtifactType.IASC_HANDOFF_PACK, "IASC"),
+                (ArtifactType.POLICE_HANDOFF_PACK, "POLICE"),
+            ):
+                built.append(
+                    self._store_pdf(
+                        case_id,
+                        artifact_type,
+                        self._channel_pack_lines(case_id, snapshot_hash, report, channel),
+                        generated_at,
+                        snapshot_hash,
+                    )
+                )
         case_json = self._case_json(case_id, snapshot_hash, generated_at)
         built.append(self._store_bytes(case_id, ArtifactType.CASE_JSON, json.dumps(case_json, ensure_ascii=False, indent=2).encode(), "application/json", snapshot_hash, "case.json"))
         checklist = self._checklist_text(case_id)
@@ -200,8 +225,11 @@ class ArtifactService:
         actions = self.actions.list_for_case(case_id)
         txs = self.transactions.list_for_case(case_id)
         artifacts = self.artifacts.list_for_case(case_id)
+        active = self.approval.approvals.active_for_case(case_id)
+        if active is None:
+            raise ArtifactVerifyFailed("persetujuan tidak ditemukan")
         return {
-            "schema_version": "2.0",
+            "schema_version": "2.1" if case.route == Route.POST_INCIDENT_RESPONSE else "2.0",
             "case_id": case.case_id,
             "mode": case.mode.value,
             "route": case.route.value,
@@ -244,7 +272,7 @@ class ArtifactService:
                     "destination_account": t.destination_account,
                     "amount": t.amount,
                     "currency": "IDR",
-                    "transferred_at": t.transferred_at if t.transferred_at and "T" in t.transferred_at else "2026-09-23T01:42:00Z",
+                    "transferred_at": transaction_time_or_none(t.transferred_at),
                 }
                 for t in txs
             ],
@@ -260,10 +288,10 @@ class ArtifactService:
             ],
             "approval": {
                 "actor": "USER",
-                "scope": "PRE_BRIEF" if case.route == Route.PRE_INCIDENT_CHECK else "POST_CASE_PACK",
+                "scope": active.scope.value,
                 "snapshot_hash": snapshot_hash,
-                "approved_at": generated_at,
-                "notice_version": payload_notice(),
+                "approved_at": active.approved_at.isoformat(),
+                "notice_version": active.notice_version,
             },
             "artifacts": [
                 {
@@ -278,6 +306,7 @@ class ArtifactService:
             "receipt": None,
             "official_status": "NOT_VERIFIED",
             "disclaimer": "Tanggap60 tidak mengirim laporan dan tidak memverifikasi status resmi tiket.",
+            "readiness": public_report(self._readiness(case_id)) if case.route == Route.POST_INCIDENT_RESPONSE else None,
         }
 
     def _zip_bytes(self, case_id: str, artifacts: list[ArtifactRecord]) -> bytes:
@@ -295,6 +324,10 @@ class ArtifactService:
             "VERIFICATION_BRIEF": "verification_brief.pdf",
             "ACTION_PLAN": "action_plan.pdf",
             "EVIDENCE_PACK": "evidence_pack.pdf",
+            "READINESS_REPORT": "readiness_report.pdf",
+            "BANK_HANDOFF_PACK": "bank_handoff_pack.pdf",
+            "IASC_HANDOFF_PACK": "iasc_handoff_pack.pdf",
+            "POLICE_HANDOFF_PACK": "police_handoff_pack.pdf",
             "CASE_JSON": "case.json",
             "CHECKLIST": "handoff.md",
             "MANIFEST": "manifest.sha256",
@@ -306,11 +339,88 @@ class ArtifactService:
         if contains_absolute_copy(text):
             raise ArtifactVerifyFailed("salinan mutlak tidak diizinkan")
 
+    def _readiness(self, case_id: str) -> dict[str, Any]:
+        case = self.cases.get(case_id)
+        return assess(
+            case_id=case_id,
+            route=case.route,
+            facts=self.facts.list_for_case(case_id),
+            conflicts=self.conflicts.list_for_case(case_id),
+            evidence=self.evidence.list_for_case(case_id),
+            transactions=self.transactions.list_for_case(case_id),
+        )
+
+    def _safety_header(self, case_id: str, snapshot_hash: str, profile_version: str, incomplete: bool) -> list[str]:
+        lines = [
+            f"Kasus {case_id}",
+            "DRAF PENGGUNA — BUKAN DOKUMEN RESMI",
+            "STATUS RESMI: NOT_VERIFIED",
+            "Tanggap60 tidak mengirim laporan dan tidak menjamin dana kembali atau penerimaan laporan.",
+            f"Profile kesiapan {profile_version}",
+            f"Snapshot {snapshot_hash}",
+        ]
+        if incomplete:
+            lines.insert(2, "BELUM LENGKAP — PERLU TINDAKAN")
+        return lines
+
+    def _readiness_lines(self, case_id: str, snapshot_hash: str, report: dict[str, Any]) -> list[str]:
+        lines = self._safety_header(case_id, snapshot_hash, str(report["profile_version"]), report["overall_status"] != "READY")
+        lines.append("Ringkasan kesiapan tiga kanal")
+        for channel in report["channels"]:
+            lines.append(
+                f"{channel['label']}: {channel['status_label']} ({channel['checks_met']}/{channel['checks_total']})"
+            )
+            for check in channel["checks"]:
+                lines.append(f"- {check['check_id']} {check['status']}: {check['reason']}")
+        lines.append(str(report["disclaimer"]))
+        return lines
+
+    def _channel_pack_lines(
+        self,
+        case_id: str,
+        snapshot_hash: str,
+        report: dict[str, Any],
+        channel: str,
+    ) -> list[str]:
+        block = next(item for item in report["channels"] if item["channel"] == channel)
+        incomplete = block["status"] != "READY"
+        lines = self._safety_header(case_id, snapshot_hash, str(report["profile_version"]), incomplete)
+        lines.append(f"Paket handoff {block['label']}")
+        lines.append("Ringkasan kejadian dari fakta yang sudah ditinjau:")
+        for fact in self.facts.list_for_case(case_id):
+            if fact.review_status == ReviewStatus.CANDIDATE:
+                continue
+            lines.append(
+                f"- {fact.type.value} ({fact.review_status.value}) sumber {fact.source_evidence_id} {fact.source_bbox or 'locator'}"
+            )
+        if any(c["check_id"].endswith("CHRONOLOGY") and c["status"] == "MET" for c in block["checks"]):
+            lines.append("Kronologi: disusun dari waktu, klaim, dan transaksi yang ditinjau.")
+        lines.append("Daftar bukti:")
+        for item in self.evidence.list_for_case(case_id):
+            lines.append(f"- {item.evidence_id} {item.original_name_display} {item.sha256[:12]}")
+        gaps = [c for c in block["checks"] if c["status"] in {"MISSING", "CONFLICT"}]
+        lines.append("Kekurangan:")
+        if gaps:
+            for check in gaps:
+                lines.append(f"- {check['label']}: {check['action'] or check['reason']}")
+        else:
+            lines.append("- Tidak ada kekurangan wajib pada pemeriksaan internal.")
+        lines.append("Langkah handoff manual: buka kanal resmi sendiri. Tanggap60 tidak mengirim laporan.")
+        lines.append(str(report["disclaimer"]))
+        return lines
+
 
 def payload_notice() -> str:
     from app.config import NOTICE_VERSION
 
     return NOTICE_VERSION
+
+
+def transaction_time_or_none(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if not text or "T" not in text:
+        return None
+    return text
 
 
 def _json_num(value: str | None) -> float | str | None:

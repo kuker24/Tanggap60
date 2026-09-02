@@ -17,7 +17,7 @@
     "official_status"
   ],
   "properties": {
-    "schema_version": {"const": "2.0"},
+    "schema_version": {"enum": ["2.0", "2.1"]},
     "case_id": {"type": "string", "minLength": 8, "maxLength": 80},
     "mode": {"enum": ["DEMO", "STANDARD"]},
     "route": {"enum": ["PRE_INCIDENT_CHECK", "POST_INCIDENT_RESPONSE", "OUT_OF_SCOPE"]},
@@ -64,8 +64,31 @@
       ]
     },
     "official_status": {"const": "NOT_VERIFIED"},
-    "disclaimer": {"type": "string"}
+    "disclaimer": {"type": "string"},
+    "readiness": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/readiness"}
+      ]
+    }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"const": "2.1"},
+          "route": {"const": "POST_INCIDENT_RESPONSE"}
+        },
+        "required": ["schema_version", "route"]
+      },
+      "then": {
+        "required": ["readiness"],
+        "properties": {
+          "readiness": {"$ref": "#/$defs/readiness"}
+        }
+      }
+    }
+  ],
   "$defs": {
     "source": {
       "type": "object",
@@ -115,7 +138,7 @@
         "destination_account": {"type": "string"},
         "amount": {"type": "number", "minimum": 0},
         "currency": {"const": "IDR"},
-        "transferred_at": {"type": "string", "format": "date-time"}
+        "transferred_at": {"type": ["string", "null"], "format": "date-time"}
       }
     },
     "action": {
@@ -148,10 +171,54 @@
       "required": ["artifact_id", "type", "sha256", "verify_status", "source_snapshot_hash"],
       "properties": {
         "artifact_id": {"type": "string"},
-        "type": {"enum": ["VERIFICATION_BRIEF", "ACTION_PLAN", "EVIDENCE_PACK", "CASE_JSON", "CHECKLIST", "MANIFEST", "CASE_ZIP"]},
+        "type": {"enum": ["VERIFICATION_BRIEF", "ACTION_PLAN", "EVIDENCE_PACK", "READINESS_REPORT", "BANK_HANDOFF_PACK", "IASC_HANDOFF_PACK", "POLICE_HANDOFF_PACK", "CASE_JSON", "CHECKLIST", "MANIFEST", "CASE_ZIP"]},
         "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
         "verify_status": {"enum": ["PENDING", "PASS", "FAIL"]},
         "source_snapshot_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "readinessCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "label", "status"],
+      "properties": {
+        "check_id": {"type": "string"},
+        "label": {"type": "string"},
+        "status": {"enum": ["MET", "MISSING", "CONFLICT", "PREPARE_EXTERNALLY"]},
+        "reason": {"type": "string"},
+        "fact_ids": {"type": "array", "items": {"type": "string"}},
+        "evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "action": {"type": "string"},
+        "blocking": {"type": "boolean"},
+        "level": {"enum": ["REQUIRED", "RECOMMENDED", "PREPARE_EXTERNALLY"]}
+      }
+    },
+    "readinessChannel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["channel", "status", "checks_met", "checks_total", "checks"],
+      "properties": {
+        "channel": {"enum": ["BANK_PJP", "IASC", "POLICE"]},
+        "label": {"type": "string"},
+        "status": {"enum": ["READY", "NEEDS_ACTION", "BLOCKED"]},
+        "status_label": {"type": "string"},
+        "checks_met": {"type": "integer", "minimum": 0},
+        "checks_total": {"type": "integer", "minimum": 0},
+        "checks": {"type": "array", "items": {"$ref": "#/$defs/readinessCheck"}}
+      }
+    },
+    "readiness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["case_id", "profile_version", "overall_status", "channels", "official_status", "disclaimer"],
+      "properties": {
+        "case_id": {"type": "string"},
+        "profile_version": {"type": "string"},
+        "overall_status": {"enum": ["READY", "NEEDS_ACTION", "BLOCKED"]},
+        "overall_label": {"type": "string"},
+        "channels": {"type": "array", "items": {"$ref": "#/$defs/readinessChannel"}},
+        "official_status": {"const": "NOT_VERIFIED"},
+        "disclaimer": {"type": "string"}
       }
     },
     "receipt": {

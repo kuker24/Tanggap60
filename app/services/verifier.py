@@ -16,6 +16,30 @@ from app.infrastructure.repositories import ArtifactRepository
 from app.infrastructure.storage import CaseStorage
 
 SCHEMA_PATH = Path(__file__).resolve().parents[2] / "schemas" / "case.schema.json"
+POST_ZIP_NAMES = frozenset(
+    {
+        "action_plan.pdf",
+        "evidence_pack.pdf",
+        "readiness_report.pdf",
+        "bank_handoff_pack.pdf",
+        "iasc_handoff_pack.pdf",
+        "police_handoff_pack.pdf",
+        "case.json",
+        "handoff.md",
+        "manifest.sha256",
+    }
+)
+CHANNEL_PACKS = {
+    ArtifactType.READINESS_REPORT,
+    ArtifactType.BANK_HANDOFF_PACK,
+    ArtifactType.IASC_HANDOFF_PACK,
+    ArtifactType.POLICE_HANDOFF_PACK,
+}
+CHANNEL_BY_TYPE = {
+    ArtifactType.BANK_HANDOFF_PACK: "BANK_PJP",
+    ArtifactType.IASC_HANDOFF_PACK: "IASC",
+    ArtifactType.POLICE_HANDOFF_PACK: "POLICE",
+}
 
 
 class VerifierService:
@@ -53,6 +77,9 @@ class VerifierService:
         results.append({"type": "CASE_JSON", "status": json_art.verify_status.value})
         if not json_ok:
             raise ArtifactVerifyFailed("JSON schema gagal")
+        if payload.get("schema_version") == "2.1" and payload.get("route") == "POST_INCIDENT_RESPONSE":
+            if not isinstance(payload.get("readiness"), dict):
+                raise ArtifactVerifyFailed("readiness 2.1 hilang")
         manifest_map = self._manifest_map(case_id, by_type.get(ArtifactType.MANIFEST))
         for artifact in artifacts:
             data = self.storage.read_bytes(case_id, artifact.storage_key)
@@ -77,6 +104,16 @@ class VerifierService:
                 if contains_absolute_copy(pdf_text):
                     ok = False
                     checks["copy"] = "fail"
+                if artifact.type in CHANNEL_PACKS:
+                    if "DRAF PENGGUNA" not in pdf_text or "NOT_VERIFIED" not in pdf_text:
+                        ok = False
+                        checks["safety_label"] = "fail"
+                    if "profile" not in pdf_text.lower() and "Profile" not in pdf_text:
+                        ok = False
+                        checks["profile"] = "fail"
+                    if _channel_incomplete(artifact.type, payload) and "BELUM LENGKAP" not in pdf_text:
+                        ok = False
+                        checks["incomplete_label"] = "fail"
             if artifact.type in {ArtifactType.CASE_JSON, ArtifactType.CHECKLIST, ArtifactType.MANIFEST}:
                 if contains_absolute_copy(data.decode("utf-8", errors="replace")):
                     ok = False
@@ -119,6 +156,15 @@ class VerifierService:
                 if bad:
                     return False
                 names = set(archive.namelist())
+                if "action_plan.pdf" in manifest_map:
+                    for required in POST_ZIP_NAMES:
+                        if required not in names:
+                            ok = False
+                            checks[f"missing:{required}"] = "fail"
+                    unexpected = names - POST_ZIP_NAMES
+                    if unexpected:
+                        ok = False
+                        checks["unexpected"] = "fail"
                 for name in names:
                     payload = archive.read(name)
                     digest = sha256_bytes(payload)
@@ -139,3 +185,21 @@ class VerifierService:
             ok = False
             checks["zip"] = "fail"
         return ok
+
+
+def _channel_incomplete(artifact_type: ArtifactType, payload: dict[str, object]) -> bool:
+    report = payload.get("readiness")
+    if not isinstance(report, dict):
+        return False
+    if artifact_type == ArtifactType.READINESS_REPORT:
+        return str(report.get("overall_status") or "") != "READY"
+    channel = CHANNEL_BY_TYPE.get(artifact_type)
+    if channel is None:
+        return False
+    blocks = report.get("channels")
+    if not isinstance(blocks, list):
+        return False
+    block = next((item for item in blocks if isinstance(item, dict) and item.get("channel") == channel), None)
+    if not isinstance(block, dict):
+        return False
+    return str(block.get("status") or "") != "READY"

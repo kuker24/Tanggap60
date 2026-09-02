@@ -109,8 +109,9 @@ def snapshot_payload(
     actions: list[dict[str, Any]],
     notice_version: str,
     template_version: str,
+    readiness: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    return {
+    payload: dict[str, Any] = {
         "actions": actions,
         "conflicts": conflicts,
         "facts": facts,
@@ -118,6 +119,10 @@ def snapshot_payload(
         "route": route,
         "template_version": template_version,
     }
+    if readiness is not None:
+        payload["readiness"] = readiness
+        payload["readiness_profile_version"] = readiness.get("profile_version")
+    return payload
 
 
 def mask_ticket(value: str) -> str:

@@ -28,7 +28,10 @@
   </form>
 </article>
 {% endfor %}
-<p><a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana</a></p>
+<p class="row">
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Cek kesiapan kanal</a>
+  <a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana</a>
+</p>
 <script>
 const VERSION = {{ case.version }};
 const CASE = "{{ case.case_id }}";

@@ -1,12 +1,14 @@
 # SatuAman Tanggap60
 
-Competition MVP: bukti digital berantakan menjadi kasus siap ditindaklanjuti. Tidak mengirim laporan, tidak menjamin dana kembali, status tiket resmi selalu `NOT_VERIFIED`.
+Competition MVP: bukti digital berantakan menjadi kasus siap ditindaklanjuti. **Preflight** menguji kelengkapan internal per kanal (Bank/PJP, IASC, Kepolisian) lalu membuat draf paket handoff. Tidak mengirim laporan, tidak menjamin dana kembali, status tiket resmi selalu `NOT_VERIFIED`.
 
 Jalankan di VPS (systemd + Nginx + venv). Jangan andalkan laptop sebagai lingkungan uji.
 
 ## Stack
 
 Hermes adapter + FastAPI + Jinja + SQLite WAL + Pillow/Tesseract + ReportLab. Satu web worker, satu heavy worker.
+
+Alur pascainsiden: unggah bukti → ekstraksi → tinjau fakta/konflik → preflight kanal → approval → paket terverifikasi → handoff manual → receipt. Artefak ZIP: Action Plan, Evidence Pack, readiness report, tiga paket kanal, `case.json`, checklist, manifest SHA-256. Lihat `docs/PREFLIGHT.md`.
 
 ## Perintah
 
