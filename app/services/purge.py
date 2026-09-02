@@ -18,6 +18,7 @@ from app.infrastructure.repositories import (
     IdempotencyRepository,
     ReceiptRepository,
     TransactionRepository,
+    UnitMappingRepository,
 )
 from app.infrastructure.storage import CaseStorage
 from app.services.cases import CaseService, now_utc
@@ -41,6 +42,7 @@ class PurgeService:
         self.events = EventRepository(session)
         self.jobs = JobQueue(session)
         self.idem = IdempotencyRepository(session)
+        self.unit_maps = UnitMappingRepository(session)
 
     def purge(self, case_id: str, session_id: str, confirmation: str) -> dict[str, str]:
         if confirmation != "PURGE":
@@ -73,4 +75,8 @@ class PurgeService:
         self.receipts.delete_for_case(case_id)
         self.jobs.delete_for_case(case_id)
         self.idem.delete_for_case(case_id)
+        try:
+            self.unit_maps.delete_for_case(case_id)
+        except Exception:
+            pass
         self.events.delete_content_for_case(case_id)

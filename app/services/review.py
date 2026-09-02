@@ -56,7 +56,48 @@ class ReviewService:
             raise ValidationFailed("aksi tidak dikenal")
         self.facts.save(fact)
         if case.state in {State.WAITING_APPROVAL, State.GENERATING, State.VERIFYING, State.HANDOFF_READY}:
-            self.approval.revoke(case_id, session_id, "fact changed")
+            try:
+                from app.infrastructure.repositories import EvidenceRepository, UnitMappingRepository
+                from app.services.reporting_units import compile_reporting_units
+
+                all_facts = self.facts.list_for_case(case_id)
+                evidence = EvidenceRepository(self.session).list_for_case(case_id)
+                mappings = UnitMappingRepository(self.session).list_for_case(case_id)
+                decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+                units = compile_reporting_units(case_id, all_facts, evidence, decs if decs else None)
+                affected_unit_ids = {u.unit_id for u in units if fact.fact_id in u.fact_ids}
+                approvals = self.approval.approvals.list_for_case(case_id)
+                revoked_any = False
+                for appr in list(approvals):
+                    if appr.revoked_at is not None:
+                        continue
+                    should_revoke = False
+                    if appr.target_id is None:
+                        should_revoke = True
+                    else:
+                        if not affected_unit_ids:
+                            should_revoke = False  # fact not in any unit -> don't revoke unit approvals (isolated)
+                        elif appr.target_id in affected_unit_ids:
+                            should_revoke = True
+                    if should_revoke:
+                        appr.revoked_at = now_utc()
+                        appr.revoke_reason = "fact changed for unit"
+                        self.approval.approvals.save(appr)
+                        revoked_any = True
+                remaining = [a for a in self.approval.approvals.list_for_case(case_id) if a.revoked_at is None]
+                if revoked_any:
+                    case.approved_snapshot_hash = remaining[0].snapshot_hash if remaining else None
+                    if not remaining:
+                        self.cases.set_state(case, State.REVIEW_REQUIRED, event_type="APPROVAL_REVOKED")
+                    elif any(a.target_id is not None for a in remaining):
+                        # keep other unit approvals, don't force REVIEW_REQUIRED
+                        self.cases.touch(case)
+                    else:
+                        self.cases.set_state(case, State.REVIEW_REQUIRED, event_type="APPROVAL_REVOKED")
+                else:
+                    self.cases.touch(case)
+            except Exception:
+                self.approval.revoke(case_id, session_id, "fact changed")
         else:
             self.cases.touch(case)
         return fact
@@ -92,6 +133,52 @@ class ReviewService:
         conflict.resolved_at = now_utc()
         self.conflicts.save(conflict)
         if case.state in {State.WAITING_APPROVAL, State.READY_FOR_ACTION}:
-            self.approval.revoke(case_id, session_id, "conflict resolved")
+            try:
+                from app.infrastructure.repositories import EvidenceRepository, UnitMappingRepository
+                from app.services.reporting_units import compile_reporting_units
+
+                all_facts = self.facts.list_for_case(case_id)
+                evidence = EvidenceRepository(self.session).list_for_case(case_id)
+                mappings = UnitMappingRepository(self.session).list_for_case(case_id)
+                decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+                units = compile_reporting_units(case_id, all_facts, evidence, decs if decs else None)
+                affected_unit_ids = set()
+                for u in units:
+                    if set(conflict.fact_ids) & set(u.fact_ids):
+                        affected_unit_ids.add(u.unit_id)
+                    if conflict.resolution_fact_id and conflict.resolution_fact_id in u.fact_ids:
+                        affected_unit_ids.add(u.unit_id)
+                # If conflict involves facts not in any unit (global), affect all
+                if not affected_unit_ids:
+                    self.approval.revoke(case_id, session_id, "conflict resolved")
+                else:
+                    approvals = self.approval.approvals.list_for_case(case_id)
+                    revoked_any = False
+                    for appr in approvals:
+                        if appr.revoked_at is not None:
+                            continue
+                        if appr.target_id is None:
+                            appr.revoked_at = now_utc()
+                            appr.revoke_reason = "conflict resolved"
+                            self.approval.approvals.save(appr)
+                            revoked_any = True
+                        elif appr.target_id in affected_unit_ids:
+                            appr.revoked_at = now_utc()
+                            appr.revoke_reason = "conflict resolved for unit"
+                            self.approval.approvals.save(appr)
+                            revoked_any = True
+                    remaining = [a for a in self.approval.approvals.list_for_case(case_id) if a.revoked_at is None]
+                    if revoked_any:
+                        case.approved_snapshot_hash = remaining[0].snapshot_hash if remaining else None
+                        if not remaining:
+                            self.cases.set_state(case, State.REVIEW_REQUIRED, event_type="APPROVAL_REVOKED_CONFLICT")
+                        elif any(a.target_id is not None for a in remaining):
+                            self.cases.touch(case)
+                        else:
+                            self.cases.set_state(case, State.REVIEW_REQUIRED, event_type="APPROVAL_REVOKED_CONFLICT")
+                    else:
+                        self.cases.touch(case)
+            except Exception:
+                self.approval.revoke(case_id, session_id, "conflict resolved")
         else:
             self.cases.touch(case)

@@ -28,6 +28,14 @@ TOOL_SPECS: tuple[dict[str, str], ...] = (
         "description": "Hitung kesiapan handoff Bank/PJP, IASC, dan Kepolisian dari aturan lokal.",
     },
     {
+        "name": "compile_reporting_units",
+        "description": "Compiler reporting units dari provenance bukti; tidak menebak pasangan.",
+    },
+    {
+        "name": "recommend_next_action",
+        "description": "Tentukan tindakan terbaik berikutnya secara deterministik.",
+    },
+    {
         "name": "compile_artifacts",
         "description": "Render PDF/JSON/ZIP dari snapshot persetujuan.",
     },

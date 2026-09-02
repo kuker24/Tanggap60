@@ -15,6 +15,8 @@ MECHANICAL_TOOLS = frozenset(
         "compile_artifacts",
         "verify_artifacts",
         "prepare_official_handoff",
+        "compile_reporting_units",
+        "recommend_next_action",
     }
 )
 USER_TOOLS = frozenset({"record_handoff_receipt", "purge_case"})

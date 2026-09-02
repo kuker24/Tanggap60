@@ -38,6 +38,7 @@ from app.infrastructure.repositories import (
     FactRepository,
     IdempotencyRepository,
     ReceiptRepository,
+    UnitMappingRepository,
 )
 from app.infrastructure.resources import guard_resources
 from app.services.ids import new_id
@@ -263,6 +264,153 @@ def resolve_conflict(case_id: str, conflict_id: str, request: Request, payload: 
         int(payload.get("expected_version", 0)),
     )
     return {"status": "resolved"}
+
+
+def _get_units_and_readiness(case_id: str, db) -> tuple[list, dict[str, Any], dict[str, Any]]:
+    from app.infrastructure.repositories import ConflictRepository, EvidenceRepository, FactRepository
+    from app.services.readiness import assess_units
+    from app.services.reporting_units import compile_reporting_units
+
+    case = CaseRepository(db).get(case_id)
+    facts = FactRepository(db).list_for_case(case_id)
+    evidence = EvidenceRepository(db).list_for_case(case_id)
+    conflicts = ConflictRepository(db).list_for_case(case_id)
+    # load mapping decisions
+    mappings = UnitMappingRepository(db).list_for_case(case_id)
+    # convert mappings to dict for compiler: list of {evidence_id, pairings}
+    decs_for_compiler = []
+    for m in mappings:
+        decs_for_compiler.append(
+            {"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings}
+        )
+    units = compile_reporting_units(case_id, facts, evidence, decs_for_compiler if decs_for_compiler else None)
+    readiness = assess_units(
+        case_id=case_id, units=units, facts=facts, evidence=evidence, conflicts=conflicts, route=case.route
+    )
+    # attach readiness per unit
+    for unit in units:
+        rep = next((r for r in readiness["units"] if r["unit_id"] == unit.unit_id), None)
+        if rep:
+            unit.readiness = rep
+    return units, readiness, {"decisions": mappings}
+
+
+@api.get("/cases/{case_id}/reporting-units")
+def list_reporting_units(case_id: str, request: Request) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    units, readiness, extra = _get_units_and_readiness(case_id, request.state.db)
+    from app.services.reporting_units import unit_to_dict
+
+    return {
+        "reporting_units": [unit_to_dict(u) for u in units],
+        "readiness": readiness,
+        "evidence_semantics": __import__("app.services.reporting_units", fromlist=["classify_evidence"]).classify_evidence(
+            __import__("app.infrastructure.repositories", fromlist=["EvidenceRepository"]).EvidenceRepository(request.state.db).list_for_case(case_id),
+            __import__("app.infrastructure.repositories", fromlist=["FactRepository"]).FactRepository(request.state.db).list_for_case(case_id),
+        ),
+    }
+
+
+@api.post("/cases/{case_id}/reporting-units/{unit_id}/mapping")
+def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dict[str, Any]) -> dict[str, Any]:
+    case = svc(request)["cases"].get_owned(case_id, sid(request))
+    # validate target evidence and pairings exist
+    evidence_id = str(payload.get("target_evidence_id") or payload.get("evidence_id") or "")
+    pairings = payload.get("pairings") or payload.get("chosen_pairings") or []
+    if not isinstance(pairings, list) or not pairings:
+        raise ValidationFailed("pairings required")
+    # verify unit exists (compile current units)
+    units, _, _ = _get_units_and_readiness(case_id, request.state.db)
+    # unit_id may be ambiguous unit id to be resolved
+    # store decision
+    from app.domain.models import UnitMappingDecision
+    from app.services.cases import now_utc
+    from app.services.ids import new_id
+
+    decision = UnitMappingDecision(
+        decision_id=new_id("map"),
+        case_id=case_id,
+        unit_id=unit_id,
+        target_evidence_id=evidence_id or None,
+        chosen_pairings=[dict(p) for p in pairings],
+        actor="USER",
+        created_at=now_utc(),
+        reason=str(payload.get("reason") or ""),
+    )
+    UnitMappingRepository(request.state.db).add(decision)
+    # audit
+    from app.domain.models import AuditEventRecord
+    from app.infrastructure.logging import hash_id
+
+    EventRepository(request.state.db).add(
+        AuditEventRecord(
+            event_id=new_id("evt"),
+            case_id=hash_id(case_id),
+            run_id=None,
+            event_type="UNIT_MAPPING_DECIDED",
+            state_before=case.state.value,
+            state_after=case.state.value,
+            tool_name="resolve_unit_mapping",
+            tool_version=__import__("app.config", fromlist=["TOOL_VERSION"]).TOOL_VERSION,
+            duration_ms=0,
+            result_code="USER",
+            error_code=None,
+            payload_hash=__import__("app.domain.policies", fromlist=["sha256_text"]).sha256_text(unit_id),
+            created_at=now_utc(),
+            planner="USER",
+            execution="LOCAL_TOOL",
+        )
+    )
+    # return updated units
+    units2, readiness2, _ = _get_units_and_readiness(case_id, request.state.db)
+    from app.services.reporting_units import unit_to_dict
+
+    return {"decision_id": decision.decision_id, "reporting_units": [unit_to_dict(u) for u in units2], "readiness": readiness2}
+
+
+@api.get("/cases/{case_id}/next-action")
+def get_next_action(case_id: str, request: Request) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    units, readiness, _ = _get_units_and_readiness(case_id, request.state.db)
+    from app.infrastructure.repositories import ConflictRepository
+    from app.services.next_action import next_action_to_dict, recommend_next_action
+
+    conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
+    action = recommend_next_action(
+        case_id=case_id,
+        units=units,
+        conflicts=conflicts,
+        readiness_by_unit=readiness.get("readiness_by_unit"),
+        incident_police_ready=(readiness.get("incident_police", {}).get("status") == "READY"),
+    )
+    return next_action_to_dict(action)
+
+
+@api.get("/cases/{case_id}/reporting-units/{unit_id}/draft")
+def get_unit_draft(case_id: str, unit_id: str, request: Request) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    payload, digest = svc(request)["approval"].unit_snapshot(case_id, unit_id)
+    return {"unit_id": unit_id, "snapshot_hash": digest, "draft": payload, "notice_version": __import__("app.config", fromlist=["NOTICE_VERSION"]).NOTICE_VERSION}
+
+
+@api.post("/cases/{case_id}/reporting-units/{unit_id}/approval")
+def post_unit_approval(
+    case_id: str,
+    unit_id: str,
+    request: Request,
+    payload: dict[str, Any],
+    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
+) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    cached = _idempotency(request, case_id, idempotency_key, json.dumps(payload, sort_keys=True) + unit_id)
+    if cached:
+        return cached
+    record = svc(request)["approval"].approve(case_id, sid(request), str(payload.get("snapshot_hash", "")), bool(payload.get("accepted_notice", False)), target_id=unit_id)
+    if request.app.state.container.settings.sync_jobs:
+        svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+    body = {"approval_id": record.approval_id, "snapshot_hash": record.snapshot_hash, "unit_id": unit_id, "state": CaseRepository(request.state.db).get(case_id).state.value}
+    _store_idem(request, idempotency_key or record.approval_id, case_id, json.dumps(payload, sort_keys=True) + unit_id, body)
+    return body
 
 
 @api.post("/cases/{case_id}/draft")

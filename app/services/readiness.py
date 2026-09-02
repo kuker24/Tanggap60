@@ -525,3 +525,241 @@ def public_report(report: dict[str, Any]) -> dict[str, Any]:
         "official_status": "NOT_VERIFIED",
         "disclaimer": report["disclaimer"],
     }
+
+
+# --- Reporting Unit scoped readiness (V2) ---
+
+def _unit_facts(unit, all_facts: list[FactRecord]) -> list[FactRecord]:
+    fid_set = set(unit.fact_ids)
+    return [f for f in all_facts if f.fact_id in fid_set]
+
+
+def _unit_evidence(unit, all_evidence: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    eid_set = set(unit.evidence_ids)
+    return [e for e in all_evidence if e.evidence_id in eid_set]
+
+
+def _conflict_scope(conflict: ConflictRecord, units: list) -> str:
+    # UNIT_SCOPED if all fact_ids belong to single unit
+    from app.domain.models import ConflictScope
+
+    fact_set = set(conflict.fact_ids)
+    matching_units = [u for u in units if fact_set.issubset(set(u.fact_ids))]
+    if len(matching_units) == 1:
+        return ConflictScope.UNIT_SCOPED.value
+    # if fact_ids span multiple units or none
+    return ConflictScope.INCIDENT_GLOBAL.value
+
+
+def assess_unit(
+    unit,
+    all_facts: list[FactRecord],
+    all_evidence: list[EvidenceRecord],
+    all_conflicts: list[ConflictRecord],
+    all_units: list,
+    route: Route,
+    profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Per-unit BANK_PJP + IASC assessment, with incident-global conflict handling."""
+    from app.domain.models import MappingStatus
+
+    loaded = profile or load_profile()
+    unit_facts = _unit_facts(unit, all_facts)
+    unit_evid = _unit_evidence(unit, all_evidence)
+    # shared evidence: allow communication evidence from shared pool? For IASC need chat; if unit has no chat but incident has shared chat, should count?
+    # For now, only unit evidence; shared chat not auto-bound. So missing.
+    usable = _usable_facts(unit_facts) if unit_facts else []
+    # Determine relevant conflicts: only those scoped to this unit or global
+    # For unit isolation: BLOCKING conflict that is UNIT_SCOPED to other unit should NOT block this unit
+    relevant_conflicts: list[ConflictRecord] = []
+    for c in all_conflicts:
+        if c.status.value != "OPEN" or c.severity.value != "BLOCKING":
+            continue
+        scope = _conflict_scope(c, all_units)
+        if scope == "INCIDENT_GLOBAL":
+            relevant_conflicts.append(c)
+        elif set(c.fact_ids).issubset(set(unit.fact_ids)):
+            relevant_conflicts.append(c)
+        # else unit-scoped to other unit -> ignore
+
+    # If mapping is AMBIGUOUS -> BLOCKED directly
+    if getattr(unit, "mapping_status", None) == MappingStatus.AMBIGUOUS:
+        # produce BLOCKED for financial channels
+        channels = []
+        for name in ("BANK_PJP", "IASC"):
+            spec_block = {"check_id": f"{name}_MAPPING", "label": "Mapping transaksi jelas", "level": "REQUIRED"}
+            blocking_check = _result(spec_block, "CONFLICT", f"AMBIGUOUS_MAPPING pada {unit.unit_id}", action="Pilih pasangan transaksi yang benar", blocking=True)
+            status = "BLOCKED"
+            channels.append(
+                {
+                    "channel": name,
+                    "label": str(loaded["channels"][name].get("label") or name),
+                    "status": status,
+                    "status_label": STATUS_LABELS[status],
+                    "checks_met": 0,
+                    "checks_total": 1,
+                    "checks": [blocking_check.as_public()],
+                    "snapshot_checks": [blocking_check.as_snapshot()],
+                }
+            )
+        overall = "BLOCKED"
+        return {
+            "unit_id": unit.unit_id,
+            "overall_status": overall,
+            "overall_label": STATUS_LABELS[overall],
+            "channels": channels,
+            "mapping_status": str(unit.mapping_status),
+        }
+
+    # Normal financial checks: BANK and IASC use unit facts/evidence plus global checks scoped to unit
+    globals_for_unit = _global_checks(route=route, facts=usable, conflicts=relevant_conflicts)
+    # For unit, we consider critical reviewed only for this unit's critical facts? Keep global but scoped.
+    channels = []
+    builders = {
+        "BANK_PJP": lambda: _bank_checks(loaded, usable, unit_evid),
+        "IASC": lambda: _iasc_checks(loaded, usable, unit_evid),
+    }
+    for name in ("BANK_PJP", "IASC"):
+        raw_checks = builders[name]()
+        # For IASC, communication and chronology may be satisfied by shared incident evidence (chat)
+        if name == "IASC":
+            # Check global communication existence
+            global_chat = _named_evidence(all_evidence, ("chat", "pesan", "wa", "whatsapp"))
+            # also consider unavailable comm fact globally
+            global_unavailable_comm = _unavailable_of(_usable_facts(all_facts), {__import__("app.domain.models", fromlist=["FactType"]).FactType.CLAIM, __import__("app.domain.models", fromlist=["FactType"]).FactType.CHANNEL})
+            patched = []
+            for ck in raw_checks:
+                if ck.check_id == "IASC_COMMUNICATION_EVIDENCE" and ck.status == "MISSING":
+                    if global_chat or global_unavailable_comm:
+                        patched.append(_result({"check_id": ck.check_id, "label": ck.label, "level": ck.level}, "MET", "Bukti komunikasi tersedia (shared)", evidence=global_chat or [], blocking=False))
+                        continue
+                if ck.check_id == "IASC_CHRONOLOGY" and ck.status == "MISSING":
+                    global_chrono = _reviewed_of(_usable_facts(all_facts), {__import__("app.domain.models", fromlist=["FactType"]).FactType.DATETIME, __import__("app.domain.models", fromlist=["FactType"]).FactType.EVENT, __import__("app.domain.models", fromlist=["FactType"]).FactType.CLAIM})
+                    if global_chrono:
+                        patched.append(_result({"check_id": ck.check_id, "label": ck.label, "level": ck.level}, "MET", "Kronologi tersusun (shared)", facts=global_chrono))
+                        continue
+                patched.append(ck)
+            raw_checks = patched
+        checks = [*globals_for_unit, *raw_checks]
+        if getattr(unit, "mapping_status", None) == MappingStatus.INCOMPLETE:
+            pass
+        status = _channel_status(checks)
+        met = sum(1 for item in checks if item.status == "MET")
+        channels.append(
+            {
+                "channel": name,
+                "label": str(loaded["channels"][name].get("label") or name),
+                "status": status,
+                "status_label": STATUS_LABELS[status],
+                "checks_met": met,
+                "checks_total": len(checks),
+                "checks": [item.as_public() for item in checks],
+                "snapshot_checks": [item.as_snapshot() for item in checks],
+            }
+        )
+    overall = "READY"
+    if any(ch["status"] == "BLOCKED" for ch in channels):
+        overall = "BLOCKED"
+    elif any(ch["status"] == "NEEDS_ACTION" for ch in channels):
+        overall = "NEEDS_ACTION"
+    return {
+        "unit_id": unit.unit_id,
+        "overall_status": overall,
+        "overall_label": STATUS_LABELS[overall],
+        "channels": channels,
+        "mapping_status": str(getattr(unit, "mapping_status", "UNKNOWN")),
+    }
+
+
+def assess_units(
+    *,
+    case_id: str,
+    units: list,
+    facts: list[FactRecord],
+    evidence: list[EvidenceRecord],
+    conflicts: list[ConflictRecord],
+    route: Route,
+    profile: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Assess all units for financial channels + incident POLICE."""
+    loaded = profile or load_profile()
+    # incident POLICE (uses all evidence)
+    usable_all = _usable_facts(facts)
+    transactions: list[Any] = []  # not used for police in v2, but keep
+    police_checks = _police_checks(loaded, usable_all, evidence, transactions)  # type: ignore[arg-type]
+    # Use global checks for police (incident-level)
+    global_police = _global_checks(route=route, facts=usable_all, conflicts=conflicts)
+    police_channel_checks = [*global_police, *police_checks]
+    police_status = _channel_status(police_channel_checks)
+    incident = {
+        "channel": "POLICE",
+        "label": str(loaded["channels"]["POLICE"].get("label") or "Kepolisian"),
+        "status": police_status,
+        "status_label": STATUS_LABELS[police_status],
+        "checks_met": sum(1 for item in police_channel_checks if item.status == "MET"),
+        "checks_total": len(police_channel_checks),
+        "checks": [c.as_public() for c in police_channel_checks],
+        "snapshot_checks": [c.as_snapshot() for c in police_channel_checks],
+    }
+    unit_reports = []
+    readiness_by_unit: dict[str, dict[str, str]] = {}
+    for unit in sorted(units, key=lambda u: u.unit_id):
+        rep = assess_unit(unit, facts, evidence, conflicts, units, route, loaded)
+        unit_reports.append(rep)
+        readiness_by_unit[unit.unit_id] = {ch["channel"]: ch["status"] for ch in rep["channels"]}
+    overall = "READY"
+    if any(r["overall_status"] == "BLOCKED" for r in unit_reports) or police_status == "BLOCKED":
+        overall = "BLOCKED"
+    elif any(r["overall_status"] == "NEEDS_ACTION" for r in unit_reports) or police_status == "NEEDS_ACTION":
+        overall = "NEEDS_ACTION"
+    return {
+        "case_id": case_id,
+        "profile_version": loaded["profile_version"],
+        "overall_status": overall,
+        "overall_label": STATUS_LABELS[overall],
+        "units": unit_reports,
+        "incident_police": incident,
+        "official_status": "NOT_VERIFIED",
+        "disclaimer": loaded["disclaimer"],
+        "source_urls": loaded["source_urls"],
+        "last_reviewed_at": loaded["last_reviewed_at"],
+        "readiness_by_unit": readiness_by_unit,
+    }
+
+
+def snapshot_units(report: dict[str, Any]) -> dict[str, Any]:
+    units = []
+    for u in report.get("units", []):
+        channels = []
+        for ch in u["channels"]:
+            channels.append(
+                {
+                    "channel": ch["channel"],
+                    "status": ch["status"],
+                    "checks": sorted(ch["snapshot_checks"], key=lambda row: str(row["check_id"])),
+                }
+            )
+        units.append(
+            {
+                "unit_id": u["unit_id"],
+                "overall_status": u["overall_status"],
+                "mapping_status": u.get("mapping_status"),
+                "channels": sorted(channels, key=lambda row: str(row["channel"])),
+            }
+        )
+    incident = None
+    if "incident_police" in report:
+        inc = report["incident_police"]
+        incident = {
+            "channel": inc["channel"],
+            "status": inc["status"],
+            "checks": sorted(inc["snapshot_checks"], key=lambda row: str(row["check_id"])),
+        }
+    payload = {
+        "units": sorted(units, key=lambda row: str(row["unit_id"])),
+        "incident_police": incident,
+        "overall_status": report["overall_status"],
+        "profile_version": report["profile_version"],
+    }
+    canonical_json(payload)
+    return payload

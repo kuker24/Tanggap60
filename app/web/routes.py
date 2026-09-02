@@ -132,21 +132,44 @@ def review(case_id: str, request: Request):
 @web.get("/cases/{case_id}/readiness")
 def readiness_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    from app.services.readiness import assess, public_report
+    from app.infrastructure.repositories import UnitMappingRepository
+    from app.services.next_action import next_action_to_dict, recommend_next_action
+    from app.services.readiness import assess, assess_units, public_report
+    from app.services.reporting_units import compile_reporting_units
 
+    facts = FactRepository(request.state.db).list_for_case(case_id)
+    evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
+    conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
+    transactions = TransactionRepository(request.state.db).list_for_case(case_id)
     report = public_report(
-        assess(
-            case_id=case_id,
-            route=case.route,
-            facts=FactRepository(request.state.db).list_for_case(case_id),
-            conflicts=ConflictRepository(request.state.db).list_for_case(case_id),
-            evidence=EvidenceRepository(request.state.db).list_for_case(case_id),
-            transactions=TransactionRepository(request.state.db).list_for_case(case_id),
-        )
+        assess(case_id=case_id, route=case.route, facts=facts, conflicts=conflicts, evidence=evidence, transactions=transactions)
     )
+    # try rescue units
+    units = []
+    units_report = None
+    next_action = None
+    try:
+        mappings = UnitMappingRepository(request.state.db).list_for_case(case_id)
+        decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+        units = compile_reporting_units(case_id, facts, evidence, decs if decs else None)
+        if units:
+            units_report = assess_units(case_id=case_id, units=units, facts=facts, evidence=evidence, conflicts=conflicts, route=case.route)
+            next_action = next_action_to_dict(
+                recommend_next_action(
+                    case_id=case_id,
+                    units=units,
+                    conflicts=conflicts,
+                    readiness_by_unit=units_report.get("readiness_by_unit"),
+                    incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                )
+            )
+    except Exception:
+        units = []
+        units_report = None
+        next_action = None
     return TEMPLATES.TemplateResponse(
         "readiness.html",
-        {"request": request, "case": case, "report": report},
+        {"request": request, "case": case, "report": report, "units": units, "units_report": units_report, "next_action": next_action},
     )
 
 

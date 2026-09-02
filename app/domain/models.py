@@ -91,6 +91,8 @@ class ActionStatus(StrEnum):
 class ApprovalScope(StrEnum):
     PRE_BRIEF = "PRE_BRIEF"
     POST_CASE_PACK = "POST_CASE_PACK"
+    REPORTING_UNIT_HANDOFF = "REPORTING_UNIT_HANDOFF"
+    INCIDENT_HANDOFF = "INCIDENT_HANDOFF"
 
 
 class ArtifactType(StrEnum):
@@ -101,6 +103,9 @@ class ArtifactType(StrEnum):
     BANK_HANDOFF_PACK = "BANK_HANDOFF_PACK"
     IASC_HANDOFF_PACK = "IASC_HANDOFF_PACK"
     POLICE_HANDOFF_PACK = "POLICE_HANDOFF_PACK"
+    REPORTING_UNIT_JSON = "REPORTING_UNIT_JSON"
+    UNIT_BANK_PACK = "UNIT_BANK_PACK"
+    UNIT_IASC_PACK = "UNIT_IASC_PACK"
     CASE_JSON = "CASE_JSON"
     CHECKLIST = "CHECKLIST"
     MANIFEST = "MANIFEST"
@@ -141,6 +146,40 @@ class LocalMatchStatus(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
     MATCH = "MATCH"
     MISMATCH = "MISMATCH"
+
+
+class MappingStatus(StrEnum):
+    COMPLETE = "COMPLETE"
+    INCOMPLETE = "INCOMPLETE"
+    AMBIGUOUS = "AMBIGUOUS"
+
+
+class EvidenceSemantics(StrEnum):
+    TRANSACTION = "TRANSACTION"
+    COMMUNICATION = "COMMUNICATION"
+    SHARED = "SHARED"
+    UNKNOWN = "UNKNOWN"
+
+
+class NextActionCode(StrEnum):
+    RESOLVE_CONFLICT = "RESOLVE_CONFLICT"
+    RESOLVE_UNIT_MAPPING = "RESOLVE_UNIT_MAPPING"
+    CONFIRM_TRANSACTION_AMOUNT = "CONFIRM_TRANSACTION_AMOUNT"
+    CONFIRM_TRANSACTION_TIME = "CONFIRM_TRANSACTION_TIME"
+    CONFIRM_DESTINATION = "CONFIRM_DESTINATION"
+    ADD_TRANSFER_EVIDENCE = "ADD_TRANSFER_EVIDENCE"
+    CONTACT_BANK_PJP = "CONTACT_BANK_PJP"
+    PREPARE_IASC_UNIT = "PREPARE_IASC_UNIT"
+    OPEN_IASC_HANDOFF = "OPEN_IASC_HANDOFF"
+    PREPARE_POLICE_INCIDENT = "PREPARE_POLICE_INCIDENT"
+    APPROVE_READY_UNIT = "APPROVE_READY_UNIT"
+    DOWNLOAD_VERIFIED_PACK = "DOWNLOAD_VERIFIED_PACK"
+    RECORD_RECEIPT = "RECORD_RECEIPT"
+
+
+class ConflictScope(StrEnum):
+    UNIT_SCOPED = "UNIT_SCOPED"
+    INCIDENT_GLOBAL = "INCIDENT_GLOBAL"
 
 
 class UserDecision(StrEnum):
@@ -247,6 +286,46 @@ class TransactionGroupRecord:
 
 
 @dataclass
+class ReportingUnitRecord:
+    unit_id: str
+    case_id: str
+    source_account: str | None
+    destination_account: str | None
+    amount: float | None
+    transferred_at: str | None
+    fact_ids: list[str]
+    evidence_ids: list[str]
+    mapping_status: MappingStatus
+    mapping_reason: str
+    mapping_provenance: str
+    # readiness scoped per unit will be computed, not stored
+    readiness: dict[str, Any] | None = None
+
+
+@dataclass
+class UnitMappingDecision:
+    decision_id: str
+    case_id: str
+    unit_id: str | None
+    target_evidence_id: str | None
+    chosen_pairings: list[dict[str, str]]
+    actor: str
+    created_at: datetime
+    reason: str = ""
+
+
+@dataclass
+class NextBestAction:
+    code: NextActionCode
+    label: str
+    reason: str
+    target_unit_id: str | None = None
+    priority: int = 0
+    related_fact_ids: list[str] | None = None
+    related_evidence_ids: list[str] | None = None
+
+
+@dataclass
 class ApprovalRecord:
     approval_id: str
     case_id: str
@@ -257,6 +336,8 @@ class ApprovalRecord:
     notice_version: str
     revoked_at: datetime | None = None
     revoke_reason: str | None = None
+    target_id: str | None = None
+    profile_version: str | None = None
 
 
 @dataclass

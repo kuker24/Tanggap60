@@ -429,6 +429,8 @@ class ApprovalRepository:
                 notice_version=approval.notice_version,
                 revoked_at=approval.revoked_at,
                 revoke_reason=approval.revoke_reason,
+                target_id=approval.target_id,
+                profile_version=approval.profile_version,
             )
         )
 
@@ -464,7 +466,24 @@ class ApprovalRepository:
             notice_version=row.notice_version,
             revoked_at=_dt(row.revoked_at) if row.revoked_at else None,  # type: ignore[arg-type]
             revoke_reason=row.revoke_reason,
+            target_id=getattr(row, "target_id", None),
+            profile_version=getattr(row, "profile_version", None),
         )
+
+    def list_for_case(self, case_id: str) -> list[ApprovalRecord]:
+        rows = self.session.scalars(select(ApprovalRow).where(ApprovalRow.case_id == case_id)).all()
+        return [self._to_model(r) for r in rows]
+
+    def active_for_target(self, case_id: str, target_id: str | None) -> ApprovalRecord | None:
+        q = select(ApprovalRow).where(ApprovalRow.case_id == case_id, ApprovalRow.revoked_at.is_(None))
+        if target_id is not None:
+            q = q.where(ApprovalRow.target_id == target_id)
+        else:
+            q = q.where(ApprovalRow.target_id.is_(None))
+        rows = self.session.scalars(q).all()
+        if not rows:
+            return None
+        return self._to_model(rows[-1])
 
 
 class ArtifactRepository:
@@ -677,3 +696,49 @@ class IdempotencyRepository:
 
     def delete_for_case(self, case_id: str) -> None:
         self.session.execute(delete(IdempotencyRow).where(IdempotencyRow.case_id == case_id))
+
+
+class UnitMappingRepository:
+    def __init__(self, session: Session) -> None:
+        self.session = session
+
+    def add(self, decision) -> None:
+        from app.infrastructure.db import UnitMappingRow
+
+        self.session.add(
+            UnitMappingRow(
+                decision_id=decision.decision_id,
+                case_id=decision.case_id,
+                unit_id=decision.unit_id,
+                target_evidence_id=decision.target_evidence_id,
+                pairings_json=json.dumps(decision.chosen_pairings),
+                actor=decision.actor,
+                reason=decision.reason,
+                created_at=decision.created_at,
+            )
+        )
+
+    def list_for_case(self, case_id: str):
+        from app.infrastructure.db import UnitMappingRow
+
+        rows = self.session.scalars(select(UnitMappingRow).where(UnitMappingRow.case_id == case_id)).all()
+        from app.domain.models import UnitMappingDecision
+
+        return [
+            UnitMappingDecision(
+                decision_id=r.decision_id,
+                case_id=r.case_id,
+                unit_id=r.unit_id,
+                target_evidence_id=r.target_evidence_id,
+                chosen_pairings=json.loads(r.pairings_json or "[]"),
+                actor=r.actor,
+                created_at=_dt(r.created_at),  # type: ignore[arg-type]
+                reason=r.reason or "",
+            )
+            for r in rows
+        ]
+
+    def delete_for_case(self, case_id: str) -> None:
+        from app.infrastructure.db import UnitMappingRow
+
+        self.session.execute(delete(UnitMappingRow).where(UnitMappingRow.case_id == case_id))

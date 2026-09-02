@@ -133,6 +133,21 @@ class ApprovalRow(Base):
     notice_version: Mapped[str] = mapped_column(String(40))
     revoked_at: Mapped[str | None] = mapped_column(DateTime, nullable=True)
     revoke_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    target_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    profile_version: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+
+class UnitMappingRow(Base):
+    __tablename__ = "unit_mappings"
+
+    decision_id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    case_id: Mapped[str] = mapped_column(ForeignKey("cases.case_id"), index=True)
+    unit_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    target_evidence_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    pairings_json: Mapped[str] = mapped_column(Text, default="[]")
+    actor: Mapped[str] = mapped_column(String(20), default="USER")
+    reason: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[str] = mapped_column(DateTime)
 
 
 class ArtifactRow(Base):
@@ -254,9 +269,22 @@ def _migrate_audit_events(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE audit_events ADD COLUMN execution VARCHAR(40)"))
 
 
+def _migrate_approvals(engine: Engine) -> None:
+    with engine.begin() as conn:
+        try:
+            names = {row[1] for row in conn.execute(text("PRAGMA table_info(approvals)"))}
+        except Exception:
+            return
+        if "target_id" not in names:
+            conn.execute(text("ALTER TABLE approvals ADD COLUMN target_id VARCHAR(80)"))
+        if "profile_version" not in names:
+            conn.execute(text("ALTER TABLE approvals ADD COLUMN profile_version VARCHAR(40)"))
+
+
 def init_db(engine: Engine) -> None:
     Base.metadata.create_all(engine)
     _migrate_audit_events(engine)
+    _migrate_approvals(engine)
     with engine.connect() as conn:
         conn.execute(text("PRAGMA foreign_keys=ON"))
         conn.commit()

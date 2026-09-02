@@ -6,5 +6,10 @@
     "Rp2.750.000"
   ],
   "account": "DEMO-DEST-01",
-  "invoice_amount_page": 2
+  "invoice_amount_page": 2,
+  "transfer_a": "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED",
+  "transfer_b": "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B",
+  "transfer_b_complete": "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB Dari: DEMO-VICTIM-MASKED",
+  "ambiguous": "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB",
+  "rescue_units": 2
 }

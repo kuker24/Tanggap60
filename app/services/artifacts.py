@@ -59,16 +59,146 @@ class ArtifactService:
             raise ApprovalRequired("butuh persetujuan")
         if case.approved_snapshot_hash != snapshot_hash:
             raise ArtifactVerifyFailed("hash persetujuan berbeda")
-        payload, digest = self.approval.current_snapshot(case_id)
-        if digest != snapshot_hash:
-            raise ArtifactVerifyFailed("snapshot berubah")
+        # try case-level snapshot first, then unit-level if target approval is unit-scoped
+        try:
+            payload, digest = self.approval.current_snapshot(case_id)
+            if digest != snapshot_hash:
+                # try unit snapshots
+                from app.infrastructure.repositories import ApprovalRepository
+
+                all_ap = ApprovalRepository(self.session).list_for_case(case_id)
+                matched = next((a for a in all_ap if a.snapshot_hash == snapshot_hash and a.revoked_at is None), None)
+                if matched and matched.target_id:
+                    payload, digest = self.approval.unit_snapshot(case_id, matched.target_id)
+                if digest != snapshot_hash:
+                    raise ArtifactVerifyFailed("snapshot berubah")
+            else:
+                payload = payload  # case-level ok
+        except ArtifactVerifyFailed:
+            raise
+        except Exception as exc:
+            raise ArtifactVerifyFailed("snapshot berubah") from exc
         generated_at = now_utc().isoformat()
         existing = self.artifacts.list_for_case(case_id)
         if existing and all(a.source_snapshot_hash == snapshot_hash for a in existing):
             return existing
         built: list[ArtifactRecord] = []
+        # Determine if we should use 2.2 reporting-units path
+        use_units = False
+        units = []
+        units_report = None
+        next_action_payload = None
+        if case.route == Route.POST_INCIDENT_RESPONSE:
+            try:
+                from app.infrastructure.repositories import UnitMappingRepository
+                from app.services.next_action import next_action_to_dict, recommend_next_action
+                from app.services.readiness import assess_units
+                from app.services.reporting_units import compile_reporting_units
+
+                raw_facts = self.facts.list_for_case(case_id)
+                raw_evidence = self.evidence.list_for_case(case_id)
+                raw_conflicts = self.conflicts.list_for_case(case_id)
+                mappings = UnitMappingRepository(self.session).list_for_case(case_id)
+                decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+                units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
+                # Use 2.2 only for multi-unit or ambiguous cases; keep single complete unit as 2.1 for backward compat
+                if len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units):
+                    use_units = bool(units)
+                    if use_units:
+                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                        next_act = recommend_next_action(
+                            case_id=case_id,
+                            units=units,
+                            conflicts=raw_conflicts,
+                            readiness_by_unit=units_report.get("readiness_by_unit"),
+                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                        )
+                        next_action_payload = next_action_to_dict(next_act)
+                elif len(units) == 1 and units[0].mapping_status == "COMPLETE":
+                    # single complete unit stays 2.1
+                    use_units = False
+                    units = []
+                else:
+                    use_units = bool(units)
+                    if use_units:
+                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                        next_act = recommend_next_action(
+                            case_id=case_id,
+                            units=units,
+                            conflicts=raw_conflicts,
+                            readiness_by_unit=units_report.get("readiness_by_unit"),
+                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                        )
+                        next_action_payload = next_action_to_dict(next_act)
+            except Exception:
+                use_units = False
         if case.route == Route.PRE_INCIDENT_CHECK:
             built.append(self._store_pdf(case_id, ArtifactType.VERIFICATION_BRIEF, self._brief_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
+        elif use_units:
+            # 2.2 path: per-unit packs
+            report = self._readiness(case_id)
+            # action plan reflects next best action
+            built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines_v2(case_id, snapshot_hash, next_action_payload, units), generated_at, snapshot_hash))
+            built.append(self._store_pdf(case_id, ArtifactType.EVIDENCE_PACK, self._pack_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
+            built.append(
+                self._store_pdf(
+                    case_id,
+                    ArtifactType.READINESS_REPORT,
+                    self._readiness_lines_v2(case_id, snapshot_hash, units_report),
+                    generated_at,
+                    snapshot_hash,
+                )
+            )
+            # incident police pack
+            built.append(
+                self._store_pdf(
+                    case_id,
+                    ArtifactType.POLICE_HANDOFF_PACK,
+                    self._channel_pack_lines(case_id, snapshot_hash, report, "POLICE"),
+                    generated_at,
+                    snapshot_hash,
+                )
+            )
+            # per-unit packs
+            for unit in units:
+                # unit.json
+                unit_data = self._unit_json_data(unit, units_report)
+                built.append(
+                    self._store_bytes(
+                        case_id,
+                        ArtifactType.REPORTING_UNIT_JSON,
+                        json.dumps(unit_data, ensure_ascii=False, indent=2).encode(),
+                        "application/json",
+                        snapshot_hash,
+                        f"units/{unit.unit_id}/unit.json",
+                    )
+                )
+                # bank pack per unit
+                urep = None
+                if units_report:
+                    urep = next((r for r in units_report["units"] if r["unit_id"] == unit.unit_id), None)  # type: ignore[index]
+                bank_ready = urep and any(ch["channel"] == "BANK_PJP" and ch["status"] == "READY" for ch in urep["channels"])  # type: ignore[union-attr]
+                iasc_ready = urep and any(ch["channel"] == "IASC" and ch["status"] == "READY" for ch in urep["channels"])  # type: ignore[union-attr]
+                built.append(
+                    self._store_pdf(
+                        case_id,
+                        ArtifactType.UNIT_BANK_PACK,
+                        self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "BANK", bank_ready),
+                        generated_at,
+                        snapshot_hash,
+                        filename=f"units/{unit.unit_id}/bank_handoff_pack.pdf",
+                    )
+                )
+                built.append(
+                    self._store_pdf(
+                        case_id,
+                        ArtifactType.UNIT_IASC_PACK,
+                        self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "IASC", iasc_ready),
+                        generated_at,
+                        snapshot_hash,
+                        filename=f"units/{unit.unit_id}/iasc_handoff_pack.pdf",
+                    )
+                )
         else:
             report = self._readiness(case_id)
             built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
@@ -100,8 +230,8 @@ class ArtifactService:
         built.append(self._store_bytes(case_id, ArtifactType.CASE_JSON, json.dumps(case_json, ensure_ascii=False, indent=2).encode(), "application/json", snapshot_hash, "case.json"))
         checklist = self._checklist_text(case_id)
         built.append(self._store_bytes(case_id, ArtifactType.CHECKLIST, checklist.encode(), "text/markdown", snapshot_hash, "handoff.md"))
-        file_map = {a.type.value: (a.storage_key, a.sha256) for a in built}
-        manifest_lines = [f"{sha}  {name}" for name, (_key, sha) in sorted((self._manifest_name(k), v) for k, v in file_map.items())]
+        file_map = {str(a.verify_details.get("filename", a.type.value.lower())): (a.storage_key, a.sha256) for a in built}
+        manifest_lines = [f"{sha}  {name}" for name, (_key, sha) in sorted(file_map.items())]
         manifest_body = "\n".join(manifest_lines) + "\n"
         built.append(self._store_bytes(case_id, ArtifactType.MANIFEST, manifest_body.encode(), "text/plain", snapshot_hash, "manifest.sha256"))
         zip_bytes = self._zip_bytes(case_id, built)
@@ -115,10 +245,12 @@ class ArtifactService:
         lines: list[str],
         generated_at: str,
         snapshot_hash: str,
+        filename: str | None = None,
     ) -> ArtifactRecord:
         self._assert_safe_copy("\n".join(lines))
         data = render_lines(artifact_type.value.replace("_", " "), lines, generated_at, snapshot_hash)
-        return self._store_bytes(case_id, artifact_type, data, "application/pdf", snapshot_hash, f"{artifact_type.value.lower()}.pdf")
+        name = filename or f"{artifact_type.value.lower()}.pdf"
+        return self._store_bytes(case_id, artifact_type, data, "application/pdf", snapshot_hash, name)
 
     def _store_bytes(
         self,
@@ -227,9 +359,52 @@ class ArtifactService:
         artifacts = self.artifacts.list_for_case(case_id)
         active = self.approval.approvals.active_for_case(case_id)
         if active is None:
+            # try any active unit approval as fallback
+            from app.infrastructure.repositories import ApprovalRepository
+
+            all_approvals = ApprovalRepository(self.session).list_for_case(case_id)
+            actives = [a for a in all_approvals if a.revoked_at is None]
+            active = actives[-1] if actives else None
+        if active is None:
             raise ArtifactVerifyFailed("persetujuan tidak ditemukan")
-        return {
-            "schema_version": "2.1" if case.route == Route.POST_INCIDENT_RESPONSE else "2.0",
+        # try to build reporting units for 2.2
+        reporting_units_payload = None
+        next_best_action_payload = None
+        schema_version = "2.1" if case.route == Route.POST_INCIDENT_RESPONSE else "2.0"
+        try:
+            from app.infrastructure.repositories import UnitMappingRepository
+            from app.services.readiness import assess_units
+            from app.services.reporting_units import compile_reporting_units, unit_to_dict
+
+            raw_facts = self.facts.list_for_case(case_id)
+            raw_evidence = self.evidence.list_for_case(case_id)
+            raw_conflicts = self.conflicts.list_for_case(case_id)
+            mappings = UnitMappingRepository(self.session).list_for_case(case_id)
+            decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+            units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
+            should_use_22 = bool(units) and (len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units))
+            if should_use_22 and case.route == Route.POST_INCIDENT_RESPONSE:
+                schema_version = "2.2"
+                units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                reporting_units_payload = [unit_to_dict(u) for u in units]
+                # attach readiness per unit
+                for ru in reporting_units_payload:
+                    urep = next((r for r in units_report["units"] if r["unit_id"] == ru["unit_id"]), None)
+                    ru["readiness"] = urep
+                from app.services.next_action import next_action_to_dict, recommend_next_action
+
+                nxt = recommend_next_action(
+                    case_id=case_id,
+                    units=units,
+                    conflicts=raw_conflicts,
+                    readiness_by_unit=units_report.get("readiness_by_unit"),
+                    incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                )
+                next_best_action_payload = next_action_to_dict(nxt)
+        except Exception:
+            pass
+        base = {
+            "schema_version": schema_version,
             "case_id": case.case_id,
             "mode": case.mode.value,
             "route": case.route.value,
@@ -308,6 +483,26 @@ class ArtifactService:
             "disclaimer": "Tanggap60 tidak mengirim laporan dan tidak memverifikasi status resmi tiket.",
             "readiness": public_report(self._readiness(case_id)) if case.route == Route.POST_INCIDENT_RESPONSE else None,
         }
+        if schema_version == "2.2":
+            base["reporting_units"] = reporting_units_payload or []
+            base["next_best_action"] = next_best_action_payload
+            # incident readiness for v2
+            try:
+                from app.infrastructure.repositories import UnitMappingRepository
+                from app.services.readiness import assess_units
+                from app.services.reporting_units import compile_reporting_units
+
+                raw_facts = self.facts.list_for_case(case_id)
+                raw_evidence = self.evidence.list_for_case(case_id)
+                raw_conflicts = self.conflicts.list_for_case(case_id)
+                mappings = UnitMappingRepository(self.session).list_for_case(case_id)
+                decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+                units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
+                units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                base["readiness_units"] = units_report
+            except Exception:
+                base["readiness_units"] = None
+        return base
 
     def _zip_bytes(self, case_id: str, artifacts: list[ArtifactRecord]) -> bytes:
         buffer = BytesIO()
@@ -328,6 +523,9 @@ class ArtifactService:
             "BANK_HANDOFF_PACK": "bank_handoff_pack.pdf",
             "IASC_HANDOFF_PACK": "iasc_handoff_pack.pdf",
             "POLICE_HANDOFF_PACK": "police_handoff_pack.pdf",
+            "REPORTING_UNIT_JSON": "unit.json",
+            "UNIT_BANK_PACK": "bank_handoff_pack.pdf",
+            "UNIT_IASC_PACK": "iasc_handoff_pack.pdf",
             "CASE_JSON": "case.json",
             "CHECKLIST": "handoff.md",
             "MANIFEST": "manifest.sha256",
@@ -408,6 +606,105 @@ class ArtifactService:
         lines.append("Langkah handoff manual: buka kanal resmi sendiri. Tanggap60 tidak mengirim laporan.")
         lines.append(str(report["disclaimer"]))
         return lines
+
+    def _plan_lines_v2(self, case_id: str, snapshot_hash: str, next_action: dict[str, Any] | None, units: list) -> list[str]:
+        lines = [
+            f"Action Plan - {case_id}",
+            "Tanggap60 AI Digital Incident Rescue — Satu Insiden Menjadi Unit Tindakan Terverifikasi.",
+            "Tidak mengirim laporan, status resmi NOT_VERIFIED.",
+        ]
+        if next_action:
+            lines.append(f"LAKUKAN SEKARANG: {next_action.get('label')} — {next_action.get('reason')}")
+            if next_action.get("target_unit_id"):
+                lines.append(f"Unit sasaran: {next_action.get('target_unit_id')}")
+            lines.append(f"Kode: {next_action.get('code')}")
+        lines.append(f"Kami menemukan {len(units)} reporting unit(s).")
+        for unit in units:
+            status = getattr(unit, "mapping_status", "UNKNOWN")
+            status_str = status.value if hasattr(status, "value") else str(status)
+            lines.append(f"- {unit.unit_id}: {status_str} dest={unit.destination_account or '?'} amount={unit.amount or '?'} time={unit.transferred_at or '?'}")
+        lines.append(f"Snapshot {snapshot_hash}")
+        return lines
+
+    def _readiness_lines_v2(self, case_id: str, snapshot_hash: str, report: dict[str, Any] | None) -> list[str]:
+        if not report:
+            return self._readiness_lines(case_id, snapshot_hash, self._readiness(case_id))
+        profile_version = str(report.get("profile_version") or "unknown")
+        overall = report.get("overall_status") or "NEEDS_ACTION"
+        incomplete = overall != "READY"
+        lines = self._safety_header(case_id, snapshot_hash, profile_version, incomplete)
+        lines.append(f"Ringkasan kesiapan: {overall} — {len(report.get('units', []))} unit(s) + incident police")
+        for unit_rep in report.get("units", []):
+            lines.append(f"Unit {unit_rep['unit_id']}: {unit_rep['overall_status']} mapping={unit_rep.get('mapping_status')}")
+            for ch in unit_rep["channels"]:
+                lines.append(f"  {ch['channel']}: {ch['status_label']} ({ch['checks_met']}/{ch['checks_total']})")
+                for ck in ch["checks"]:
+                    lines.append(f"    - {ck['check_id']} {ck['status']}: {ck['reason']}")
+        incident = report.get("incident_police")
+        if incident:
+            lines.append(f"Incident Police: {incident['status_label']} ({incident['checks_met']}/{incident['checks_total']})")
+        lines.append(str(report.get("disclaimer") or ""))
+        return lines
+
+    def _unit_pack_lines(self, case_id: str, snapshot_hash: str, unit, urep: dict[str, Any] | None, channel: str, is_ready: bool | None) -> list[str]:
+        profile_version = ""
+        try:
+            from app.services.readiness import load_profile
+
+            profile_version = load_profile()["profile_version"]
+        except Exception:
+            profile_version = "unknown"
+        incomplete = not is_ready
+        lines = self._safety_header(case_id, snapshot_hash, profile_version, incomplete)
+        lines.append(f"Paket handoff {channel} — Unit {unit.unit_id}")
+        lines.append(f"Rekening tujuan: {unit.destination_account or 'BELUM ADA'}")
+        lines.append(f"Nominal: {unit.amount if unit.amount is not None else 'BELUM ADA'}")
+        lines.append(f"Waktu: {unit.transferred_at or 'BELUM ADA'}")
+        lines.append(f"Mapping: {getattr(unit.mapping_status, 'value', str(unit.mapping_status))} — {unit.mapping_reason}")
+        lines.append(f"Provenance: {unit.mapping_provenance}")
+        lines.append("Bukti terkait:")
+        for eid in unit.evidence_ids:
+            lines.append(f"- {eid}")
+        lines.append("Fakta terkait:")
+        for fid in unit.fact_ids:
+            try:
+                fact = next((f for f in self.facts.list_for_case(case_id) if f.fact_id == fid), None)
+                if fact:
+                    lines.append(f"- {fact.type.value}: {fact.raw_value} ({fact.review_status.value})")
+                else:
+                    lines.append(f"- {fid}")
+            except Exception:
+                lines.append(f"- {fid}")
+        if urep:
+            lines.append("Kesiapan kanal:")
+            for ch in urep["channels"]:
+                if channel.lower() in ch["channel"].lower() or channel == "BANK" and ch["channel"] == "BANK_PJP" or channel == "IASC" and ch["channel"] == "IASC":
+                    lines.append(f"- {ch['channel']}: {ch['status_label']}")
+                    for ck in ch["checks"]:
+                        if ck["status"] in {"MISSING", "CONFLICT", "PREPARE_EXTERNALLY"}:
+                            lines.append(f"  * {ck['label']}: {ck['reason'] or ck['action']}")
+        lines.append("Langkah handoff manual: buka kanal resmi sendiri. Tanggap60 tidak mengirim laporan.")
+        return lines
+
+    def _unit_json_data(self, unit, report: dict[str, Any] | None) -> dict[str, Any]:
+        urep = None
+        if report:
+            urep = next((r for r in report.get("units", []) if r["unit_id"] == unit.unit_id), None)
+        return {
+            "unit_id": unit.unit_id,
+            "case_id": unit.case_id,
+            "source_account": unit.source_account,
+            "destination_account": unit.destination_account,
+            "amount": unit.amount,
+            "currency": "IDR",
+            "transferred_at": transaction_time_or_none(unit.transferred_at) if unit.transferred_at else None,
+            "fact_ids": list(unit.fact_ids),
+            "evidence_ids": list(unit.evidence_ids),
+            "mapping_status": getattr(unit.mapping_status, "value", str(unit.mapping_status)),
+            "mapping_reason": unit.mapping_reason,
+            "mapping_provenance": unit.mapping_provenance,
+            "readiness": urep,
+        }
 
 
 def payload_notice() -> str:
