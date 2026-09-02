@@ -1,32 +1,65 @@
 {% extends "base.html" %}
-{% block title %}Rencana tindakan{% endblock %}
+{% block title %}Rencana tindakan — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Periksa</span>
+  <span class="step done"><i>✓</i> Tinjau</span>
+  <span class="step active"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
 <h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Indikator untuk diperiksa{% else %}Rencana tindakan darurat{% endif %}</h1>
-<p class="lede">Semakin cepat melapor dapat membantu penanganan, tetapi Tanggap60 tidak menjamin dana kembali.</p>
+<p class="lede">Semakin cepat melapor dapat membantu penanganan, tetapi Tanggap60 <b>tidak menjamin dana kembali</b>. Ikuti urutan — jangan lompat ke IASC sebelum bank/PJP.</p>
+
+<div class="fact-grid">
 {% for action in actions %}
 <article class="card">
-  <p class="muted">{{ action.priority.value }} · {{ action.channel.value }}</p>
-  <p>{{ action.instruction }}</p>
+  <div class="card-head">
+    <span class="kicker">{{ action.priority.value }} · {{ action.channel.value }}</span>
+    <span class="badge neutral">{{ loop.index }} / {{ actions|length }}</span>
+  </div>
+  <p style="margin:0;font-size:15px;line-height:1.6">{{ action.instruction }}</p>
 </article>
+{% else %}
+<article class="card soft">Belum ada rencana. Kembali ke tinjauan dan pastikan fakta terkonfirmasi.</article>
 {% endfor %}
-<p class="muted">Snapshot {{ snapshot_hash[:16] }}…</p>
-<p class="row">
+</div>
+
+<p class="muted" style="margin-top:12px">Snapshot <code>{{ snapshot_hash[:16] }}…</code> · hash mencakup readiness profile & status check. Perubahan fakta membatalkan approval.</p>
+
+<div class="row" style="margin-top:14px">
   <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Cek kesiapan kanal</a>
-  <a class="btn" href="/cases/{{ case.case_id }}/approval">Tinjau persetujuan</a>
-</p>
+  <a class="btn" href="/cases/{{ case.case_id }}/approval">Tinjau persetujuan →</a>
+</div>
+
 {% if case.route.value == "PRE_INCIDENT_CHECK" %}
-<form class="row" id="decision">
-  <button class="btn ghost" data-d="CANCELLED_ACTION">Batalkan tindakan</button>
-  <button class="btn" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Verifikasi lewat kanal resmi</button>
-  <button class="btn ghost" data-d="PROCEED_BY_USER">Saya memilih lanjut sendiri</button>
-</form>
+<div class="card" style="margin-top:16px">
+  <h3 style="margin:0 0 6px">Keputusan Anda</h3>
+  <p class="muted">Pilih satu — tidak ada default. Keputusan dicatat sebagai event.</p>
+  <form class="row" id="decision" style="margin-top:10px">
+    <button class="btn ghost" data-d="CANCELLED_ACTION">Batalkan tindakan</button>
+    <button class="btn" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Verifikasi lewat kanal resmi</button>
+    <button class="btn ghost" data-d="PROCEED_BY_USER">Saya memilih lanjut sendiri</button>
+  </form>
+</div>
 <script>
 document.getElementById("decision").addEventListener("click", async (ev) => {
   const d = ev.target.getAttribute("data-d");
   if (!d) return;
   ev.preventDefault();
   await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
+  ev.target.textContent = "Tercatat ✓";
 });
 </script>
 {% endif %}
+{% endblock %}
+{% block rail %}
+<h2>Urutan</h2>
+<div class="rail-list">
+  <div class="rail-item"><span>1. Sekarang</span><b>Bank/PJP</b></div>
+  <div class="rail-item"><span>2. Siapkan</span><b>Fakta & bukti</b></div>
+  <div class="rail-item"><span>3. Serahkan</span><b>IASC + Polisi</b></div>
+</div>
+<p class="muted" style="margin-top:10px">Snapshot hash mengikat paket. Jika hash berubah, Anda harus menyetujui ulang.</p>
 {% endblock %}

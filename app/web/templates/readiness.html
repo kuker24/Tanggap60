@@ -1,33 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Kesiapan handoff{% endblock %}
+{% block title %}Kesiapan handoff — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Periksa</span>
+  <span class="step active"><i>3</i> Tinjau</span>
+  <span class="step"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
 <h1>Cek kelengkapan sebelum ke kanal resmi</h1>
-<p class="lede">{{ report.disclaimer }} Status resmi tetap NOT_VERIFIED. Tanggap60 tidak mengirim laporan.</p>
-<p class="muted">Profil {{ report.profile_version }} · {{ report.overall_label }}</p>
+<p class="lede">{{ report.disclaimer }} Status resmi tetap <b>NOT_VERIFIED</b>. Tanggap60 tidak mengirim laporan — Anda yang membawa paket.</p>
+
+<div class="readiness-top">
+  <span class="pill">Profil {{ report.profile_version }} · {{ report.overall_label }}</span>
+  <span class="muted">3 kanal · nilai = checks_met / checks_total</span>
+</div>
+
 <div class="cards-3">
   {% for channel in report.channels %}
-  <article class="card status-{{ channel.status|lower }}">
-    <h2>{{ channel.label }}</h2>
-    <p><span class="badge {% if channel.status == 'READY' %}ok{% elif channel.status == 'BLOCKED' %}err{% endif %}">{{ channel.status_label }}</span></p>
-    <p>{{ channel.checks_met }}/{{ channel.checks_total }} pemeriksaan terpenuhi</p>
+  <article class="status-card status-{{ channel.status|lower }}">
+    <div class="card-head">
+      <h3>{{ channel.label }}</h3>
+      <span class="badge {% if channel.status == 'READY' %}ok{% elif channel.status == 'BLOCKED' %}err{% endif %}">{{ channel.status_label }}</span>
+    </div>
+    <p style="margin:0 0 8px"><b style="font-size:22px;letter-spacing:-.04em">{{ channel.checks_met }}/{{ channel.checks_total }}</b> <span class="muted">pemeriksaan terpenuhi</span></p>
+    <div class="progress" aria-hidden="true"><i style="width: {{ (channel.checks_met / channel.checks_total * 100) if channel.checks_total else 0 }}%"></i></div>
     <ul class="gaps">
       {% for check in channel.checks if check.status in ['MISSING', 'CONFLICT'] %}
-      <li>{{ check.label }} — {{ check.action or check.reason }}</li>
+      <li><b>{{ check.label }}</b> — {{ check.action or check.reason }}</li>
       {% endfor %}
       {% for check in channel.checks if check.status == 'PREPARE_EXTERNALLY' %}
-      <li class="muted">{{ check.label }}</li>
+      <li class="muted">{{ check.label }} · isi di portal resmi</li>
       {% endfor %}
+      {% if channel.status == 'READY' %}
+      <li class="muted">Siap dibuatkan draf paket kanal.</li>
+      {% endif %}
     </ul>
-    <p><a class="btn ghost" href="/cases/{{ case.case_id }}/review">Perbaiki kekurangan</a></p>
+    <div class="row" style="margin-top:12px">
+      <a class="btn ghost small" href="/cases/{{ case.case_id }}/review">Perbaiki kekurangan</a>
+    </div>
   </article>
   {% endfor %}
 </div>
-<p class="row">
+
+<div class="row" style="margin-top:18px">
   <a class="btn ghost" href="/cases/{{ case.case_id }}/review">Kembali ke fakta</a>
-  <a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana</a>
-</p>
+  <a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana →</a>
+</div>
+<p class="muted" style="margin-top:10px">Profil adalah rule internal Tanggap60, bukan reproduksi resmi bank/IASC/polisi. Lihat <code>app/data/readiness_profiles.json</code>.</p>
 {% endblock %}
 {% block rail %}
 <h2>{{ case.state.value }}</h2>
-<p class="muted">Pemeriksaan internal. Bukan jaminan laporan diterima.</p>
+<p class="muted">Pemeriksaan internal. Bukan jaminan laporan diterima. Kanal BLOCKED harus diselesaikan sebelum paket final.</p>
+<div class="rail-list">
+  <div class="rail-item"><span>READY</span><b style="color:var(--green)">Siap draf</b></div>
+  <div class="rail-item"><span>NEEDS_ACTION</span><b style="color:var(--amber-2)">Perlu tindakan</b></div>
+  <div class="rail-item"><span>BLOCKED</span><b style="color:var(--red)">Terblokir</b></div>
+</div>
 {% endblock %}

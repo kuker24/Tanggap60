@@ -1,12 +1,63 @@
 {% extends "base.html" %}
-{% block title %}Ada yang mencurigakan?{% endblock %}
+{% block title %}Ada yang mencurigakan? — SatuAman{% endblock %}
 {% block content %}
-<h1>Ada yang mencurigakan? Mulai dari kondisi Anda.</h1>
-<p class="lede">Pilih satu. Tanggap60 memakai mesin yang sama untuk cek awal dan penanganan setelah kerugian.</p>
-<form class="choices" method="post" action="/start">
-  <input type="hidden" name="mode" value="DEMO">
-  <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">Belum ada kerugian - saya ingin mengecek dulu</button>
-  <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">Sudah terjadi kerugian - bantu saya bertindak</button>
-</form>
-<p class="muted">Mode demo: unggah data dummy. Jangan unggah password, OTP, CAPTCHA, atau KTP.</p>
+<div class="hero">
+  <div class="hero-copy">
+    <h1>Ada yang mencurigakan?<br>Mulai dari kondisi Anda.</h1>
+    <p class="lede">Tanggap60 mengubah bukti berantakan — chat, invoice, bukti transfer — menjadi <b>map forensik yang bisa diajar</b> ke bank, IASC, dan polisi. Satu intake, satu tinjauan, satu approval.</p>
+    <form class="choices" method="post" action="/start">
+      <input type="hidden" name="mode" value="DEMO">
+      <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
+        <span class="choice-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="8"/><path d="M8 16l2-2"/><path d="M16 16l-2-2"/></svg>
+        </span>
+        <span>
+          <b>Sudah terjadi kerugian — bantu saya bertindak</b>
+          <span>Unggah bukti, Tanggap60 ekstrak fakta & deteksi konflik, lalu susun paket handoff.</span>
+        </span>
+        <span class="choice-arrow" aria-hidden="true">→</span>
+      </button>
+      <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
+        <span class="choice-icon" aria-hidden="true">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="6"/><path d="M20 20l-3.5-3.5"/><path d="M8 11h6"/></svg>
+        </span>
+        <span>
+          <b>Belum ada kerugian — saya ingin mengecek dulu</b>
+          <span>Dapat indikator, alasan, dan cara verifikasi resmi. Bukan vonis aman/tidak.</span>
+        </span>
+        <span class="choice-arrow" aria-hidden="true">→</span>
+      </button>
+    </form>
+    <div class="trustbar">
+      <span>Setiap fakta punya sumber</span>
+      <span>Tidak ada auto-submit</span>
+      <span>ZIP 9 berkas · SHA-256</span>
+    </div>
+    <p class="muted" style="margin-top:14px">Mode demo: jangan unggah password, OTP, CAPTCHA, atau KTP. Data dummy untuk 60 detik.</p>
+  </div>
+  <div class="hero-preview reveal" aria-hidden="true">
+    <div class="preview-head">
+      <strong>Preview map — setelah intake</strong>
+      <em>Hermes 9 tool</em>
+    </div>
+    <div class="mini-stack">
+      <div class="mini">
+        <b>Rp 2.750.000 · 12 Agu 2026 09:41 WIB</b>
+        <p>Sumber: transfer.png · hal 1 · bbox 12,40 — perlu konfirmasi. Deteksi konflik nominal aktif.</p>
+        <div class="meta"><span class="meta-tag">Transaksi</span><span class="meta-tag">Bukti transaksi</span><span class="meta-tag">Butuh tinjau</span></div>
+      </div>
+      <div class="mini">
+        <b>Rek. tujuan 123-456-7890 · BCA</b>
+        <p>Diekstrak dari chat & invoice, cross-check dengan mutasi. Status kesiapan Bank: NEEDS_ACTION.</p>
+        <div class="meta"><span class="meta-tag">Rekening</span><span class="meta-tag">Penerima</span><span class="meta-tag">Siap handoff</span></div>
+      </div>
+      <div class="mini">
+        <b>Konflik: dua nominal berbeda</b>
+        <p>Tanggap60 tidak memilih sendiri — Anda tentukan nilai benar sebelum paket final.</p>
+        <div class="meta"><span class="meta-tag" style="background:var(--red-soft);border-color:rgba(153,27,27,.18);color:var(--red)">BLOCKING</span><span class="meta-tag">Perlu keputusan</span></div>
+      </div>
+    </div>
+    <div class="map-foot"><span>Timeline · Fakta · Kesiapan kanal</span><span class="badge ok">Preflight mvp2</span></div>
+  </div>
+</div>
 {% endblock %}

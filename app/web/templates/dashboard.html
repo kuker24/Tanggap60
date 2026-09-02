@@ -1,14 +1,34 @@
 {% extends "base.html" %}
-{% block title %}Dashboard VPS{% endblock %}
+{% block title %}Dashboard VPS — Tanggap60{% endblock %}
 {% block content %}
 <h1>Dashboard sumber daya</h1>
-<pre id="metrics" class="card">memuat…</pre>
+<p class="lede">Live dari <code>/demo/metrics</code> — elapsed, RSS, RAM tersedia, queue, dan tool durations. Guard: RAM ≥1024 MB · disk ≥2048 MB.</p>
+<div class="grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:14px 0">
+  <div class="card"><span class="kicker">Cases</span><b id="m-cases" style="font-size:22px">—</b></div>
+  <div class="card"><span class="kicker">Avg p95 target</span><b style="font-size:22px">&lt;60s</b></div>
+  <div class="card"><span class="kicker">Status</span><b id="m-status" style="font-size:22px">—</b></div>
+</div>
+<pre id="metrics" class="card mono" style="min-height:220px;overflow:auto">memuat…</pre>
 <script>
 async function load() {
-  const res = await fetch("/demo/metrics");
-  document.getElementById("metrics").textContent = JSON.stringify(await res.json(), null, 2);
+  try{
+    const res = await fetch("/demo/metrics");
+    const j = await res.json();
+    document.getElementById("metrics").textContent = JSON.stringify(j, null, 2);
+    if(j.cases!==undefined) document.getElementById("m-cases").textContent = j.cases;
+    document.getElementById("m-status").textContent = j.status || "ok";
+  }catch(e){ document.getElementById("metrics").textContent = "gagal memuat metrics: "+e; }
 }
 load();
 setInterval(load, 3000);
 </script>
+{% endblock %}
+{% block rail %}
+<h2>Untuk juri</h2>
+<p class="muted">Setiap request membawa case_id & run_id. Durasi per tool tercatat — lihat timeline di halaman Processing.</p>
+<div class="kv">
+  <div><span class="muted">Worker</span><b>1 web · 1 heavy</b></div>
+  <div><span class="muted">Hermes</span><b>allowlist</b></div>
+  <div><span class="muted">DB</span><b>SQLite WAL</b></div>
+</div>
 {% endblock %}

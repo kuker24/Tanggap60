@@ -1,21 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Masukkan bukti{% endblock %}
+{% block title %}Masukkan bukti — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step active"><i>1</i> Masukkan bukti</span>
+  <span class="step"><i>2</i> Periksa</span>
+  <span class="step"><i>3</i> Tinjau</span>
+  <span class="step"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
-<h1>Masukkan yang Anda punya. Tidak harus rapi.</h1>
-<p class="lede">Screenshot chat, bukti transfer, PDF, URL, atau cerita singkat.</p>
-<p class="notice">Jangan unggah password, OTP, CAPTCHA, atau KTP pada versi demo.</p>
-<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data">
-  <label for="files">Berkas (JPG, PNG, PDF · maks 8 · 25 MB)</label>
-  <input id="files" name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
-  <label for="text">Cerita singkat</label>
-  <textarea id="text" name="text" placeholder="Contoh: saya transfer tadi pagi lalu penjual hilang."></textarea>
-  <label for="url">URL (opsional, tidak dibuka oleh server)</label>
-  <input id="url" name="url" type="text" placeholder="https://">
-  <p><button class="btn" type="submit">Analisis bukti saya</button></p>
+<h1>Masukkan yang Anda punya.<br> Tidak harus rapi.</h1>
+<p class="lede">Screenshot chat, bukti transfer, PDF, URL, atau cerita singkat. Tanggap60 akan menyusun fakta dengan sumbernya.</p>
+<div class="notice">Jangan unggah password, OTP, CAPTCHA, atau KTP pada versi demo. Upload dibatasi 8 berkas · 25 MB · JPG/PNG/PDF.</div>
+
+<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" style="margin-top:16px">
+  <div class="drop">
+    <div class="drop-head">
+      <span class="drop-title">Seret berkas ke sini atau pilih</span>
+      <span class="pill">JPG · PNG · PDF</span>
+    </div>
+    <input id="files" name="files" type="file" class="file-input" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
+    <p class="drop-hint" style="margin:8px 0 0">Tips: foto transfer yang jelas mempercepat ekstraksi. Jika blur, Anda tetap bisa isi manual di tinjauan.</p>
+  </div>
+
+  <label for="text">Cerita singkat <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— opsional tapi sangat membantu</span></label>
+  <textarea id="text" name="text" placeholder="Contoh: saya transfer tadi pagi Rp2.750.000 ke BCA 123-... lalu penjual hilang. Kejadian 12 Agu 09:41 WIB."></textarea>
+
+  <label for="url">URL <span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">— tidak dibuka server, hanya cek indikator</span></label>
+  <input id="url" name="url" type="text" placeholder="https:// contoh-link-meragukan">
+
+  <div class="row" style="margin-top:18px">
+    <button class="btn" type="submit">Analisis bukti saya →</button>
+    <a class="btn ghost" href="/">Batal</a>
+  </div>
 </form>
 {% endblock %}
 {% block rail %}
 <h2>Kasus</h2>
-<p class="badge">{{ case.state.value }}</p>
+<p><span class="badge">{{ case.state.value }}</span></p>
 <p class="muted">{{ case.route_reason }}</p>
+<div class="divider"></div>
+<p class="muted">Setelah ini Tanggap60 menjalankan 9 tool berurutan. Bukan persentase palsu — status nyata yang bisa Anda audit.</p>
+<div class="kv">
+  <div><span class="muted">ID kasus</span><b class="mono" style="font-size:11px">{{ case.case_id[:12] }}…</b></div>
+  <div><span class="muted">Rute</span><b>{{ case.route.value }}</b></div>
+</div>
 {% endblock %}

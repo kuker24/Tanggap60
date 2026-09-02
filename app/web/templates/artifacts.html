@@ -1,28 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Paket kasus{% endblock %}
+{% block title %}Paket kasus — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Periksa</span>
+  <span class="step done"><i>✓</i> Tinjau</span>
+  <span class="step active"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
 <h1>Paket terverifikasi secara teknis</h1>
+<p class="lede">Setiap PDF berlabel <b>DRAF PENGGUNA — BUKAN DOKUMEN RESMI</b> dan <b>STATUS RESMI: NOT_VERIFIED</b>. Belum lengkap = <b>BELUM LENGKAP — PERLU TINDAKAN</b>.</p>
+
 <table>
   <thead><tr><th>Artefak</th><th>Status</th><th>Hash</th><th></th></tr></thead>
   <tbody>
   {% for a in artifacts %}
     <tr>
-      <td>{{ a.type }}</td>
+      <td><b style="font-size:13px">{{ a.type }}</b></td>
       <td><span class="badge {% if a.verify_status == 'PASS' %}ok{% elif a.verify_status == 'FAIL' %}err{% endif %}">{{ a.verify_status }}</span></td>
-      <td class="muted">{{ a.sha256[:16] }}…</td>
-      <td>{% if a.downloadable %}<a href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>{% else %}terkunci{% endif %}</td>
+      <td class="muted mono">{{ a.sha256[:16] }}…</td>
+      <td>{% if a.downloadable %}<a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>{% else %}<span class="muted">terkunci</span>{% endif %}</td>
     </tr>
   {% endfor %}
   </tbody>
 </table>
-<article class="card">
-  <h2>Handoff resmi</h2>
-  <p>Domain yang akan dibuka: <strong>{{ domain }}</strong></p>
-  <p class="muted">{{ official_url }}</p>
-  <p>Isi identitas dan KTP langsung di portal resmi. Jangan masukkan data tersebut ke Tanggap60 versi demo.</p>
-  <p class="row">
-    <a class="btn" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs resmi IASC</a>
+
+<article class="card" style="margin-top:16px">
+  <div class="card-head">
+    <h3>Handoff resmi — hanya buka & bawa paket</h3>
+    <span class="badge">Manual</span>
+  </div>
+  <p>Domain yang akan dibuka: <strong style="letter-spacing:-.02em">{{ domain }}</strong></p>
+  <p class="muted mono" style="word-break:break-all">{{ official_url }}</p>
+  <p class="muted">Isi identitas dan KTP <b>langsung di portal resmi</b>. Jangan masukkan data tersebut ke Tanggap60 demo.</p>
+  <div class="row" style="margin-top:10px">
+    <a class="btn" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs resmi IASC →</a>
     <a class="btn ghost" href="/cases/{{ case.case_id }}/receipt">Catat bukti tiket</a>
-  </p>
+    <a class="btn ghost" href="/api/v1/cases/{{ case.case_id }}/artifacts/download?format=zip">Unduh ZIP 9 berkas</a>
+  </div>
 </article>
+{% endblock %}
+{% block rail %}
+<h2>Verifikasi</h2>
+<p class="muted">Tanggap60 memverifikasi: schema, PDF bisa dibuka, hash cocok, ZIP test. Gagal = unduh terkunci.</p>
+<div class="kv">
+  <div><span class="muted">ZIP isi</span><b>9</b></div>
+  <div><span class="muted">Manifest</span><b>SHA-256</b></div>
+</div>
+<div class="divider"></div>
+<p class="muted">ZIP: action_plan, evidence_pack, readiness_report, 3 handoff pack, case.json (2.1), handoff.md, manifest.sha256.</p>
 {% endblock %}

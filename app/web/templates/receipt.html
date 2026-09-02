@@ -1,44 +1,73 @@
 {% extends "base.html" %}
-{% block title %}Catat bukti{% endblock %}
+{% block title %}Catat bukti — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Periksa</span>
+  <span class="step done"><i>✓</i> Tinjau</span>
+  <span class="step active"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
 <h1>Sudah menyerahkan laporan? Catat buktinya.</h1>
+
 {% if receipt %}
-<ul>
-  <li>Nomor dicatat pengguna: {{ receipt.ticket_value_masked }}</li>
-  <li>Format diperiksa secara lokal: {{ receipt.format_status.value }}</li>
-  <li>Cocok dengan screenshot receipt: {{ receipt.local_match_status.value }}</li>
-  <li>Status resmi belum diverifikasi</li>
-</ul>
+<div class="card">
+  <div class="card-head"><h3>Tercatat</h3><span class="badge ok">Format diperiksa lokal</span></div>
+  <div class="kv">
+    <div><span class="muted">Nomor (masked)</span><b class="mono">{{ receipt.ticket_value_masked }}</b></div>
+    <div><span class="muted">Format lokal</span><b>{{ receipt.format_status.value }}</b></div>
+    <div><span class="muted">Cocok screenshot receipt</span><b>{{ receipt.local_match_status.value }}</b></div>
+    <div><span class="muted">Status resmi</span><b style="color:var(--amber-2)">NOT_VERIFIED</b></div>
+  </div>
+  <p class="muted" style="margin-top:10px">Aplikasi tidak pernah menampilkan “laporan resmi berhasil” — itu hanya bisa Anda lihat di portal resmi.</p>
+</div>
 {% else %}
-<form id="rcpt">
-  <label for="ticket">Nomor tiket</label>
-  <input id="ticket" name="ticket_text" type="text">
-  <p><button class="btn" type="submit">Simpan catatan</button></p>
-</form>
-<p class="muted">Aplikasi tidak menampilkan “laporan resmi berhasil”.</p>
-<script>
-document.getElementById("rcpt").addEventListener("submit", async (ev) => {
-  ev.preventDefault();
-  const ticket_text = document.getElementById("ticket").value;
-  await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
-    method: "POST",
-    headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
-    body: JSON.stringify({ticket_text})
+<div class="card">
+  <h3 style="margin:0 0 8px">Masukkan nomor tiket</h3>
+  <p class="muted">Hanya dicatat lokal dan diperiksa format. Tidak ada verifikasi ke portal.</p>
+  <form id="rcpt" style="margin-top:12px">
+    <label for="ticket">Nomor tiket</label>
+    <input id="ticket" name="ticket_text" type="text" placeholder="Contoh: IASC-2026-...">
+    <div class="row" style="margin-top:12px">
+      <button class="btn" type="submit">Simpan catatan</button>
+      <span class="muted">Idempotent — aman diklik dua kali.</span>
+    </div>
+  </form>
+  <p class="muted" style="margin-top:10px">Aplikasi tidak menampilkan “laporan resmi berhasil”.</p>
+  <script>
+  document.getElementById("rcpt").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const ticket_text = document.getElementById("ticket").value;
+    await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
+      body: JSON.stringify({ticket_text})
+    });
+    location.reload();
   });
-  location.reload();
-});
-</script>
+  </script>
+</div>
 {% endif %}
-<form method="post" action="#" onsubmit="return purgeNow(event)">
-  <button class="btn danger" type="submit">Hapus kasus ini</button>
-</form>
+
+<div class="card" style="margin-top:14px;border-color:rgba(153,27,27,.18)">
+  <h3 style="margin:0">Hapus kasus ini</h3>
+  <p class="muted">Menghapus evidence, fakta, artefak, approval, dan receipt secara permanen. Tidak bisa dibatalkan.</p>
+  <form method="post" action="#" onsubmit="return purgeNow(event)" style="margin-top:10px">
+    <button class="btn danger" type="submit">Hapus permanen</button>
+  </form>
+</div>
 <script>
 async function purgeNow(ev) {
   ev.preventDefault();
-  if (!confirm("Hapus permanen?")) return false;
+  if (!confirm("Hapus permanen? Data tidak bisa kembali.")) return false;
   await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
   location.href = "/";
   return false;
 }
 </script>
+{% endblock %}
+{% block rail %}
+<h2>Setelah handoff</h2>
+<p class="muted">Bawa ZIP ke bank/IASC/polisi. Simpan nomor tiket di sini hanya sebagai jejak lokal — status resmi tetap NOT_VERIFIED sampai Anda cek kembali di portal.</p>
 {% endblock %}

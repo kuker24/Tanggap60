@@ -1,22 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Persetujuan{% endblock %}
+{% block title %}Persetujuan — Tanggap60{% endblock %}
+{% block stepper %}
+<nav class="stepper" aria-label="Langkah">
+  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Periksa</span>
+  <span class="step done"><i>✓</i> Tinjau</span>
+  <span class="step active"><i>4</i> Paket</span>
+</nav>
+{% endblock %}
 {% block content %}
 <h1>Buat paket final?</h1>
+
 {% if blocking %}
-<p class="card block">Selesaikan {{ blocking|length }} konflik nominal terlebih dahulu.</p>
-<a class="btn" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a>
+<article class="card block">
+  <h3 style="margin:0">Tertahan — selesaikan konflik</h3>
+  <p class="muted">Ada <b>{{ blocking|length }} konflik BLOCKING</b> terbuka. Paket tidak bisa dibuat sebelum Anda memilih nilai yang benar.</p>
+  <div class="row" style="margin-top:10px"><a class="btn" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan →</a></div>
+</article>
 {% else %}
-<p><a href="/cases/{{ case.case_id }}/readiness">Lihat kesiapan Bank/PJP, IASC, dan Kepolisian</a></p>
-<p>Snapshot: <code>{{ snapshot_hash }}</code></p>
-<label>
-  <input id="notice" type="checkbox">
-  Saya telah meninjau fakta dan memahami bahwa Tanggap60 tidak mengirim laporan atau membuat keputusan hukum.
-</label>
-<p><button class="btn" id="go" disabled>Buat Paket Final</button></p>
+<div class="card">
+  <div class="card-head">
+    <h3>Ringkas sebelum menyetujui</h3>
+    <span class="badge ok">Siap</span>
+  </div>
+  <p class="muted">Anda akan mengunci paket pada snapshot ini. Perubahan fakta/kesiapan setelah ini akan membatalkan approval dan menuntut persetujuan baru.</p>
+  <p style="margin:12px 0 0"><a class="link" href="/cases/{{ case.case_id }}/readiness">Lihat kesiapan Bank/PJP, IASC, dan Kepolisian →</a></p>
+  <div class="kv">
+    <div><span class="muted">Snapshot</span><b class="mono">{{ snapshot_hash[:16] }}…</b></div>
+    <div><span class="muted">Full hash</span><span class="mono" style="font-size:11px;word-break:break-all">{{ snapshot_hash }}</span></div>
+  </div>
+  <label style="margin-top:14px;display:flex;gap:10px;align-items:start;text-transform:none;letter-spacing:0;font-weight:500;font-size:14px;color:var(--ink)">
+    <input id="notice" type="checkbox" style="margin-top:4px;width:18px;height:18px;accent-color:var(--ink)">
+    <span>Saya telah meninjau fakta dan memahami bahwa Tanggap60 <b>tidak mengirim laporan</b> atau membuat keputusan hukum. Paket ini draf untuk saya bawa ke kanal resmi.</span>
+  </label>
+  <div class="row" style="margin-top:14px">
+    <button class="btn" id="go" disabled>Buat Paket Final →</button>
+    <span id="hint" class="muted">Centang pernyataan di atas untuk melanjutkan.</span>
+  </div>
+</div>
 <script>
 const box = document.getElementById("notice");
 const go = document.getElementById("go");
-box.addEventListener("change", () => { go.disabled = !box.checked; });
+const hint = document.getElementById("hint");
+box.addEventListener("change", () => { go.disabled = !box.checked; hint.textContent = box.checked ? "Siap. Paket akan diverifikasi & dimanifest." : "Centang pernyataan di atas untuk melanjutkan."; });
 go.addEventListener("click", async () => {
   const res = await fetch("/api/v1/cases/{{ case.case_id }}/approval", {
     method: "POST",
@@ -25,10 +51,18 @@ go.addEventListener("click", async () => {
   });
   if (res.ok) location.href = "/cases/{{ case.case_id }}/artifacts";
   else {
-    const err = await res.json();
-    alert(err.message || err.code);
+    const err = await res.json().catch(()=>({message:await res.text()}));
+    alert(err.message || err.detail || err.code || "Gagal approval");
   }
 });
 </script>
 {% endif %}
+{% endblock %}
+{% block rail %}
+<h2>Kenapa dikunci?</h2>
+<p class="muted">Approval hash-bound mencegah paket berubah diam-diam setelah Anda setuju. Jika konflik muncul lagi, tombol terkunci dengan alasan yang bisa dibaca.</p>
+<div class="kv">
+  <div><span class="muted">State</span><b>{{ case.state.value }}</b></div>
+  <div><span class="muted">Versi</span><b>{{ case.version }}</b></div>
+</div>
 {% endblock %}
