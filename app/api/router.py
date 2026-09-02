@@ -659,6 +659,7 @@ def list_events(case_id: str, request: Request) -> dict[str, Any]:
 @api.get("/cases/{case_id}/trace")
 def agent_trace(case_id: str, request: Request) -> dict[str, Any]:
     svc(request)["cases"].get_owned(case_id, sid(request))
+    from app.hermes.telemetry import REASONING_TOOLS
     from app.infrastructure.logging import hash_id
 
     events = EventRepository(request.state.db).list_for_case(hash_id(case_id))
@@ -672,9 +673,21 @@ def agent_trace(case_id: str, request: Request) -> dict[str, Any]:
         for e in events
         if e.event_type == "TOOL_CALLED" and e.tool_name
     ]
+    reasoning_steps = [s for s in steps if s["tool_name"] in REASONING_TOOLS]
+    reasoning_fallback = [s for s in reasoning_steps if s["planner"] != "HERMES_CLI"]
+    hermes_cli_used = any(step["planner"] == "HERMES_CLI" for step in steps)
+    # detailed hermes telemetry per case via hermes instance last state (best-effort)
+    hermes = request.app.state.container.hermes
     return {
         "steps": steps,
-        "hermes_cli_used": any(step["planner"] == "HERMES_CLI" for step in steps),
+        "hermes_cli_used": hermes_cli_used,
+        "hermes_cli_configured": bool(getattr(hermes, "hermes_cli_configured", False) or request.app.state.container.settings.hermes_bin),
+        "hermes_cli_attempted": bool(getattr(hermes, "hermes_cli_attempted", False)),
+        "hermes_cli_succeeded": bool(getattr(hermes, "hermes_cli_succeeded", False)) or hermes_cli_used,
+        "hermes_fallback_used": len(reasoning_fallback) > 0 or bool(getattr(hermes, "hermes_fallback_used", False)),
+        "hermes_failure_reason": getattr(hermes, "hermes_failure_reason", None),
+        "hermes_reasoning_success": len(reasoning_fallback) == 0 and hermes_cli_used,
+        "reasoning_fallback_count": len(reasoning_fallback),
         "official_status": "NOT_VERIFIED",
     }
 
@@ -687,7 +700,12 @@ def agent_tools(request: Request) -> dict[str, Any]:
         "tools": list(TOOL_SPECS),
         "hermes_mode": getattr(hermes, "last_mode", "deterministic"),
         "hermes_cli_used": bool(getattr(hermes, "cli_used", False)),
+        "hermes_cli_configured": bool(getattr(hermes, "hermes_cli_configured", False) or bool(settings.hermes_bin) or bool(settings.hermes_endpoint)),
         "hermes_bin_configured": bool(settings.hermes_bin),
+        "hermes_cli_attempted": bool(getattr(hermes, "hermes_cli_attempted", False)),
+        "hermes_cli_succeeded": bool(getattr(hermes, "hermes_cli_succeeded", False)),
+        "hermes_fallback_used": bool(getattr(hermes, "hermes_fallback_used", False)),
+        "hermes_failure_reason": getattr(hermes, "hermes_failure_reason", None),
     }
 
 
