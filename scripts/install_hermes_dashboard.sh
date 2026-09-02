@@ -34,9 +34,12 @@ id tanggap60 >/dev/null 2>&1 && usermod -aG hermes tanggap60
 apt-get install -y --no-install-recommends acl
 chmod 0750 /home/hermes
 chmod 0750 /home/hermes/.hermes
-setfacl -b /home/hermes /home/hermes/.hermes || true
 setfacl -m u:tanggap60:--x /home/hermes
+setfacl -m m::rx /home/hermes/.hermes
 setfacl -m u:tanggap60:r-x /home/hermes/.hermes
+if [[ -d /home/hermes/.hermes/hermes-agent ]]; then
+  setfacl -R -m u:tanggap60:r-x -m m::rx /home/hermes/.hermes/hermes-agent
+fi
 if [[ -f /home/hermes/.hermes/config.yaml ]]; then
   setfacl -m u:tanggap60:r-- /home/hermes/.hermes/config.yaml
 fi
@@ -45,7 +48,7 @@ if [[ -f /home/hermes/.hermes/.env ]]; then
 fi
 for d in logs sessions tmp cache; do
   install -d -o hermes -g hermes "/home/hermes/.hermes/${d}"
-  setfacl -m u:tanggap60:rwx "/home/hermes/.hermes/${d}"
+  setfacl -m u:tanggap60:rwx -m m::rwx "/home/hermes/.hermes/${d}"
   setfacl -d -m u:tanggap60:rwx "/home/hermes/.hermes/${d}"
 done
 ENV_FILE=/etc/tanggap60/tanggap60.env
