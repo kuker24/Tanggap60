@@ -11,6 +11,7 @@ from app.hermes.adapter import (
     FallbackHermes,
     build_hermes,
     parse_tool_reply,
+    parse_tools_reply,
 )
 from app.hermes.tools.catalog import TOOL_SPECS, tool_names
 
@@ -43,6 +44,28 @@ def test_parse_tool_reply_json_and_fence() -> None:
     allowed = {"inspect_evidence", "extract_candidate_facts"}
     assert parse_tool_reply('{"tool": "inspect_evidence"}', allowed) == "inspect_evidence"
     assert parse_tool_reply("```json\n{\"tool\": null}\n```", allowed) is None
+
+
+def test_parse_tools_reply_sequence() -> None:
+    assert parse_tools_reply('{"tools": ["inspect_evidence", "extract_candidate_facts"]}') == [
+        "inspect_evidence",
+        "extract_candidate_facts",
+    ]
+    assert parse_tools_reply('{"tool": null}') == []
+
+
+def test_cli_hermes_sequence() -> None:
+    def fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["hermes"],
+            returncode=0,
+            stdout='{"tools": ["inspect_evidence", "extract_candidate_facts"]}',
+            stderr="",
+        )
+
+    hermes = CliHermes(command=["hermes"], runner=fake_run)
+    assert hermes.propose_sequence("INGESTING", {}) == ["inspect_evidence", "extract_candidate_facts"]
+    assert hermes.last_mode == "cli"
 
 
 def test_parse_tool_reply_rejects_outside_allowlist() -> None:

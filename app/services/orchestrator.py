@@ -36,6 +36,22 @@ class Orchestrator:
 
     def run_until_pause(self, case_id: str, run_id: str) -> dict[str, object]:
         trace: list[str] = []
+        case = self.case_repo.get(case_id)
+        summary0 = {
+            "route": case.route.value,
+            "candidates_done": bool(self.facts.list_for_case(case_id)),
+            "allowed_tools": list(allowed_tools(case.state.value)),
+            "handoff_prepared": False,
+        }
+        planned: list[str] | None = None
+        seq_fn = getattr(self.hermes, "propose_sequence", None)
+        if seq_fn is not None:
+            try:
+                raw = seq_fn(case.state.value, summary0)
+                if raw is not None:
+                    planned = [str(item) for item in raw]
+            except Exception:
+                planned = None
         for _ in range(16):
             case = self.case_repo.get(case_id)
             if self._should_pause(case.state, trace):
@@ -46,7 +62,13 @@ class Orchestrator:
                 "allowed_tools": list(allowed_tools(case.state.value)),
                 "handoff_prepared": "prepare_official_handoff" in trace,
             }
-            tool = self.hermes.propose_tool(case.state.value, summary)
+            if planned:
+                tool = planned.pop(0)
+                if tool not in allowed_tools(case.state.value):
+                    planned = None
+                    tool = self.hermes.propose_tool(case.state.value, summary)
+            else:
+                tool = self.hermes.propose_tool(case.state.value, summary)
             if tool is None:
                 break
             if tool == "validate_case_facts" and case.state == State.REVIEW_REQUIRED and tool in trace:

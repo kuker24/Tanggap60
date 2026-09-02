@@ -48,7 +48,7 @@ class DeterministicHermes:
         return self.ORDER.get(state)
 
 
-def parse_tool_reply(text: str, allowed: set[str]) -> str | None:
+def extract_json_object(text: str) -> dict[str, Any]:
     blob = text.strip()
     if "```" in blob:
         parts = blob.split("```")
@@ -62,6 +62,11 @@ def parse_tool_reply(text: str, allowed: set[str]) -> str | None:
     data = json.loads(blob[start : end + 1])
     if not isinstance(data, dict):
         raise ValueError("hermes reply is not an object")
+    return data
+
+
+def parse_tool_reply(text: str, allowed: set[str]) -> str | None:
+    data = extract_json_object(text)
     name = data.get("tool")
     if name in (None, "", "null"):
         return None
@@ -69,6 +74,19 @@ def parse_tool_reply(text: str, allowed: set[str]) -> str | None:
     if tool not in allowed:
         raise ValueError("hermes proposed a tool outside the allowlist")
     return tool
+
+
+def parse_tools_reply(text: str) -> list[str]:
+    data = extract_json_object(text)
+    if "tools" in data:
+        raw = data.get("tools") or []
+        if not isinstance(raw, list):
+            raise ValueError("hermes tools is not a list")
+        return [str(item) for item in raw]
+    name = data.get("tool")
+    if name in (None, "", "null"):
+        return []
+    return [str(name)]
 
 
 def picker_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> str:
@@ -80,6 +98,22 @@ def picker_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> st
         f"candidates_done={bool(summary.get('candidates_done'))}\n"
         f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
         "Pick exactly one allowed tool to advance the case, or null to pause for the human.\n"
+    )
+
+
+def sequence_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> str:
+    return (
+        "Tanggap60 orchestrator. Reply with JSON only: {\"tools\": [\"name\", ...]}.\n"
+        f"state={state}\n"
+        f"allowed_now={allowed}\n"
+        f"route={summary.get('route')}\n"
+        f"candidates_done={bool(summary.get('candidates_done'))}\n"
+        f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
+        "List tools to run in order until the next human pause "
+        "(REVIEW_REQUIRED or WAITING_APPROVAL). Empty list means pause now.\n"
+        "INGESTING typically: inspect_evidence, extract_candidate_facts, validate_case_facts.\n"
+        "READY_FOR_ACTION typically: build_postincident_plan or build_preincident_brief.\n"
+        "GENERATING typically: compile_artifacts, verify_artifacts, prepare_official_handoff.\n"
     )
 
 
@@ -116,7 +150,7 @@ class CliHermes:
         self,
         command: list[str],
         env: dict[str, str] | None = None,
-        timeout: float = 25.0,
+        timeout: float = 40.0,
         runner: Runner = subprocess.run,
     ) -> None:
         self.command = command
@@ -124,9 +158,7 @@ class CliHermes:
         self.timeout = timeout
         self.runner = runner
 
-    def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
-        allowed = list(summary.get("allowed_tools") or allowed_tools(state))
-        prompt = picker_prompt(state, summary, allowed)
+    def _run(self, prompt: str) -> str:
         completed = self.runner(
             self.command,
             input=prompt,
@@ -138,9 +170,19 @@ class CliHermes:
         )
         if completed.returncode != 0:
             raise RuntimeError("hermes cli failed")
-        tool = parse_tool_reply(completed.stdout, set(allowed))
+        return completed.stdout
+
+    def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
+        allowed = list(summary.get("allowed_tools") or allowed_tools(state))
+        tool = parse_tool_reply(self._run(picker_prompt(state, summary, allowed)), set(allowed))
         self.last_mode = "cli"
         return tool
+
+    def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str]:
+        allowed = list(summary.get("allowed_tools") or allowed_tools(state))
+        tools = parse_tools_reply(self._run(sequence_prompt(state, summary, allowed)))
+        self.last_mode = "cli"
+        return tools
 
 
 class FallbackHermes:
@@ -158,6 +200,17 @@ class FallbackHermes:
             tool = self.fallback.propose_tool(state, summary)
             self.last_mode = getattr(self.fallback, "last_mode", "deterministic")
             return tool
+
+    def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str] | None:
+        seq_fn = getattr(self.primary, "propose_sequence", None)
+        if seq_fn is None:
+            return None
+        try:
+            tools = seq_fn(state, summary)
+            self.last_mode = getattr(self.primary, "last_mode", "http")
+            return tools
+        except Exception:
+            return None
 
 
 def _cli_command(binary: str) -> list[str]:
