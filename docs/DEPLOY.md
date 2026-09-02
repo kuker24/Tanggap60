@@ -32,5 +32,6 @@ Koneksi lokal (bukan git): `ssh tanggap60-uji`. Password hanya di `VPSujicoba.tx
 8. `systemctl enable --now tanggap60-web tanggap60-worker tanggap60-purge.timer`
 9. `make smoke` dari VPS (`http://127.0.0.1:8000`)
 10. `make test && make test-security`
+11. Tanpa IP publik: `systemctl enable --now tanggap60-tunnel` (Cloudflare quick tunnel ke `127.0.0.1:80`). URL: `scripts/tunnel_url.sh`. SSH/password/NAT tidak diubah. Origin tetap HTTP lokal.
 
 Wajib di env: `SECRET_KEY` (>=16), `DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db`, `CASE_STORAGE_DIR=/var/lib/tanggap60/cases`, `OFFICIAL_IASC_URL=https://iasc.ojk.go.id/`

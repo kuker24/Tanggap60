@@ -1,0 +1,15 @@
+[Unit]
+Description=Tanggap60 Cloudflare quick tunnel
+After=network-online.target nginx.service tanggap60-web.service
+Wants=network-online.target
+Requires=nginx.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:80
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
