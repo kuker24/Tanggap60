@@ -23,7 +23,7 @@ test-security:
 	$(BIN)/pytest -q tests/security
 
 lint:
-	$(BIN)/ruff check app tests
+	$(BIN)/ruff check app tests scripts/smoke_*.py scripts/benchmark_vps.py
 
 typecheck:
 	$(BIN)/mypy app

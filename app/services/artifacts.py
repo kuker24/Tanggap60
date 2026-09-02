@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import zipfile
-from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -25,6 +24,7 @@ from app.infrastructure.repositories import (
 )
 from app.infrastructure.storage import CaseStorage
 from app.services.approval import ApprovalService
+from app.services.cases import now_utc
 from app.services.ids import new_id
 from app.services.readiness import assess, public_report
 from app.templates.pdf import render_lines
@@ -62,7 +62,7 @@ class ArtifactService:
         payload, digest = self.approval.current_snapshot(case_id)
         if digest != snapshot_hash:
             raise ArtifactVerifyFailed("snapshot berubah")
-        generated_at = datetime(2026, 9, 23, 9, 1, tzinfo=UTC).isoformat()
+        generated_at = now_utc().isoformat()
         existing = self.artifacts.list_for_case(case_id)
         if existing and all(a.source_snapshot_hash == snapshot_hash for a in existing):
             return existing
@@ -225,6 +225,9 @@ class ArtifactService:
         actions = self.actions.list_for_case(case_id)
         txs = self.transactions.list_for_case(case_id)
         artifacts = self.artifacts.list_for_case(case_id)
+        active = self.approval.approvals.active_for_case(case_id)
+        if active is None:
+            raise ArtifactVerifyFailed("persetujuan tidak ditemukan")
         return {
             "schema_version": "2.1" if case.route == Route.POST_INCIDENT_RESPONSE else "2.0",
             "case_id": case.case_id,
@@ -269,7 +272,7 @@ class ArtifactService:
                     "destination_account": t.destination_account,
                     "amount": t.amount,
                     "currency": "IDR",
-                    "transferred_at": t.transferred_at if t.transferred_at and "T" in t.transferred_at else "2026-09-23T01:42:00Z",
+                    "transferred_at": transaction_time_or_none(t.transferred_at),
                 }
                 for t in txs
             ],
@@ -285,10 +288,10 @@ class ArtifactService:
             ],
             "approval": {
                 "actor": "USER",
-                "scope": "PRE_BRIEF" if case.route == Route.PRE_INCIDENT_CHECK else "POST_CASE_PACK",
+                "scope": active.scope.value,
                 "snapshot_hash": snapshot_hash,
-                "approved_at": generated_at,
-                "notice_version": payload_notice(),
+                "approved_at": active.approved_at.isoformat(),
+                "notice_version": active.notice_version,
             },
             "artifacts": [
                 {
@@ -411,6 +414,13 @@ def payload_notice() -> str:
     from app.config import NOTICE_VERSION
 
     return NOTICE_VERSION
+
+
+def transaction_time_or_none(value: str | None) -> str | None:
+    text = str(value or "").strip()
+    if not text or "T" not in text:
+        return None
+    return text
 
 
 def _json_num(value: str | None) -> float | str | None:

@@ -19,13 +19,13 @@ Label awam:
 
 File: `app/data/readiness_profiles.json`
 
-- `profile_version` (saat ini `2026-09-02.mvp1`)
+- `profile_version` (saat ini `2026-09-02.mvp2`)
 - `last_reviewed_at`
 - `source_urls` publik
 - `disclaimer`
 - checks per kanal: `REQUIRED`, `RECOMMENDED`, `PREPARE_EXTERNALLY`
 
-Profile invalid membuat penilaian gagal terkontrol. Profile bukan persyaratan resmi yang dijamin selalu terbaru.
+Profile adalah rule internal Tanggap60. Bukan reproduksi resmi requirement Bank, IASC, atau Kepolisian. Profile invalid membuat penilaian gagal terkontrol.
 
 ## Kanal MVP
 

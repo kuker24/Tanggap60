@@ -18,6 +18,13 @@ class MechanicalPlan(Exception):
     pass
 
 
+class HermesPlannerError(Exception):
+    def __init__(self, code: str, retryable: bool = True) -> None:
+        self.code = code
+        self.retryable = retryable
+        super().__init__(code)
+
+
 class HermesPort(Protocol):
     last_mode: str
 
@@ -107,6 +114,8 @@ def picker_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> st
         f"route={summary.get('route')}\n"
         f"candidates_done={bool(summary.get('candidates_done'))}\n"
         f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
+        f"plan_done={bool(summary.get('plan_done'))}\n"
+        f"readiness_assessed={bool(summary.get('readiness_assessed'))}\n"
         "Pick exactly one allowed tool to advance the case, or null to pause for the human.\n"
     )
 
@@ -119,6 +128,8 @@ def sequence_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> 
         f"route={summary.get('route')}\n"
         f"candidates_done={bool(summary.get('candidates_done'))}\n"
         f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
+        f"plan_done={bool(summary.get('plan_done'))}\n"
+        f"readiness_assessed={bool(summary.get('readiness_assessed'))}\n"
         "List tools to run in order until the next human pause "
         "(REVIEW_REQUIRED or WAITING_APPROVAL). Empty list means pause now.\n"
         "INGESTING typically: inspect_evidence, extract_candidate_facts, validate_case_facts.\n"
@@ -165,33 +176,70 @@ class CliHermes:
         self,
         command: list[str],
         env: dict[str, str] | None = None,
-        timeout: float = 40.0,
+        timeout: float = 22.0,
         runner: Runner = subprocess.run,
     ) -> None:
         self.command = command
         self.env = env
         self.timeout = timeout
         self.runner = runner
+        self.last_reason: str | None = None
 
-    def _run(self, prompt: str) -> str:
-        completed = self.runner(
-            self.command,
-            input=prompt,
-            capture_output=True,
-            text=True,
-            timeout=self.timeout,
-            env=self.env,
-            check=False,
-        )
+    def _run_once(self, prompt: str) -> str:
+        try:
+            completed = self.runner(
+                self.command,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+                env=self.env,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise HermesPlannerError("HERMES_TIMEOUT") from exc
+        except PermissionError as exc:
+            raise HermesPlannerError("HERMES_PERMISSION") from exc
+        except OSError as exc:
+            if getattr(exc, "errno", None) in {1, 13}:
+                raise HermesPlannerError("HERMES_PERMISSION") from exc
+            raise HermesPlannerError("HERMES_NONZERO") from exc
         if completed.returncode != 0:
-            raise RuntimeError("hermes cli failed")
+            raise HermesPlannerError("HERMES_NONZERO")
         return completed.stdout
+
+    def _parse_failure(self, exc: ValueError) -> HermesPlannerError:
+        if "allowlist" in str(exc):
+            return HermesPlannerError("HERMES_TOOL_INVALID")
+        return HermesPlannerError("HERMES_JSON_INVALID")
+
+    def _invoke(self, prompt: str, parser: Callable[[str], Any]) -> Any:
+        last: HermesPlannerError | None = None
+        for attempt in range(2):
+            try:
+                result = parser(self._run_once(prompt))
+                self.last_reason = None
+                return result
+            except HermesPlannerError as exc:
+                wrapped = exc
+            except ValueError as exc:
+                wrapped = self._parse_failure(exc)
+            self.last_reason = wrapped.code
+            last = wrapped
+            if attempt == 0 and wrapped.retryable:
+                continue
+            raise wrapped
+        assert last is not None
+        raise last
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
         if state in _MECHANICAL_STATES:
             raise MechanicalPlan
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
-        tool = parse_tool_reply(self._run(picker_prompt(state, summary, allowed)), set(allowed))
+        tool = self._invoke(
+            picker_prompt(state, summary, allowed),
+            lambda text: parse_tool_reply(text, set(allowed)),
+        )
         self.last_mode = "cli"
         self.last_planner_mode = "cli"
         return tool
@@ -200,7 +248,7 @@ class CliHermes:
         if state in _MECHANICAL_STATES:
             raise MechanicalPlan
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
-        tools = parse_tools_reply(self._run(sequence_prompt(state, summary, allowed)))
+        tools = self._invoke(sequence_prompt(state, summary, allowed), parse_tools_reply)
         self.last_mode = "cli"
         self.last_planner_mode = "cli"
         return tools
@@ -213,16 +261,19 @@ class FallbackHermes:
         self.last_mode = fallback.last_mode
         self.last_planner_mode = getattr(fallback, "last_planner_mode", fallback.last_mode)
         self.cli_used = False
+        self.last_reason: str | None = None
 
     def _mark_primary(self) -> None:
         self.last_mode = getattr(self.primary, "last_mode", "http")
         self.last_planner_mode = self.last_mode
+        self.last_reason = getattr(self.primary, "last_reason", None)
         if self.last_mode == "cli":
             self.cli_used = True
 
     def _mark_fallback(self, *, keep_cli: bool) -> None:
         fallback_mode = getattr(self.fallback, "last_mode", "deterministic")
         self.last_planner_mode = fallback_mode
+        self.last_reason = getattr(self.primary, "last_reason", None)
         if keep_cli and self.cli_used:
             self.last_mode = "cli"
         else:

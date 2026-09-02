@@ -72,6 +72,23 @@
       ]
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"const": "2.1"},
+          "route": {"const": "POST_INCIDENT_RESPONSE"}
+        },
+        "required": ["schema_version", "route"]
+      },
+      "then": {
+        "required": ["readiness"],
+        "properties": {
+          "readiness": {"$ref": "#/$defs/readiness"}
+        }
+      }
+    }
+  ],
   "$defs": {
     "source": {
       "type": "object",
@@ -121,7 +138,7 @@
         "destination_account": {"type": "string"},
         "amount": {"type": "number", "minimum": 0},
         "currency": {"const": "IDR"},
-        "transferred_at": {"type": "string", "format": "date-time"}
+        "transferred_at": {"type": ["string", "null"], "format": "date-time"}
       }
     },
     "action": {

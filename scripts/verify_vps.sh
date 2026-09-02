@@ -12,6 +12,6 @@ systemctl is-active --quiet nginx
 BASE_URL="${BASE_URL}" ./scripts/smoke.sh
 .venv/bin/pytest -q
 .venv/bin/pytest -q tests/security
-.venv/bin/ruff check app tests
+.venv/bin/ruff check app tests scripts/smoke_*.py scripts/benchmark_vps.py
 .venv/bin/mypy app
 echo "VERIFY_OK"

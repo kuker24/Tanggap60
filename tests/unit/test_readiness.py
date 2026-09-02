@@ -89,7 +89,7 @@ def _complete() -> dict[str, object]:
 
 def test_profile_loads() -> None:
     profile = load_profile()
-    assert profile["profile_version"] == "2026-09-02.mvp1"
+    assert profile["profile_version"] == "2026-09-02.mvp2"
 
 
 def test_ready_complete_fixture() -> None:

@@ -1,11 +1,11 @@
 {
-  "profile_version": "2026-09-02.mvp1",
+  "profile_version": "2026-09-02.mvp2",
   "last_reviewed_at": "2026-09-02",
   "source_urls": [
     "https://iasc.ojk.go.id/",
     "https://www.ojk.go.id/"
   ],
-  "disclaimer": "Pemeriksaan internal, bukan jaminan penerimaan laporan.",
+  "disclaimer": "Pemeriksaan internal Tanggap60 untuk membantu persiapan handoff. Bukan persyaratan resmi lembaga dan bukan jaminan penerimaan laporan.",
   "channels": {
     "BANK_PJP": {
       "label": "Bank/PJP",
