@@ -101,17 +101,35 @@ class ArtifactService:
                 mappings = UnitMappingRepository(self.session).list_for_case(case_id)
                 decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
                 units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-                if units:
-                    use_units = True
-                    units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
-                    next_act = recommend_next_action(
-                        case_id=case_id,
-                        units=units,
-                        conflicts=raw_conflicts,
-                        readiness_by_unit=units_report.get("readiness_by_unit"),
-                        incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
-                    )
-                    next_action_payload = next_action_to_dict(next_act)
+                # Use 2.2 only for multi-unit or ambiguous cases; keep single complete unit as 2.1 for backward compat
+                if len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units):
+                    use_units = bool(units)
+                    if use_units:
+                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                        next_act = recommend_next_action(
+                            case_id=case_id,
+                            units=units,
+                            conflicts=raw_conflicts,
+                            readiness_by_unit=units_report.get("readiness_by_unit"),
+                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                        )
+                        next_action_payload = next_action_to_dict(next_act)
+                elif len(units) == 1 and units[0].mapping_status == "COMPLETE":
+                    # single complete unit stays 2.1
+                    use_units = False
+                    units = []
+                else:
+                    use_units = bool(units)
+                    if use_units:
+                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                        next_act = recommend_next_action(
+                            case_id=case_id,
+                            units=units,
+                            conflicts=raw_conflicts,
+                            readiness_by_unit=units_report.get("readiness_by_unit"),
+                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                        )
+                        next_action_payload = next_action_to_dict(next_act)
             except Exception:
                 use_units = False
         if case.route == Route.PRE_INCIDENT_CHECK:

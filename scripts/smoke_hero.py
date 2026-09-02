@@ -99,6 +99,24 @@ def _evidence_bytes() -> tuple[bytes, bytes]:
     return png_bytes(CHAT), png_bytes(TRANSFER)
 
 
+def _evidence_bytes_multi() -> tuple[bytes, bytes, bytes]:
+    # 2 transfers + 1 chat for rescue compiler multi-unit hero
+    # transfer_a complete, transfer_b with time but will be left unconfirmed initially
+    a_text = "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED"
+    b_text = "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB Dari: DEMO-VICTIM-MASKED"
+    c_text = "Kirim dulu uangnya ya"
+    if (FIX / "04_transfer_a.png").exists() and (FIX / "05_transfer_b.png").exists():
+        # use fixtures if available (05 is without time, but we want with time for candidate)
+        # use 06 which is complete
+        if (FIX / "06_transfer_b_complete.png").exists():
+            return (FIX / "04_transfer_a.png").read_bytes(), (FIX / "06_transfer_b_complete.png").read_bytes(), (FIX / "01_chat.png").read_bytes()
+        return (FIX / "04_transfer_a.png").read_bytes(), (FIX / "05_transfer_b.png").read_bytes(), (FIX / "01_chat.png").read_bytes()
+    sys.path.insert(0, str(ROOT))
+    from tests.fixture_render import png_bytes
+
+    return png_bytes(a_text), png_bytes(b_text), png_bytes(c_text)
+
+
 def _resolve_conflicts(client: httpx.Client, case_id: str) -> None:
     conflicts = _call(client, "GET", f"/api/v1/cases/{case_id}/conflicts").json().get("conflicts", [])
     blocking = [c for c in conflicts if c.get("severity") == "BLOCKING" and c.get("status") == "OPEN"]

@@ -1,8 +1,12 @@
-# SatuAman Tanggap60
+# Tanggap60 — AI Digital Incident Rescue
 
-Competition MVP: bukti digital berantakan menjadi kasus siap ditindaklanjuti. **Preflight** menguji kelengkapan internal per kanal (Bank/PJP, IASC, Kepolisian) lalu membuat draf paket handoff. Tidak mengirim laporan, tidak menjamin dana kembali, status tiket resmi selalu `NOT_VERIFIED`.
+Mengubah bukti digital berantakan menjadi **unit kasus yang dapat ditelusuri**, tindakan berikutnya, dan paket handoff terverifikasi.
 
-Jalankan di VPS (systemd + Nginx + venv). Jangan andalkan laptop sebagai lingkungan uji.
+> Tanggap60 bukan scam detector. Ia membantu korban mengubah satu insiden digital menjadi unit kasus yang dapat ditelusuri, menunjukkan apa yang masih salah, lalu menentukan tindakan paling berguna berikutnya sebelum korban berpindah ke kanal resmi.
+
+Benang merah: `ONE INCIDENT → EVIDENCE → VERIFIED FACTS → REPORTING UNITS → GAPS → NEXT BEST ACTION → UNIT READINESS → HUMAN APPROVAL → VERIFIED HANDOFF PACK`.
+
+Jangan andalkan laptop sebagai lingkungan uji. Jalankan di VPS (systemd + Nginx + venv).
 
 ## Stack
 

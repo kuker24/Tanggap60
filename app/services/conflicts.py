@@ -52,13 +52,7 @@ def detect_conflicts(case_id: str, facts: list[FactRecord]) -> list[ConflictReco
     # Also consider PJP?
     unique_dest = {f.normalized_value or f.raw_value for f in dests}
     if len(amounts) >= 2 and len({f.normalized_value for f in amounts if f.normalized_value}) > 1:
-        # if amounts are from different evidences but dest count is 1, treat as conflict for single-unit case
-        # also if any amount is from communication evidence (chat) vs transaction, keep conflict for legacy hero
-        # heuristic: if number of distinct transaction evidences ==1 and multiple amounts -> conflict
-        # We approximate transaction evidences as those that have at least one ACCOUNT or DATETIME
-        transaction_evid_ids = {f.source_evidence_id for f in active if f.type in {FactType.ACCOUNT, FactType.DATETIME}}
         amount_evid_ids = {f.source_evidence_id for f in amounts}
-        # if amounts span >1 evidence but only one transaction evidence has account, it's still single unit
         if len(unique_dest) == 1 and len(amount_evid_ids) > 1:
             # check if not already flagged per-evidence
             if not any(c.type == ConflictType.VALUE_MISMATCH for c in conflicts):
