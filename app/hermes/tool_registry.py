@@ -135,6 +135,53 @@ def _assess(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     }
 
 
+def _compile_units(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    from app.infrastructure.repositories import (
+        EvidenceRepository,
+        FactRepository,
+        UnitMappingRepository,
+    )
+    from app.services.reporting_units import compile_reporting_units, unit_to_dict
+
+    case_id = str(args["case_id"])
+    facts = FactRepository(ctx.inspect.session).list_for_case(case_id)
+    evidence = EvidenceRepository(ctx.inspect.session).list_for_case(case_id)
+    mappings = UnitMappingRepository(ctx.inspect.session).list_for_case(case_id)
+    decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+    units = compile_reporting_units(case_id, facts, evidence, decs if decs else None)
+    return {"reporting_units": [unit_to_dict(u) for u in units], "count": len(units)}
+
+
+def _recommend(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
+    from app.infrastructure.repositories import (
+        ConflictRepository,
+        EvidenceRepository,
+        FactRepository,
+        UnitMappingRepository,
+    )
+    from app.services.next_action import next_action_to_dict, recommend_next_action
+    from app.services.readiness import assess_units
+    from app.services.reporting_units import compile_reporting_units
+
+    case_id = str(args["case_id"])
+    case = CaseRepository(ctx.inspect.session).get(case_id)
+    facts = FactRepository(ctx.inspect.session).list_for_case(case_id)
+    evidence = EvidenceRepository(ctx.inspect.session).list_for_case(case_id)
+    conflicts = ConflictRepository(ctx.inspect.session).list_for_case(case_id)
+    mappings = UnitMappingRepository(ctx.inspect.session).list_for_case(case_id)
+    decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+    units = compile_reporting_units(case_id, facts, evidence, decs if decs else None)
+    readiness = assess_units(case_id=case_id, units=units, facts=facts, evidence=evidence, conflicts=conflicts, route=case.route)
+    action = recommend_next_action(
+        case_id=case_id,
+        units=units,
+        conflicts=conflicts,
+        readiness_by_unit=readiness.get("readiness_by_unit"),
+        incident_police_ready=(readiness.get("incident_police", {}).get("status") == "READY"),
+    )
+    return next_action_to_dict(action)
+
+
 def _post_plan(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     case_id = str(args["case_id"])
     case = CaseRepository(ctx.inspect.session).get(case_id)
@@ -205,7 +252,9 @@ HANDLERS: dict[str, Callable[[dict[str, Any], ToolContext], dict[str, Any]]] = {
     "validate_case_facts": _validate,
     "build_preincident_brief": _pre_brief,
     "build_postincident_plan": _post_plan,
+    "compile_reporting_units": _compile_units,
     "assess_handoff_readiness": _assess,
+    "recommend_next_action": _recommend,
     "compile_artifacts": _compile,
     "verify_artifacts": _verify,
     "prepare_official_handoff": _handoff,

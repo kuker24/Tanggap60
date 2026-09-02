@@ -101,11 +101,13 @@ def transition(current: State, target: State) -> State:
 TOOLS_BY_STATE: dict[State, tuple[str, ...]] = {
     State.INGESTING: ("inspect_evidence",),
     State.EXTRACTING: ("extract_candidate_facts", "validate_case_facts"),
-    State.REVIEW_REQUIRED: ("validate_case_facts",),
+    State.REVIEW_REQUIRED: ("validate_case_facts", "compile_reporting_units"),
     State.READY_FOR_ACTION: (
         "build_preincident_brief",
         "build_postincident_plan",
+        "compile_reporting_units",
         "assess_handoff_readiness",
+        "recommend_next_action",
     ),
     State.WAITING_APPROVAL: (),
     State.GENERATING: ("compile_artifacts",),

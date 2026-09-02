@@ -42,7 +42,10 @@ def test_tampered_channel_pack_fails(client: TestClient, ocr: ScriptedOcr, tmp_e
     resolve_amount_conflict(client, case_id)
     approve_to_handoff(client, case_id)
     arts = client.get(f"/api/v1/cases/{case_id}/artifacts").json()["artifacts"]
-    pack = next(a for a in arts if a["type"] == "IASC_HANDOFF_PACK")
+    # For 2.2 per-unit packs, legacy IASC_HANDOFF_PACK may not exist; try per-unit
+    cand = [a for a in arts if a["type"] in {"IASC_HANDOFF_PACK", "UNIT_IASC_PACK"}]
+    assert cand, "no iasc pack found"
+    pack = cand[0]
     _settings, _ocr, container = tmp_env
     session = container.sessions()
     from app.infrastructure.repositories import ArtifactRepository

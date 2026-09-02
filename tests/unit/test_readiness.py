@@ -209,5 +209,19 @@ def test_deterministic_hermes_asks_assess_after_plan() -> None:
             "READY_FOR_ACTION",
             {"route": "POST_INCIDENT_RESPONSE", "plan_done": True},
         )
+        == "compile_reporting_units"
+    )
+    assert (
+        hermes.propose_tool(
+            "READY_FOR_ACTION",
+            {"route": "POST_INCIDENT_RESPONSE", "plan_done": True, "units_compiled": True},
+        )
         == "assess_handoff_readiness"
+    )
+    assert (
+        hermes.propose_tool(
+            "READY_FOR_ACTION",
+            {"route": "POST_INCIDENT_RESPONSE", "plan_done": True, "units_compiled": True, "readiness_assessed": True},
+        )
+        == "recommend_next_action"
     )

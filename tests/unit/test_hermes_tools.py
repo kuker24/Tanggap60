@@ -26,7 +26,9 @@ def test_tool_catalog_covers_hero_loop() -> None:
         "extract_candidate_facts",
         "validate_case_facts",
         "build_postincident_plan",
+        "compile_reporting_units",
         "assess_handoff_readiness",
+        "recommend_next_action",
         "compile_artifacts",
         "verify_artifacts",
         "prepare_official_handoff",
@@ -34,7 +36,7 @@ def test_tool_catalog_covers_hero_loop() -> None:
         "purge_case",
     }:
         assert required in names
-    assert len(TOOL_SPECS) == 11
+    assert len(TOOL_SPECS) == 13
 
 
 def test_deterministic_handoff_after_verify() -> None:

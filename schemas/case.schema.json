@@ -17,7 +17,7 @@
     "official_status"
   ],
   "properties": {
-    "schema_version": {"enum": ["2.0", "2.1"]},
+    "schema_version": {"enum": ["2.0", "2.1", "2.2"]},
     "case_id": {"type": "string", "minLength": 8, "maxLength": 80},
     "mode": {"enum": ["DEMO", "STANDARD"]},
     "route": {"enum": ["PRE_INCIDENT_CHECK", "POST_INCIDENT_RESPONSE", "OUT_OF_SCOPE"]},
@@ -70,6 +70,22 @@
         {"type": "null"},
         {"$ref": "#/$defs/readiness"}
       ]
+    },
+    "reporting_units": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/reportingUnit"}
+    },
+    "next_best_action": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/nextBestAction"}
+      ]
+    },
+    "readiness_units": {
+      "anyOf": [
+        {"type": "null"},
+        {"type": "object"}
+      ]
     }
   },
   "allOf": [
@@ -85,6 +101,23 @@
         "required": ["readiness"],
         "properties": {
           "readiness": {"$ref": "#/$defs/readiness"}
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "schema_version": {"const": "2.2"},
+          "route": {"const": "POST_INCIDENT_RESPONSE"}
+        },
+        "required": ["schema_version", "route"]
+      },
+      "then": {
+        "required": ["readiness", "reporting_units", "next_best_action"],
+        "properties": {
+          "readiness": {"$ref": "#/$defs/readiness"},
+          "reporting_units": {"type": "array", "minItems": 1},
+          "next_best_action": {"$ref": "#/$defs/nextBestAction"}
         }
       }
     }
@@ -159,7 +192,7 @@
       "required": ["actor", "scope", "snapshot_hash", "approved_at", "notice_version"],
       "properties": {
         "actor": {"const": "USER"},
-        "scope": {"enum": ["PRE_BRIEF", "POST_CASE_PACK"]},
+        "scope": {"enum": ["PRE_BRIEF", "POST_CASE_PACK", "REPORTING_UNIT_HANDOFF", "INCIDENT_HANDOFF"]},
         "snapshot_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
         "approved_at": {"type": "string", "format": "date-time"},
         "notice_version": {"type": "string"}
@@ -171,7 +204,7 @@
       "required": ["artifact_id", "type", "sha256", "verify_status", "source_snapshot_hash"],
       "properties": {
         "artifact_id": {"type": "string"},
-        "type": {"enum": ["VERIFICATION_BRIEF", "ACTION_PLAN", "EVIDENCE_PACK", "READINESS_REPORT", "BANK_HANDOFF_PACK", "IASC_HANDOFF_PACK", "POLICE_HANDOFF_PACK", "CASE_JSON", "CHECKLIST", "MANIFEST", "CASE_ZIP"]},
+        "type": {"enum": ["VERIFICATION_BRIEF", "ACTION_PLAN", "EVIDENCE_PACK", "READINESS_REPORT", "BANK_HANDOFF_PACK", "IASC_HANDOFF_PACK", "POLICE_HANDOFF_PACK", "REPORTING_UNIT_JSON", "UNIT_BANK_PACK", "UNIT_IASC_PACK", "CASE_JSON", "CHECKLIST", "MANIFEST", "CASE_ZIP"]},
         "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
         "verify_status": {"enum": ["PENDING", "PASS", "FAIL"]},
         "source_snapshot_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
@@ -231,6 +264,39 @@
         "format_status": {"enum": ["NOT_CHECKED", "PLAUSIBLE", "UNRECOGNIZED"]},
         "local_match_status": {"enum": ["NOT_APPLICABLE", "MATCH", "MISMATCH"]},
         "official_status": {"const": "NOT_VERIFIED"}
+      }
+    },
+    "reportingUnit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unit_id", "case_id", "fact_ids", "evidence_ids", "mapping_status"],
+      "properties": {
+        "unit_id": {"type": "string"},
+        "case_id": {"type": "string"},
+        "source_account": {"type": ["string", "null"]},
+        "destination_account": {"type": ["string", "null"]},
+        "amount": {"type": ["number", "null"]},
+        "transferred_at": {"type": ["string", "null"], "format": "date-time"},
+        "fact_ids": {"type": "array", "items": {"type": "string"}},
+        "evidence_ids": {"type": "array", "items": {"type": "string"}},
+        "mapping_status": {"enum": ["COMPLETE", "INCOMPLETE", "AMBIGUOUS"]},
+        "mapping_reason": {"type": "string"},
+        "mapping_provenance": {"type": "string"},
+        "readiness": {"type": ["object", "null"]}
+      }
+    },
+    "nextBestAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "label", "reason"],
+      "properties": {
+        "code": {"type": "string"},
+        "label": {"type": "string"},
+        "reason": {"type": "string"},
+        "target_unit_id": {"type": ["string", "null"]},
+        "priority": {"type": "integer"},
+        "related_fact_ids": {"type": "array", "items": {"type": "string"}},
+        "related_evidence_ids": {"type": "array", "items": {"type": "string"}}
       }
     }
   }
