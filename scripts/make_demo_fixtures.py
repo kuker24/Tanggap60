@@ -14,20 +14,20 @@ from tests.fixture_render import CHAT, TRANSFER, invoice_pdf, png_bytes  # noqa:
 TRANSFER_A = "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED"
 TRANSFER_B = "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B"
 TRANSFER_B_COMPLETE = "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB Dari: DEMO-VICTIM-MASKED"
-AMBIGUOUS_TEXT = "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB"
+AMBIGUOUS_TEXT = "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB\nTransfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB"
 
 
 def main() -> None:
     dest = ROOT / "fixtures" / "demo_tanggap60"
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / "01_chat.png").write_bytes(png_bytes(CHAT))
+    (dest / "01_chat.png").write_bytes(png_bytes(CHAT, width=900, height=240))
     (dest / "02_invoice.pdf").write_bytes(invoice_pdf())
-    (dest / "03_transfer.png").write_bytes(png_bytes(TRANSFER))
-    # Rescue compiler multi-unit fixtures
-    (dest / "04_transfer_a.png").write_bytes(png_bytes(TRANSFER_A))
-    (dest / "05_transfer_b.png").write_bytes(png_bytes(TRANSFER_B))
-    (dest / "06_transfer_b_complete.png").write_bytes(png_bytes(TRANSFER_B_COMPLETE))
-    (dest / "07_ambiguous.png").write_bytes(png_bytes(AMBIGUOUS_TEXT))
+    (dest / "03_transfer.png").write_bytes(png_bytes(TRANSFER, width=900, height=240))
+    # Rescue compiler multi-unit fixtures — use wider/taller image to avoid clipping long transfer text for OCR
+    (dest / "04_transfer_a.png").write_bytes(png_bytes(TRANSFER_A, width=1400, height=300))
+    (dest / "05_transfer_b.png").write_bytes(png_bytes(TRANSFER_B, width=900, height=240))
+    (dest / "06_transfer_b_complete.png").write_bytes(png_bytes(TRANSFER_B_COMPLETE, width=1400, height=300))
+    (dest / "07_ambiguous.png").write_bytes(png_bytes(AMBIGUOUS_TEXT, width=1600, height=400))
     expected = {
         "chat_text": CHAT,
         "transfer_text": TRANSFER,

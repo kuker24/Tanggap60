@@ -76,16 +76,13 @@ class Orchestrator:
                 "readiness_assessed": "assess_handoff_readiness" in trace,
                 "next_action_done": "recommend_next_action" in trace,
             }
-            # Forced deterministic for rescue pipeline to keep p95 <60; Hermes still used for early steps (inspect/extract/validate)
+            # Mechanical tools forced deterministic; reasoning via Hermes (build_postincident_plan, assess_handoff_readiness must be HERMES_CLI)
             forced = None
             if case.state == State.READY_FOR_ACTION and case.route.value == "POST_INCIDENT_RESPONSE":
-                if "build_postincident_plan" not in trace:
-                    forced = "build_postincident_plan"
-                elif "compile_reporting_units" not in trace:
+                # Only force mechanical steps deterministically, allow Hermes to orchestrate reasoning
+                if "build_postincident_plan" in trace and "compile_reporting_units" not in trace:
                     forced = "compile_reporting_units"
-                elif "assess_handoff_readiness" not in trace:
-                    forced = "assess_handoff_readiness"
-                elif "recommend_next_action" not in trace:
+                elif "assess_handoff_readiness" in trace and "recommend_next_action" not in trace:
                     forced = "recommend_next_action"
             source_mode = planned_mode
             pick_ms = 0
@@ -132,6 +129,11 @@ class Orchestrator:
                     "error": exc.code,
                     "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
                     "hermes_cli_used": bool(getattr(self.hermes, "cli_used", False)),
+                    "hermes_cli_configured": bool(getattr(self.hermes, "hermes_cli_configured", False)),
+                    "hermes_cli_attempted": bool(getattr(self.hermes, "hermes_cli_attempted", False)),
+                    "hermes_cli_succeeded": bool(getattr(self.hermes, "hermes_cli_succeeded", False)),
+                    "hermes_fallback_used": bool(getattr(self.hermes, "hermes_fallback_used", False)),
+                    "hermes_failure_reason": getattr(self.hermes, "hermes_failure_reason", None),
                 }
             trace.append(tool)
             case = self.case_repo.get(case_id)
@@ -168,6 +170,11 @@ class Orchestrator:
             "trace": trace,
             "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
             "hermes_cli_used": bool(getattr(self.hermes, "cli_used", False)),
+            "hermes_cli_configured": bool(getattr(self.hermes, "hermes_cli_configured", False)),
+            "hermes_cli_attempted": bool(getattr(self.hermes, "hermes_cli_attempted", False)),
+            "hermes_cli_succeeded": bool(getattr(self.hermes, "hermes_cli_succeeded", False)),
+            "hermes_fallback_used": bool(getattr(self.hermes, "hermes_fallback_used", False)),
+            "hermes_failure_reason": getattr(self.hermes, "hermes_failure_reason", None),
         }
 
     def run_tool(self, case_id: str, run_id: str, tool: str, extra: dict[str, object] | None = None) -> dict[str, object]:

@@ -4,6 +4,7 @@ from typing import Any
 
 from app.domain.models import (
     ConflictRecord,
+    ConflictScope,
     ConflictSeverity,
     ConflictStatus,
     MappingStatus,
@@ -11,13 +12,6 @@ from app.domain.models import (
     NextBestAction,
     ReportingUnitRecord,
 )
-
-# Priority policy
-# 1 blocking conflict -> RESOLVE_CONFLICT
-# 2 ambiguous mapping -> RESOLVE_UNIT_MAPPING
-# 3 missing critical transaction fact -> CONFIRM_*
-# 4 one ready financial unit -> CONTACT_BANK_PJP / PREPARE_IASC_UNIT
-# 5 after urgent financial -> PREPARE_POLICE_INCIDENT
 
 
 def _open_blocking(conflicts: list[ConflictRecord]) -> list[ConflictRecord]:
@@ -35,6 +29,31 @@ def _unit_missing_fields(unit: ReportingUnitRecord) -> list[str]:
     return missing
 
 
+def _conflict_scope(conflict: ConflictRecord, units: list[ReportingUnitRecord]) -> str:
+    fact_set = set(conflict.fact_ids)
+    matching = [u for u in units if fact_set.issubset(set(u.fact_ids))]
+    if len(matching) == 1:
+        return ConflictScope.UNIT_SCOPED.value
+    return ConflictScope.INCIDENT_GLOBAL.value
+
+
+def _ready_financial_units(
+    units: list[ReportingUnitRecord],
+    readiness_by_unit: dict[str, dict[str, Any]] | None,
+) -> list[ReportingUnitRecord]:
+    if not readiness_by_unit:
+        return []
+    ready: list[ReportingUnitRecord] = []
+    for unit in units:
+        if unit.mapping_status != MappingStatus.COMPLETE:
+            continue
+        r = readiness_by_unit.get(unit.unit_id, {})
+        if r.get("BANK_PJP") == "READY" or r.get("IASC") == "READY":
+            ready.append(unit)
+    ready.sort(key=lambda u: u.unit_id)
+    return ready
+
+
 def recommend_next_action(
     *,
     case_id: str,
@@ -43,77 +62,105 @@ def recommend_next_action(
     readiness_by_unit: dict[str, dict[str, Any]] | None = None,
     incident_police_ready: bool = False,
 ) -> NextBestAction:
-    # Priority 1: blocking conflict
+    # 1. Incident-global blocker has highest priority
     blocking = _open_blocking(conflicts)
-    if blocking:
-        # If conflict is unit-scoped vs incident? we treat any blocking as global priority
-        # But per prompt, unit isolation: if conflict only affects unit B, unit A ready should still be actionable
-        # So we need to distinguish. However for now, blocking conflict always top priority
-        # To allow unit isolation, we will check if blocking conflict scopes only to incomplete units?
-        # Simple: return RESOLVE_CONFLICT with first blocking
+    global_blocking: ConflictRecord | None = None
+    scoped_blocking: list[tuple[ConflictRecord, str]] = []
+    for c in blocking:
+        scope = _conflict_scope(c, units)
+        if scope == ConflictScope.INCIDENT_GLOBAL.value:
+            global_blocking = c
+            break
+        else:
+            # unit scoped
+            # find which unit it belongs to
+            for u in units:
+                if set(c.fact_ids).issubset(set(u.fact_ids)):
+                    scoped_blocking.append((c, u.unit_id))
+                    break
+            else:
+                # no unit match but not global, treat as global
+                global_blocking = c
+                break
+    if global_blocking:
         return NextBestAction(
             code=NextActionCode.RESOLVE_CONFLICT,
             label="Selesaikan konflik bukti",
-            reason=f"Ada {len(blocking)} konflik wajib yang masih terbuka — selesaikan di tinjauan fakta.",
+            reason="Ada konflik wajib yang memblokir seluruh insiden — selesaikan di tinjauan fakta.",
             priority=1,
-            related_fact_ids=blocking[0].fact_ids,
+            related_fact_ids=global_blocking.fact_ids,
         )
 
-    # Priority 2: ambiguous mapping
-    ambiguous = [u for u in units if u.mapping_status == MappingStatus.AMBIGUOUS]
-    if ambiguous:
-        # pick first ambiguous unit deterministically (sorted)
-        target = sorted(ambiguous, key=lambda x: x.unit_id)[0]
-        return NextBestAction(
-            code=NextActionCode.RESOLVE_UNIT_MAPPING,
-            label="Tentukan pasangan transaksi",
-            reason=f"Unit {target.unit_id} memiliki AMBIGUOUS_MAPPING — pilih pasangan nominal, rekening, dan waktu yang benar.",
-            target_unit_id=target.unit_id,
-            priority=2,
-            related_fact_ids=target.fact_ids,
-            related_evidence_ids=target.evidence_ids,
-        )
-
-    # Priority 3: ready financial unit (so ready can be acted without waiting for other incomplete)
-    if readiness_by_unit:
-        ready_units = []
-        for unit in units:
-            if unit.mapping_status != MappingStatus.COMPLETE:
-                continue
-            r = readiness_by_unit.get(unit.unit_id, {})
-            bank = r.get("BANK_PJP")
-            iasc = r.get("IASC")
-            if bank == "READY" or iasc == "READY":
-                ready_units.append(unit)
-        ready_units.sort(key=lambda u: u.unit_id)
-        if ready_units:
-            target = ready_units[0]
-            r = readiness_by_unit.get(target.unit_id, {})
+    # 2. Any unaffected READY financial unit should be acted on immediately
+    ready_units = _ready_financial_units(units, readiness_by_unit)
+    if ready_units:
+        # Ensure ready unit is not affected by scoped conflict
+        # If ready unit has no scoped conflict, it is unaffected
+        unaffected_ready: list[ReportingUnitRecord] = []
+        for u in ready_units:
+            # check if this unit has a scoped blocking conflict
+            has_scoped = any(unit_id == u.unit_id for _, unit_id in scoped_blocking)
+            if not has_scoped:
+                unaffected_ready.append(u)
+        # If at least one unaffected ready exists, act on it
+        acting_pool = unaffected_ready if unaffected_ready else []
+        if acting_pool:
+            target = acting_pool[0]
+            r = (readiness_by_unit or {}).get(target.unit_id, {})
             if r.get("BANK_PJP") == "READY":
                 return NextBestAction(
                     code=NextActionCode.CONTACT_BANK_PJP,
                     label="Hubungi bank/PJP untuk unit siap",
-                    reason=f"Unit {target.unit_id} sudah READY untuk jalur finansial — segera hubungi bank/PJP via kanal resmi.",
+                    reason=f"Unit {target.unit_id} sudah READY untuk jalur finansial — segera hubungi bank/PJP via kanal resmi, jangan menunggu unit lain.",
                     target_unit_id=target.unit_id,
-                    priority=3,
+                    priority=2,
                 )
             if r.get("IASC") == "READY":
                 return NextBestAction(
                     code=NextActionCode.PREPARE_IASC_UNIT,
                     label="Siapkan laporan IASC untuk unit siap",
-                    reason=f"Unit {target.unit_id} READY untuk IASC — buka portal resmi IASC dan isi data.",
+                    reason=f"Unit {target.unit_id} READY untuk IASC — buka portal resmi IASC dan isi data, jangan menunggu unit lain.",
                     target_unit_id=target.unit_id,
-                    priority=3,
+                    priority=2,
                 )
             return NextBestAction(
                 code=NextActionCode.PREPARE_IASC_UNIT,
                 label="Tindak lanjuti unit siap",
                 reason=f"Unit {target.unit_id} sudah siap — jangan menunggu unit lain.",
                 target_unit_id=target.unit_id,
-                priority=3,
+                priority=2,
             )
+        # if all ready are affected by scoped conflict, fall through to scoped handling next
 
-    # Priority 4: missing critical transaction fact per unit
+    # 3. Unit-scoped blocker where no other ready unaffected exists
+    if scoped_blocking:
+        # no unaffected ready, so need to resolve scoped conflict for its unit
+        c, unit_id = sorted(scoped_blocking, key=lambda x: x[1])[0]
+        return NextBestAction(
+            code=NextActionCode.RESOLVE_CONFLICT,
+            label="Selesaikan konflik untuk unit terdampak",
+            reason=f"Unit {unit_id} terblokir konflik — selesaikan konflik untuk unit tersebut.",
+            priority=3,
+            target_unit_id=unit_id,
+            related_fact_ids=c.fact_ids,
+        )
+
+    # 4. Ambiguous unit where no other ready unaffected exists
+    ambiguous = [u for u in units if u.mapping_status == MappingStatus.AMBIGUOUS]
+    if ambiguous:
+        # if we have no unaffected ready above, then need to resolve ambiguous
+        target = sorted(ambiguous, key=lambda x: x.unit_id)[0]
+        return NextBestAction(
+            code=NextActionCode.RESOLVE_UNIT_MAPPING,
+            label="Tentukan pasangan transaksi",
+            reason=f"Unit {target.unit_id} memiliki AMBIGUOUS_MAPPING — pilih pasangan nominal, rekening, dan waktu yang benar.",
+            target_unit_id=target.unit_id,
+            priority=4,
+            related_fact_ids=target.fact_ids,
+            related_evidence_ids=target.evidence_ids,
+        )
+
+    # 5. Incomplete critical field
     incomplete_units = [u for u in units if u.mapping_status == MappingStatus.INCOMPLETE]
     incomplete_units.sort(key=lambda u: u.unit_id)
     for unit in incomplete_units:
@@ -124,7 +171,7 @@ def recommend_next_action(
                 label="Konfirmasi nominal transfer",
                 reason=f"Unit {unit.unit_id} belum memiliki nominal yang ditinjau.",
                 target_unit_id=unit.unit_id,
-                priority=4,
+                priority=5,
                 related_fact_ids=unit.fact_ids,
             )
         if "DATETIME" in missing:
@@ -133,7 +180,7 @@ def recommend_next_action(
                 label="Konfirmasi waktu transaksi",
                 reason=f"Unit {unit.unit_id} belum memiliki waktu transaksi yang ditinjau.",
                 target_unit_id=unit.unit_id,
-                priority=4,
+                priority=5,
                 related_fact_ids=unit.fact_ids,
             )
         if "DESTINATION" in missing:
@@ -142,7 +189,7 @@ def recommend_next_action(
                 label="Konfirmasi rekening tujuan",
                 reason=f"Unit {unit.unit_id} belum memiliki rekening tujuan yang ditinjau.",
                 target_unit_id=unit.unit_id,
-                priority=4,
+                priority=5,
                 related_fact_ids=unit.fact_ids,
             )
         return NextBestAction(
@@ -150,61 +197,16 @@ def recommend_next_action(
             label="Tambahkan bukti transfer",
             reason=f"Unit {unit.unit_id} belum lengkap — unggah bukti transaksi yang jelas.",
             target_unit_id=unit.unit_id,
-            priority=4,
+            priority=5,
         )
 
-    # Priority 4 fallback already handled; next is police
-    # Determine which units are READY for BANK_PJP or IASC
-    # readiness_by_unit maps unit_id -> {BANK_PJP: status, IASC: status}
-    if readiness_by_unit:
-        ready_units = []
-        for unit in units:
-            if unit.mapping_status != MappingStatus.COMPLETE:
-                continue
-            r = readiness_by_unit.get(unit.unit_id, {})
-            bank = r.get("BANK_PJP")
-            iasc = r.get("IASC")
-            if bank == "READY" or iasc == "READY":
-                ready_units.append(unit)
-        ready_units.sort(key=lambda u: u.unit_id)
-        if ready_units:
-            target = ready_units[0]
-            r = readiness_by_unit.get(target.unit_id, {})
-            # Prefer BANK first, then IASC
-            if r.get("BANK_PJP") == "READY":
-                return NextBestAction(
-                    code=NextActionCode.CONTACT_BANK_PJP,
-                    label="Hubungi bank/PJP untuk unit siap",
-                    reason=f"Unit {target.unit_id} sudah READY untuk jalur finansial — segera hubungi bank/PJP via kanal resmi.",
-                    target_unit_id=target.unit_id,
-                    priority=4,
-                )
-            if r.get("IASC") == "READY":
-                return NextBestAction(
-                    code=NextActionCode.PREPARE_IASC_UNIT,
-                    label="Siapkan laporan IASC untuk unit siap",
-                    reason=f"Unit {target.unit_id} READY untuk IASC — buka portal resmi IASC dan isi data.",
-                    target_unit_id=target.unit_id,
-                    priority=4,
-                )
-            # generic
-            return NextBestAction(
-                code=NextActionCode.PREPARE_IASC_UNIT,
-                label="Tindak lanjuti unit siap",
-                reason=f"Unit {target.unit_id} sudah siap — jangan menunggu unit lain.",
-                target_unit_id=target.unit_id,
-                priority=4,
-            )
-
-    # Priority 5: police incident
-    # If no ready financial but we have units, or after financial handled
+    # 6. Police incident preparation
     if units and not incident_police_ready:
-        # Check if financial units are done? For now suggest police
         return NextBestAction(
             code=NextActionCode.PREPARE_POLICE_INCIDENT,
             label="Siapkan paket incident untuk kepolisian",
             reason="Setelah jalur finansial, siapkan kronologi lengkap untuk kanal kepolisian — pilih kanal resmi yang tersedia.",
-            priority=5,
+            priority=6,
         )
 
     # If no units at all, suggest adding evidence
@@ -213,11 +215,10 @@ def recommend_next_action(
             code=NextActionCode.ADD_TRANSFER_EVIDENCE,
             label="Unggah bukti transfer",
             reason="Belum ada unit transaksi — unggah bukti transfer yang memuat nominal, rekening, dan waktu.",
-            priority=6,
+            priority=7,
         )
 
-    # Fallback: approve ready unit
-    # Find any complete unit
+    # Fallback: approve ready unit or download pack
     complete_units = [u for u in units if u.mapping_status == MappingStatus.COMPLETE]
     if complete_units:
         target = sorted(complete_units, key=lambda u: u.unit_id)[0]
@@ -226,15 +227,14 @@ def recommend_next_action(
             label="Setujui unit yang sudah siap",
             reason=f"Unit {target.unit_id} menunggu persetujuan untuk menghasilkan paket terverifikasi.",
             target_unit_id=target.unit_id,
-            priority=7,
+            priority=8,
         )
 
-    # Final fallback
     return NextBestAction(
         code=NextActionCode.DOWNLOAD_VERIFIED_PACK,
         label="Unduh paket terverifikasi",
         reason="Semua unit sudah diproses — unduh ZIP dan lakukan handoff manual.",
-        priority=8,
+        priority=9,
     )
 
 

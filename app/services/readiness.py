@@ -621,22 +621,31 @@ def assess_unit(
     }
     for name in ("BANK_PJP", "IASC"):
         raw_checks = builders[name]()
+        # Shared incident communication: INCIDENT_SHARED vs UNIT_SCOPED
         # For IASC, communication and chronology may be satisfied by shared incident evidence (chat)
+        # but we must not claim unit-specific verification without human confirmation
         if name == "IASC":
-            # Check global communication existence
             global_chat = _named_evidence(all_evidence, ("chat", "pesan", "wa", "whatsapp"))
-            # also consider unavailable comm fact globally
             global_unavailable_comm = _unavailable_of(_usable_facts(all_facts), {__import__("app.domain.models", fromlist=["FactType"]).FactType.CLAIM, __import__("app.domain.models", fromlist=["FactType"]).FactType.CHANNEL})
             patched = []
             for ck in raw_checks:
                 if ck.check_id == "IASC_COMMUNICATION_EVIDENCE" and ck.status == "MISSING":
                     if global_chat or global_unavailable_comm:
-                        patched.append(_result({"check_id": ck.check_id, "label": ck.label, "level": ck.level}, "MET", "Bukti komunikasi tersedia (shared)", evidence=global_chat or [], blocking=False))
+                        # INCIDENT_SHARED: available but not unit-specific
+                        patched.append(
+                            _result(
+                                {"check_id": ck.check_id, "label": ck.label, "level": ck.level},
+                                "MET",
+                                "Bukti komunikasi insiden tersedia (INCIDENT_SHARED) — belum terverifikasi khusus untuk unit ini",
+                                evidence=global_chat or [],
+                                blocking=False,
+                            )
+                        )
                         continue
                 if ck.check_id == "IASC_CHRONOLOGY" and ck.status == "MISSING":
                     global_chrono = _reviewed_of(_usable_facts(all_facts), {__import__("app.domain.models", fromlist=["FactType"]).FactType.DATETIME, __import__("app.domain.models", fromlist=["FactType"]).FactType.EVENT, __import__("app.domain.models", fromlist=["FactType"]).FactType.CLAIM})
                     if global_chrono:
-                        patched.append(_result({"check_id": ck.check_id, "label": ck.label, "level": ck.level}, "MET", "Kronologi tersusun (shared)", facts=global_chrono))
+                        patched.append(_result({"check_id": ck.check_id, "label": ck.label, "level": ck.level}, "MET", "Kronologi tersusun dari fakta insiden (INCIDENT_SHARED)", facts=global_chrono))
                         continue
                 patched.append(ck)
             raw_checks = patched
