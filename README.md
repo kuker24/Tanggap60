@@ -21,11 +21,14 @@ Hermes adapter + FastAPI + Jinja + SQLite WAL + Pillow/Tesseract + ReportLab. Sa
 
 ## Deploy VPS
 
-Lihat `deploy/` dan `docs/DEPLOY.md`. Path default:
+Lihat `docs/DEPLOY.md`. VPS lomba:
 
-- `/opt/tanggap60/app`
-- `/var/lib/tanggap60/cases`
-- `/var/lib/tanggap60/db`
-- `/etc/tanggap60/tanggap60.env` (mode 0600)
+```bash
+git clone https://github.com/kuker24/Tanggap60.git /opt/tanggap60/app
+cd /opt/tanggap60/app
+sudo ./scripts/bootstrap_vps.sh
+./scripts/verify_vps.sh
+```
 
-Salin `.env.example` ke env file. Jangan mengisi secret di git.
+Tanpa IP publik: `sudo ENABLE_TUNNEL=1 ./scripts/bootstrap_vps.sh`.
+
