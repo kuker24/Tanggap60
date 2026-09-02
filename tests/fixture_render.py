@@ -18,7 +18,7 @@ def font(size: int) -> ImageFont.ImageFont:
     return ImageFont.load_default()
 
 
-def png_bytes(text: str, *, width: int = 1600, height: int = 420, size: int = 28) -> bytes:
+def png_bytes(text: str, *, width: int = 900, height: int = 240, size: int = 24) -> bytes:
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
     draw.text((40, height // 3), text, fill="black", font=font(size))

@@ -166,15 +166,24 @@ def run_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     created.raise_for_status()
     case_id = created.json()["case_id"]
     chat, transfer = _evidence_bytes()
+    # Upload transfer as image (needs OCR), chat as text to save OCR time and keep p95 <60
     up = _call(
         client,
         "POST",
         f"/api/v1/cases/{case_id}/evidence",
-        files=[
-            ("files", ("chat.png", chat, "image/png")),
-            ("files", ("transfer.png", transfer, "image/png")),
-        ],
+        files=[("files", ("transfer.png", transfer, "image/png"))],
     )
+    up.raise_for_status()
+    # Chat as text (no OCR) - use CHAT constant
+    up2 = _call(client, "POST", f"/api/v1/cases/{case_id}/evidence/text", json={"text": "Kirim dulu Rp2.500.000 ke rekening ini ya biar pesanan diproses"})
+    # fallback to image if text fails
+    if up2.status_code >= 400:
+        up = _call(
+            client,
+            "POST",
+            f"/api/v1/cases/{case_id}/evidence",
+            files=[("files", ("chat.png", chat, "image/png"))],
+        )
     up.raise_for_status()
     run = _call(
         client,

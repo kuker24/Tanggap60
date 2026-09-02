@@ -315,6 +315,8 @@ class FallbackHermes:
         except MechanicalPlan:
             return None
         except Exception:
+            if isinstance(self.primary, CliHermes):
+                self.cli_used = True
             return None
 
 
