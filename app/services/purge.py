@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from app.domain.errors import ValidationFailed
 from app.domain.states import State
 from app.infrastructure.jobs import JobQueue
 from app.infrastructure.repositories import (
@@ -43,7 +44,7 @@ class PurgeService:
 
     def purge(self, case_id: str, session_id: str, confirmation: str) -> dict[str, str]:
         if confirmation != "PURGE":
-            raise ValueError("konfirmasi purge tidak cocok")
+            raise ValidationFailed("konfirmasi purge tidak cocok")
         case = self.cases.get_owned(case_id, session_id)
         self._wipe(case.case_id)
         case.state = State.PURGED

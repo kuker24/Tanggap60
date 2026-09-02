@@ -8,5 +8,5 @@ if [[ -x .venv/bin/python ]]; then
 else
   PY=python3
 fi
-export TANGGAP60_SOAK="${TANGGAP60_SOAK:-3}"
+export TANGGAP60_SOAK="${TANGGAP60_SOAK:-10}"
 "${PY}" scripts/benchmark_vps.py "${BASE}"

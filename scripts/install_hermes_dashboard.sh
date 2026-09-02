@@ -34,10 +34,20 @@ id tanggap60 >/dev/null 2>&1 && usermod -aG hermes tanggap60
 apt-get install -y --no-install-recommends acl
 chmod 0750 /home/hermes
 chmod 0750 /home/hermes/.hermes
+setfacl -b /home/hermes /home/hermes/.hermes || true
 setfacl -m u:tanggap60:--x /home/hermes
-setfacl -R -m u:tanggap60:rwx /home/hermes/.hermes
-setfacl -R -d -m u:tanggap60:rwx /home/hermes/.hermes
-chmod g+s /home/hermes/.hermes || true
+setfacl -m u:tanggap60:r-x /home/hermes/.hermes
+if [[ -f /home/hermes/.hermes/config.yaml ]]; then
+  setfacl -m u:tanggap60:r-- /home/hermes/.hermes/config.yaml
+fi
+if [[ -f /home/hermes/.hermes/.env ]]; then
+  setfacl -m u:tanggap60:r-- /home/hermes/.hermes/.env
+fi
+for d in logs sessions tmp cache; do
+  install -d -o hermes -g hermes "/home/hermes/.hermes/${d}"
+  setfacl -m u:tanggap60:rwx "/home/hermes/.hermes/${d}"
+  setfacl -d -m u:tanggap60:rwx "/home/hermes/.hermes/${d}"
+done
 ENV_FILE=/etc/tanggap60/tanggap60.env
 if [[ -f "${ENV_FILE}" ]]; then
   grep -q '^HERMES_BIN=' "${ENV_FILE}" || printf '\nHERMES_BIN=/home/hermes/.local/bin/hermes\n' >> "${ENV_FILE}"

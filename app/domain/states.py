@@ -107,7 +107,7 @@ TOOLS_BY_STATE: dict[State, tuple[str, ...]] = {
     State.GENERATING: ("compile_artifacts",),
     State.VERIFYING: ("verify_artifacts",),
     State.HANDOFF_READY: ("prepare_official_handoff", "record_handoff_receipt"),
-    State.RECEIPT_RECORDED: ("purge_case",),
-    State.COMPLETE: ("purge_case",),
-    State.FAILED_SAFE: ("purge_case",),
+    State.RECEIPT_RECORDED: ("record_handoff_receipt",),
+    State.COMPLETE: (),
+    State.FAILED_SAFE: (),
 }

@@ -3,11 +3,12 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.domain.errors import AppError
+from app.domain.errors import AppError, NotFound
 from app.domain.models import AuditEventRecord
 from app.domain.policies import sha256_text
 from app.domain.states import State, transition
 from app.hermes.adapter import HermesPort
+from app.hermes.telemetry import execution_for, mode_from_hermes, planner_for
 from app.hermes.tool_registry import ToolContext, execute_tool
 from app.hermes.tools.catalog import allowed_tools
 from app.infrastructure.logging import hash_id
@@ -44,12 +45,14 @@ class Orchestrator:
             "handoff_prepared": False,
         }
         planned: list[str] | None = None
+        planned_mode = "deterministic"
         seq_fn = getattr(self.hermes, "propose_sequence", None)
         if seq_fn is not None:
             try:
                 raw = seq_fn(case.state.value, summary0)
                 if raw is not None:
                     planned = [str(item) for item in raw]
+                    planned_mode = mode_from_hermes(self.hermes)
             except Exception:
                 planned = None
         for _ in range(16):
@@ -62,13 +65,16 @@ class Orchestrator:
                 "allowed_tools": list(allowed_tools(case.state.value)),
                 "handoff_prepared": "prepare_official_handoff" in trace,
             }
+            source_mode = planned_mode
             if planned:
                 tool = planned.pop(0)
                 if tool not in allowed_tools(case.state.value):
                     planned = None
                     tool = self.hermes.propose_tool(case.state.value, summary)
+                    source_mode = mode_from_hermes(self.hermes)
             else:
                 tool = self.hermes.propose_tool(case.state.value, summary)
+                source_mode = mode_from_hermes(self.hermes)
             if tool is None:
                 break
             if tool == "validate_case_facts" and case.state == State.REVIEW_REQUIRED and tool in trace:
@@ -88,12 +94,13 @@ class Orchestrator:
                 case = self.case_repo.get(case_id)
                 case.state = transition(case.state, State.FAILED_SAFE)
                 self.cases.touch(case)
-                self._trace(case_id, run_id, tool, case.state.value, "ERROR", exc.code, None)
+                self._trace(case_id, run_id, tool, case.state.value, "ERROR", exc.code, None, source_mode)
                 return {
                     "status": "FAILED_SAFE",
                     "trace": trace,
                     "error": exc.code,
                     "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
+                    "hermes_cli_used": bool(getattr(self.hermes, "cli_used", False)),
                 }
             trace.append(tool)
             case = self.case_repo.get(case_id)
@@ -112,6 +119,7 @@ class Orchestrator:
                 "OK",
                 None,
                 int(result.get("duration_ms") or 0),
+                source_mode,
             )
             if self._should_pause(self.case_repo.get(case_id).state, trace):
                 break
@@ -119,6 +127,7 @@ class Orchestrator:
             "status": "OK",
             "trace": trace,
             "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
+            "hermes_cli_used": bool(getattr(self.hermes, "cli_used", False)),
         }
 
     def run_tool(self, case_id: str, run_id: str, tool: str, extra: dict[str, object] | None = None) -> dict[str, object]:
@@ -131,8 +140,12 @@ class Orchestrator:
         if extra:
             args.update(extra)
         result = execute_tool(tool, case.state, args, self.ctx)
-        case = self.case_repo.get(case_id)
-        self._trace(case_id, run_id, tool, case.state.value, "OK", None, int(result.get("duration_ms") or 0))
+        try:
+            case = self.case_repo.get(case_id)
+            state_after = case.state.value
+        except NotFound:
+            state_after = "PURGED"
+        self._trace(case_id, run_id, tool, state_after, "OK", None, int(result.get("duration_ms") or 0), "user")
         return result
 
     def _should_pause(self, state: State, trace: list[str]) -> bool:
@@ -153,6 +166,7 @@ class Orchestrator:
         result: str,
         error: str | None,
         duration: int | None,
+        source_mode: str = "deterministic",
     ) -> None:
         self.events.add(
             AuditEventRecord(
@@ -169,5 +183,7 @@ class Orchestrator:
                 error_code=error,
                 payload_hash=sha256_text(tool),
                 created_at=now_utc(),
+                planner=planner_for(tool, source_mode),
+                execution=execution_for(tool),
             )
         )

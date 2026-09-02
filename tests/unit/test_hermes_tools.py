@@ -9,10 +9,12 @@ from app.hermes.adapter import (
     CliHermes,
     DeterministicHermes,
     FallbackHermes,
+    MechanicalPlan,
     build_hermes,
     parse_tool_reply,
     parse_tools_reply,
 )
+from app.hermes.telemetry import planner_for
 from app.hermes.tools.catalog import TOOL_SPECS, tool_names
 
 
@@ -98,6 +100,38 @@ def test_fallback_uses_deterministic_when_cli_fails() -> None:
     hermes = FallbackHermes(CliHermes(command=["hermes"], runner=boom), DeterministicHermes())
     assert hermes.propose_tool("INGESTING", {}) == "inspect_evidence"
     assert hermes.last_mode == "deterministic"
+
+
+def test_planner_labels() -> None:
+    assert planner_for("inspect_evidence", "cli") == "HERMES_CLI"
+    assert planner_for("compile_artifacts", "cli") == "DETERMINISTIC_SAFE"
+    assert planner_for("record_handoff_receipt", "cli") == "USER"
+
+
+def test_cli_mechanical_plan() -> None:
+    hermes = CliHermes(command=["hermes"])
+    try:
+        hermes.propose_tool("GENERATING", {})
+    except MechanicalPlan:
+        return
+    raise AssertionError("expected MechanicalPlan")
+
+
+def test_mechanical_keeps_cli_used() -> None:
+    def fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["hermes"],
+            returncode=0,
+            stdout='{"tool": "inspect_evidence"}',
+            stderr="",
+        )
+
+    wrapped = FallbackHermes(CliHermes(command=["hermes"], runner=fake_run), DeterministicHermes())
+    assert wrapped.propose_tool("INGESTING", {"allowed_tools": ["inspect_evidence"]}) == "inspect_evidence"
+    assert wrapped.cli_used is True
+    assert wrapped.propose_tool("GENERATING", {}) == "compile_artifacts"
+    assert wrapped.last_mode == "cli"
+    assert wrapped.last_planner_mode == "deterministic"
 
 
 def test_build_hermes_cli_when_bin_set() -> None:

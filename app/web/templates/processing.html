@@ -6,7 +6,7 @@
 <p id="state-live" class="live" aria-live="polite">{{ case.state.value }}</p>
 <ul class="timeline">
   {% for event in events %}
-  <li><span class="badge {% if event.result_code == 'OK' %}ok{% endif %}">{{ event.tool_name or event.event_type }}</span> {{ event.duration_ms or 0 }} ms</li>
+  <li><span class="badge {% if event.result_code == 'OK' %}ok{% endif %}">{{ event.tool_name or event.event_type }}</span> {{ event.planner or "" }} · {{ event.duration_ms or 0 }} ms</li>
   {% else %}
   <li>Memeriksa keamanan file</li>
   <li>Membaca bukti</li>

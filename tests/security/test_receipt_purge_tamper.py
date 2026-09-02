@@ -59,10 +59,17 @@ def test_t15_t16_receipt(client: TestClient, ocr: ScriptedOcr) -> None:
 
 def test_t18_purge(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
     case_id = _ready_pack(client, ocr)
+    denied = client.request("DELETE", f"/api/v1/cases/{case_id}", json={"confirmation": "nope"})
+    assert denied.status_code == 400
+    still = client.get(f"/api/v1/cases/{case_id}")
+    assert still.status_code == 200
     res = client.request("DELETE", f"/api/v1/cases/{case_id}", json={"confirmation": "PURGE"})
     assert res.status_code == 200
+    assert res.json()["tool_name"] == "purge_case"
     missing = client.get(f"/api/v1/cases/{case_id}")
     assert missing.status_code in {403, 404, 410}
+    _settings, _ocr, container = tmp_env
+    assert not any(container.storage.root.joinpath(case_id).rglob("*"))
 
 
 def test_t11_tamper_blocks_download(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:

@@ -86,6 +86,11 @@ class JobQueue:
     def depth(self) -> int:
         return len(list(self.session.scalars(select(JobRow).where(JobRow.status == "pending"))))
 
+    def active_depth(self) -> int:
+        return len(
+            list(self.session.scalars(select(JobRow).where(JobRow.status.in_(("pending", "running")))))
+        )
+
     def delete_for_case(self, case_id: str) -> None:
         from sqlalchemy import delete
 

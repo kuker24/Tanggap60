@@ -595,6 +595,8 @@ class EventRepository:
                 error_code=event.error_code,
                 payload_hash=event.payload_hash,
                 created_at=event.created_at,
+                planner=event.planner,
+                execution=event.execution,
             )
         )
 
@@ -619,6 +621,8 @@ class EventRepository:
                 error_code=r.error_code,
                 payload_hash=r.payload_hash,
                 created_at=_dt(r.created_at),  # type: ignore[arg-type]
+                planner=r.planner,
+                execution=r.execution,
             )
             for r in rows
         ]

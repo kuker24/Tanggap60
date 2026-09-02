@@ -14,6 +14,10 @@ from app.hermes.tools.catalog import allowed_tools
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
+class MechanicalPlan(Exception):
+    pass
+
+
 class HermesPort(Protocol):
     last_mode: str
 
@@ -23,6 +27,8 @@ class HermesPort(Protocol):
 
 class DeterministicHermes:
     last_mode = "deterministic"
+    last_planner_mode = "deterministic"
+    cli_used = False
     ORDER = {
         "INGESTING": "inspect_evidence",
         "EXTRACTING": "extract_candidate_facts",
@@ -119,6 +125,8 @@ def sequence_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> 
 
 class HttpHermes:
     last_mode = "http"
+    last_planner_mode = "http"
+    cli_used = False
 
     def __init__(self, endpoint: str) -> None:
         self.endpoint = endpoint.rstrip("/")
@@ -145,6 +153,8 @@ class HttpHermes:
 
 class CliHermes:
     last_mode = "cli"
+    last_planner_mode = "cli"
+    cli_used = True
 
     def __init__(
         self,
@@ -174,18 +184,20 @@ class CliHermes:
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
         if state in _MECHANICAL_STATES:
-            raise RuntimeError("mechanical")
+            raise MechanicalPlan
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
         tool = parse_tool_reply(self._run(picker_prompt(state, summary, allowed)), set(allowed))
         self.last_mode = "cli"
+        self.last_planner_mode = "cli"
         return tool
 
     def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str]:
         if state in _MECHANICAL_STATES:
-            raise RuntimeError("mechanical")
+            raise MechanicalPlan
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
         tools = parse_tools_reply(self._run(sequence_prompt(state, summary, allowed)))
         self.last_mode = "cli"
+        self.last_planner_mode = "cli"
         return tools
 
 
@@ -194,15 +206,35 @@ class FallbackHermes:
         self.primary = primary
         self.fallback = fallback
         self.last_mode = fallback.last_mode
+        self.last_planner_mode = getattr(fallback, "last_planner_mode", fallback.last_mode)
+        self.cli_used = False
+
+    def _mark_primary(self) -> None:
+        self.last_mode = getattr(self.primary, "last_mode", "http")
+        self.last_planner_mode = self.last_mode
+        if self.last_mode == "cli":
+            self.cli_used = True
+
+    def _mark_fallback(self, *, keep_cli: bool) -> None:
+        fallback_mode = getattr(self.fallback, "last_mode", "deterministic")
+        self.last_planner_mode = fallback_mode
+        if keep_cli and self.cli_used:
+            self.last_mode = "cli"
+        else:
+            self.last_mode = fallback_mode
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
         try:
             tool = self.primary.propose_tool(state, summary)
-            self.last_mode = getattr(self.primary, "last_mode", "http")
+            self._mark_primary()
+            return tool
+        except MechanicalPlan:
+            tool = self.fallback.propose_tool(state, summary)
+            self._mark_fallback(keep_cli=True)
             return tool
         except Exception:
             tool = self.fallback.propose_tool(state, summary)
-            self.last_mode = getattr(self.fallback, "last_mode", "deterministic")
+            self._mark_fallback(keep_cli=False)
             return tool
 
     def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str] | None:
@@ -211,8 +243,10 @@ class FallbackHermes:
             return None
         try:
             tools = seq_fn(state, summary)
-            self.last_mode = getattr(self.primary, "last_mode", "http")
+            self._mark_primary()
             return tools
+        except MechanicalPlan:
+            return None
         except Exception:
             return None
 

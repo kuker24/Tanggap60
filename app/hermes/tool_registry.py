@@ -38,9 +38,14 @@ class ToolContext:
 
 
 def execute_tool(name: str, state: State, args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
-    allowed = TOOLS_BY_STATE.get(state, ())
-    if name not in allowed and not (state == State.REVIEW_REQUIRED and name == "validate_case_facts"):
-        raise InvalidStateTransition(f"tool {name} tidak diizinkan pada {state}")
+    user_initiated = bool(args.get("user_initiated"))
+    if name == "purge_case":
+        if not user_initiated:
+            raise InvalidStateTransition("purge hanya atas permintaan pengguna")
+    else:
+        allowed = TOOLS_BY_STATE.get(state, ())
+        if name not in allowed and not (state == State.REVIEW_REQUIRED and name == "validate_case_facts"):
+            raise InvalidStateTransition(f"tool {name} tidak diizinkan pada {state}")
     start = time.perf_counter()
     handler = HANDLERS[name]
     result = handler(args, ctx)

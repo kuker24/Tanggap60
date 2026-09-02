@@ -285,3 +285,5 @@ class AuditEventRecord:
     error_code: str | None
     payload_hash: str | None
     created_at: datetime
+    planner: str | None = None
+    execution: str | None = None

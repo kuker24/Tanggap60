@@ -49,6 +49,10 @@ def test_t01_t04_hero(client: TestClient, ocr: ScriptedOcr) -> None:
     arts = client.get(f"/api/v1/cases/{case_id}/artifacts").json()["artifacts"]
     assert arts
     assert all(a["verify_status"] == "PASS" for a in arts)
+    steps = {s["tool_name"]: s for s in client.get(f"/api/v1/cases/{case_id}/trace").json()["steps"]}
+    assert steps["compile_artifacts"]["planner"] == "DETERMINISTIC_SAFE"
+    assert steps["verify_artifacts"]["planner"] == "DETERMINISTIC_SAFE"
+    assert steps["inspect_evidence"]["planner"] == "DETERMINISTIC_SAFE"
     fact_id = client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"][0]["fact_id"]
     version = client.get(f"/api/v1/cases/{case_id}").json()["version"]
     patched = client.patch(

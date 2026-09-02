@@ -181,6 +181,8 @@ class AuditEventRow(Base):
     error_code: Mapped[str | None] = mapped_column(String(40), nullable=True)
     payload_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[str] = mapped_column(DateTime)
+    planner: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    execution: Mapped[str | None] = mapped_column(String(40), nullable=True)
 
 
 class JobRow(Base):
@@ -243,8 +245,18 @@ def make_engine(database_url: str) -> Engine:
     return engine
 
 
+def _migrate_audit_events(engine: Engine) -> None:
+    with engine.begin() as conn:
+        names = {row[1] for row in conn.execute(text("PRAGMA table_info(audit_events)"))}
+        if "planner" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN planner VARCHAR(40)"))
+        if "execution" not in names:
+            conn.execute(text("ALTER TABLE audit_events ADD COLUMN execution VARCHAR(40)"))
+
+
 def init_db(engine: Engine) -> None:
     Base.metadata.create_all(engine)
+    _migrate_audit_events(engine)
     with engine.connect() as conn:
         conn.execute(text("PRAGMA foreign_keys=ON"))
         conn.commit()

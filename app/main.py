@@ -91,7 +91,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         storage = app.state.container.storage
         return {
             "case_state_total": CaseRepository(session).counts_by_state(),
-            "job_queue_depth": JobQueue(session).depth(),
+            "job_queue_depth": JobQueue(session).active_depth(),
             "process_rss_mb": process_rss_mb(),
             "available_ram_mb": available_ram_mb(),
             "cpu_load_proxy": cpu_percent(),

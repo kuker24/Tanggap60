@@ -70,8 +70,14 @@ def get_case(case_id: str, request: Request) -> dict[str, Any]:
 
 @api.delete("/cases/{case_id}")
 def delete_case(case_id: str, request: Request, payload: dict[str, str] | None = None) -> dict[str, str]:
-    confirmation = (payload or {}).get("confirmation", "PURGE")
-    return svc(request)["purge"].purge(case_id, sid(request), confirmation)
+    confirmation = (payload or {}).get("confirmation", "")
+    result = svc(request)["orchestrator"].run_tool(
+        case_id,
+        new_id("run"),
+        "purge_case",
+        {"confirmation": confirmation, "user_initiated": True, "session_id": sid(request)},
+    )
+    return {"status": str(result.get("status") or "PURGED"), "case_id": case_id, "tool_name": "purge_case"}
 
 
 @api.post("/cases/{case_id}/evidence", status_code=202)
@@ -472,17 +478,46 @@ def list_events(case_id: str, request: Request) -> dict[str, Any]:
                 "duration_ms": e.duration_ms,
                 "result_code": e.result_code,
                 "state_after": e.state_after,
+                "planner": e.planner,
+                "execution": e.execution,
             }
             for e in events
         ]
     }
 
 
+@api.get("/cases/{case_id}/trace")
+def agent_trace(case_id: str, request: Request) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    from app.infrastructure.logging import hash_id
+
+    events = EventRepository(request.state.db).list_for_case(hash_id(case_id))
+    steps = [
+        {
+            "tool_name": e.tool_name,
+            "planner": e.planner or "DETERMINISTIC_SAFE",
+            "execution": e.execution or "LOCAL_TOOL",
+            "duration_ms": e.duration_ms or 0,
+        }
+        for e in events
+        if e.event_type == "TOOL_CALLED" and e.tool_name
+    ]
+    return {
+        "steps": steps,
+        "hermes_cli_used": any(step["planner"] == "HERMES_CLI" for step in steps),
+        "official_status": "NOT_VERIFIED",
+    }
+
+
 @api.get("/agent/tools")
 def agent_tools(request: Request) -> dict[str, Any]:
+    hermes = request.app.state.container.hermes
+    settings = request.app.state.container.settings
     return {
         "tools": list(TOOL_SPECS),
-        "hermes_mode": getattr(request.app.state.container.hermes, "last_mode", "deterministic"),
+        "hermes_mode": getattr(hermes, "last_mode", "deterministic"),
+        "hermes_cli_used": bool(getattr(hermes, "cli_used", False)),
+        "hermes_bin_configured": bool(settings.hermes_bin),
     }
 
 

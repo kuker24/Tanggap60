@@ -20,6 +20,12 @@ REQUIRED = (
     "prepare_official_handoff",
     "record_handoff_receipt",
 )
+REASONING = {
+    "inspect_evidence",
+    "extract_candidate_facts",
+    "validate_case_facts",
+    "build_postincident_plan",
+}
 
 
 def _keep_session(client: httpx.Client, response: httpx.Response) -> None:
@@ -54,6 +60,13 @@ def _tools(client: httpx.Client, case_id: str) -> list[str]:
     if events.status_code != 200:
         return []
     return [e.get("tool_name") for e in events.json().get("events", []) if e.get("tool_name")]
+
+
+def _trace(client: httpx.Client, case_id: str) -> dict[str, Any]:
+    res = _call(client, "GET", f"/api/v1/cases/{case_id}/trace")
+    if res.status_code != 200:
+        return {"steps": [], "hermes_cli_used": False}
+    return res.json()
 
 
 def _evidence_bytes() -> tuple[bytes, bytes]:
@@ -185,34 +198,56 @@ def run_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     receipt.raise_for_status()
     if receipt.json().get("official_status") != "NOT_VERIFIED":
         raise SystemExit("official_status must stay NOT_VERIFIED")
+    if receipt.json().get("local_match_status") != "MATCH":
+        raise SystemExit(f"receipt not MATCH {receipt.json()}")
+    state = _wait_state(client, case_id, {"RECEIPT_RECORDED"}, 15)
+    if state != "RECEIPT_RECORDED":
+        raise SystemExit(f"expected RECEIPT_RECORDED got {state}")
     tools = _tools(client, case_id)
-    mode = _call(client, "GET", "/api/v1/agent/tools").json().get("hermes_mode")
+    trace = _trace(client, case_id)
+    agent = _call(client, "GET", "/api/v1/agent/tools").json()
     missing = [name for name in REQUIRED if name not in tools]
     elapsed = time.perf_counter() - started
+    cli_used = bool(trace.get("hermes_cli_used"))
     result = {
         "case_id": case_id,
         "state": state,
         "tools": tools,
         "missing": missing,
-        "hermes_mode": mode,
+        "hermes_mode": agent.get("hermes_mode"),
+        "hermes_cli_used": cli_used,
         "elapsed_s": round(elapsed, 3),
         "artifacts": len(arts),
         "receipt": receipt.json().get("local_match_status"),
+        "verification": "PASS",
+        "official_status": "NOT_VERIFIED",
+        "trace_steps": trace.get("steps") or [],
+        "metrics": _call(client, "GET", "/demo/metrics").json(),
     }
     if missing:
         raise SystemExit(f"missing tools {missing} result={result}")
+    if state == "REVIEW_REQUIRED":
+        raise SystemExit("REVIEW_REQUIRED is not a final hero success")
+    if agent.get("hermes_bin_configured") and not cli_used:
+        raise SystemExit("hermes_cli_used=false while HERMES_BIN is configured")
+    planners = {str(step.get("tool_name")): str(step.get("planner")) for step in result["trace_steps"]}
+    for name in REASONING:
+        if name in planners and planners[name] == "DETERMINISTIC_SAFE" and agent.get("hermes_bin_configured"):
+            raise SystemExit(f"{name} planned by fallback")
     return result
 
 
 def main() -> None:
     base = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
     result = run_hero(base)
-    print(
-        "HERO_SMOKE_PASS "
-        f"state={result['state']} tools={len(result['tools'])} "
-        f"hermes={result['hermes_mode']} elapsed_s={result['elapsed_s']} "
-        f"trace={result['tools']}"
-    )
+    print("HERO_SMOKE_PASS")
+    print(f"state={result['state']}")
+    print(f"hermes_cli_used={str(result['hermes_cli_used']).lower()}")
+    print(f"artifacts={result['artifacts']}")
+    print("verification=PASS")
+    print(f"receipt={result['receipt']}")
+    print(f"elapsed_s={result['elapsed_s']}")
+    print(f"trace={result['tools']}")
 
 
 if __name__ == "__main__":
