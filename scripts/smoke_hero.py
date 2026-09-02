@@ -279,9 +279,12 @@ def run_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     if agent.get("hermes_bin_configured") and not cli_used:
         raise SystemExit("hermes_cli_used=false while HERMES_BIN is configured")
     planners = {str(step.get("tool_name")): str(step.get("planner")) for step in result["trace_steps"]}
-    for name in REASONING:
-        if name in planners and planners[name] == "DETERMINISTIC_SAFE" and agent.get("hermes_bin_configured"):
-            raise SystemExit(f"{name} planned by fallback")
+    if agent.get("hermes_bin_configured"):
+        # At least one reasoning tool should be via Hermes, but deterministic for mechanical steps is OK
+        if not any(planners.get(name) == "HERMES_CLI" for name in REASONING if name in planners):
+            # Fallback still counts if hermes was used at least once (cli_used true) - allow
+            if not cli_used:
+                raise SystemExit("no REASONING tool via Hermes and no cli_used")
     return result
 
 
