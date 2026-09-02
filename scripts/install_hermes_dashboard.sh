@@ -31,8 +31,12 @@ as_hermes 'cd "$HOME/.hermes/hermes-agent" && "$HOME/.hermes/bin/uv" pip install
 
 APP_DIR="${APP_DIR:-/opt/tanggap60/app}"
 id tanggap60 >/dev/null 2>&1 && usermod -aG hermes tanggap60
+apt-get install -y --no-install-recommends acl
 chmod 0750 /home/hermes
-chmod -R g+rwX /home/hermes/.hermes
+chmod 0750 /home/hermes/.hermes
+setfacl -m u:tanggap60:--x /home/hermes
+setfacl -R -m u:tanggap60:rwx /home/hermes/.hermes
+setfacl -R -d -m u:tanggap60:rwx /home/hermes/.hermes
 chmod g+s /home/hermes/.hermes || true
 ENV_FILE=/etc/tanggap60/tanggap60.env
 if [[ -f "${ENV_FILE}" ]]; then

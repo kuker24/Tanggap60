@@ -173,12 +173,16 @@ class CliHermes:
         return completed.stdout
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
+        if state in _MECHANICAL_STATES:
+            raise RuntimeError("mechanical")
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
         tool = parse_tool_reply(self._run(picker_prompt(state, summary, allowed)), set(allowed))
         self.last_mode = "cli"
         return tool
 
     def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str]:
+        if state in _MECHANICAL_STATES:
+            raise RuntimeError("mechanical")
         allowed = list(summary.get("allowed_tools") or allowed_tools(state))
         tools = parse_tools_reply(self._run(sequence_prompt(state, summary, allowed)))
         self.last_mode = "cli"
@@ -213,6 +217,14 @@ class FallbackHermes:
             return None
 
 
+_MECHANICAL_STATES = {
+    "GENERATING",
+    "VERIFYING",
+    "HANDOFF_READY",
+    "WAITING_APPROVAL",
+}
+
+
 def _cli_command(binary: str) -> list[str]:
     return [
         binary,
@@ -224,6 +236,8 @@ def _cli_command(binary: str) -> list[str]:
         "--ignore-rules",
         "--source",
         "tool",
+        "--toolsets",
+        "clarify",
         "--query-file",
         "-",
     ]
