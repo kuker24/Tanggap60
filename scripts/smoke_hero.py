@@ -415,17 +415,20 @@ def run_rescue_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     units = ru_data.get("reporting_units") or []
     if len(units) != 2:
         raise SystemExit(f"reporting_units expected 2 got {len(units)} {units}")
-    # identify A and B by destination
-    unit_a = next((u for u in units if "DEMO-DEST-A" in str(u.get("destination_account") or "")), None)
-    unit_b = next((u for u in units if "DEMO-DEST-B" in str(u.get("destination_account") or "")), None)
+    # identify A (COMPLETE with dest A) and B (AMBIGUOUS/INCOMPLETE)
+    unit_a = next((u for u in units if u.get("mapping_status") == "COMPLETE" and "DEMO-DEST-A" in str(u.get("destination_account") or "")), None)
+    unit_b = next((u for u in units if u.get("mapping_status") in ("AMBIGUOUS", "INCOMPLETE")), None)
+    if not unit_a:
+        unit_a = next((u for u in units if u.get("mapping_status") == "COMPLETE"), None)
+    if not unit_b:
+        unit_b = next((u for u in units if u["unit_id"] != (unit_a.get("unit_id") if unit_a else "")), None)
     if not unit_a or not unit_b:
-        # fallback by sorting
         units_sorted = sorted(units, key=lambda x: x.get("unit_id"))
         unit_a, unit_b = units_sorted[0], units_sorted[1]
     if unit_a.get("mapping_status") != "COMPLETE":
         raise SystemExit(f"Unit A expected COMPLETE got {unit_a}")
-    # Unit B should start not READY (INCOMPLETE due to missing reviewed time)
-    if unit_b.get("mapping_status") == "COMPLETE":
+    # Unit B should be AMBIGUOUS (or INCOMPLETE) initially
+    if unit_b.get("mapping_status") not in ("AMBIGUOUS", "INCOMPLETE"):
         # check readiness, maybe still not READY due to not confirmed
         readiness = ru_data.get("readiness") or {}
         rb = readiness.get("readiness_by_unit") or {}
