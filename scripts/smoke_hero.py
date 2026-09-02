@@ -74,6 +74,17 @@ def _keep_session(client: httpx.Client, response: httpx.Response) -> None:
     if "t60_sid=" not in header:
         return
     value = header.split("t60_sid=", 1)[1].split(";", 1)[0]
+    # Clear existing to avoid duplicate Secure vs non-Secure conflict (httpx does not send Secure over http)
+    try:
+        # remove any existing t60_sid cookies to avoid CookieConflict
+        to_delete = [c for c in list(client.cookies.jar) if getattr(c, "name", "") == "t60_sid"]
+        for c in to_delete:
+            try:
+                client.cookies.delete(c.name, domain=c.domain, path=c.path)
+            except Exception:
+                pass
+    except Exception:
+        pass
     client.cookies.set("t60_sid", value)
 
 
