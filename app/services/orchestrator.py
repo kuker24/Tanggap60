@@ -76,16 +76,12 @@ class Orchestrator:
                 "readiness_assessed": "assess_handoff_readiness" in trace,
                 "next_action_done": "recommend_next_action" in trace,
             }
-            # Forced deterministic order for rescue compiler: avoid extra hermes latency for mechanical steps
+            # Forced deterministic for mechanical steps only (compile/recommend), keep build/assess via Hermes
             forced = None
             if case.state == State.READY_FOR_ACTION and case.route.value == "POST_INCIDENT_RESPONSE":
-                if "build_postincident_plan" not in trace:
-                    forced = "build_postincident_plan"
-                elif "compile_reporting_units" not in trace:
+                if "build_postincident_plan" in trace and "compile_reporting_units" not in trace:
                     forced = "compile_reporting_units"
-                elif "assess_handoff_readiness" not in trace:
-                    forced = "assess_handoff_readiness"
-                elif "recommend_next_action" not in trace:
+                elif "assess_handoff_readiness" in trace and "recommend_next_action" not in trace:
                     forced = "recommend_next_action"
             source_mode = planned_mode
             pick_ms = 0
