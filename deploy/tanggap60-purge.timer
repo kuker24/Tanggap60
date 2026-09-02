@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Tanggap60 purge hourly
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec=1h
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

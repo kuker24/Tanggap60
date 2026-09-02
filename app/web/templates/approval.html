@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Persetujuan{% endblock %}
+{% block content %}
+<h1>Buat paket final?</h1>
+{% if blocking %}
+<p class="card block">Selesaikan {{ blocking|length }} konflik nominal terlebih dahulu.</p>
+<a class="btn" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a>
+{% else %}
+<p>Snapshot: <code>{{ snapshot_hash }}</code></p>
+<label>
+  <input id="notice" type="checkbox">
+  Saya telah meninjau fakta dan memahami bahwa Tanggap60 tidak mengirim laporan atau membuat keputusan hukum.
+</label>
+<p><button class="btn" id="go" disabled>Buat Paket Final</button></p>
+<script>
+const box = document.getElementById("notice");
+const go = document.getElementById("go");
+box.addEventListener("change", () => { go.disabled = !box.checked; });
+go.addEventListener("click", async () => {
+  const res = await fetch("/api/v1/cases/{{ case.case_id }}/approval", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "Idempotency-Key": "appr-{{ case.case_id }}-{{ case.version }}"},
+    body: JSON.stringify({snapshot_hash: "{{ snapshot_hash }}", accepted_notice: true})
+  });
+  if (res.ok) location.href = "/cases/{{ case.case_id }}/artifacts";
+  else {
+    const err = await res.json();
+    alert(err.message || err.code);
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

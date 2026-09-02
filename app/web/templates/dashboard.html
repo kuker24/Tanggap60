@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Dashboard VPS{% endblock %}
+{% block content %}
+<h1>Dashboard sumber daya</h1>
+<pre id="metrics" class="card">memuat…</pre>
+<script>
+async function load() {
+  const res = await fetch("/demo/metrics");
+  document.getElementById("metrics").textContent = JSON.stringify(await res.json(), null, 2);
+}
+load();
+setInterval(load, 3000);
+</script>
+{% endblock %}

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SatuAman Tanggap60{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <a class="skip" href="#main">Lewati ke isi</a>
+  <header class="top">
+    <div class="brand">
+      <span class="mark" aria-hidden="true"></span>
+      <div>
+        <strong>SatuAman</strong>
+        <span class="sub">Tanggap60 · bantuan pasca-insiden</span>
+      </div>
+    </div>
+    <p class="disclaimer">Tanggap60 membantu menyusun informasi dan langkah. Keputusan resmi tetap oleh Anda dan lembaga berwenang.</p>
+  </header>
+  <div class="shell">
+    <main id="main">{% block content %}{% endblock %}</main>
+    <aside class="rail" aria-label="Status kasus">
+      {% block rail %}
+      <h2>Status</h2>
+      <p class="muted">Tidak ada kasus aktif.</p>
+      {% endblock %}
+    </aside>
+  </div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

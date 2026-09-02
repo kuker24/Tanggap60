@@ -1,0 +1,18 @@
+[Unit]
+Description=Tanggap60 worker
+After=network.target
+
+[Service]
+Type=simple
+User=tanggap60
+Group=tanggap60
+EnvironmentFile=/etc/tanggap60/tanggap60.env
+WorkingDirectory=/opt/tanggap60/app
+ExecStart=/opt/tanggap60/app/.venv/bin/python -m app.worker
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

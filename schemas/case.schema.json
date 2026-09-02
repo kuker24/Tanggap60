@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/tanggap60/case.schema.json",
+  "title": "SatuAman Tanggap60 Competition Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_id",
+    "mode",
+    "route",
+    "state",
+    "facts",
+    "conflicts",
+    "actions",
+    "artifacts",
+    "official_status"
+  ],
+  "properties": {
+    "schema_version": {"const": "2.0"},
+    "case_id": {"type": "string", "minLength": 8, "maxLength": 80},
+    "mode": {"enum": ["DEMO", "STANDARD"]},
+    "route": {"enum": ["PRE_INCIDENT_CHECK", "POST_INCIDENT_RESPONSE", "OUT_OF_SCOPE"]},
+    "state": {
+      "enum": [
+        "NEW", "INGESTING", "EXTRACTING", "REVIEW_REQUIRED",
+        "READY_FOR_ACTION", "WAITING_APPROVAL", "GENERATING",
+        "VERIFYING", "HANDOFF_READY", "RECEIPT_RECORDED",
+        "COMPLETE", "FAILED_SAFE", "PURGED"
+      ]
+    },
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "facts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/fact"}
+    },
+    "conflicts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/conflict"}
+    },
+    "transactions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/transaction"}
+    },
+    "actions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/action"}
+    },
+    "approval": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/approval"}
+      ]
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/artifact"}
+    },
+    "receipt": {
+      "anyOf": [
+        {"type": "null"},
+        {"$ref": "#/$defs/receipt"}
+      ]
+    },
+    "official_status": {"const": "NOT_VERIFIED"},
+    "disclaimer": {"type": "string"}
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["evidence_id", "locator"],
+      "properties": {
+        "evidence_id": {"type": "string"},
+        "locator": {"type": "string"},
+        "excerpt_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fact_id", "type", "raw_value", "review_status", "criticality", "source"],
+      "properties": {
+        "fact_id": {"type": "string"},
+        "type": {"enum": ["PERSON_NAME", "PHONE", "ACCOUNT", "PJP", "AMOUNT", "DATETIME", "CHANNEL", "URL", "CLAIM", "EVENT"]},
+        "raw_value": {"type": "string"},
+        "normalized_value": {"type": ["string", "number", "null"]},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "criticality": {"enum": ["CRITICAL", "IMPORTANT", "OPTIONAL"]},
+        "review_status": {"enum": ["CANDIDATE", "CONFIRMED", "CORRECTED", "REJECTED", "UNAVAILABLE"]},
+        "source": {"$ref": "#/$defs/source"}
+      }
+    },
+    "conflict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["conflict_id", "type", "fact_ids", "severity", "status"],
+      "properties": {
+        "conflict_id": {"type": "string"},
+        "type": {"enum": ["VALUE_MISMATCH", "TIME_ORDER", "DUPLICATE", "SOURCE_DISAGREEMENT"]},
+        "fact_ids": {"type": "array", "minItems": 2, "items": {"type": "string"}},
+        "severity": {"enum": ["BLOCKING", "WARNING"]},
+        "status": {"enum": ["OPEN", "RESOLVED", "DISMISSED"]},
+        "resolution_fact_id": {"type": ["string", "null"]}
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["transaction_id", "destination_account", "amount", "transferred_at"],
+      "properties": {
+        "transaction_id": {"type": "string"},
+        "victim_account": {"type": ["string", "null"]},
+        "destination_account": {"type": "string"},
+        "amount": {"type": "number", "minimum": 0},
+        "currency": {"const": "IDR"},
+        "transferred_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action_id", "priority", "channel", "instruction", "status"],
+      "properties": {
+        "action_id": {"type": "string"},
+        "priority": {"enum": ["NOW", "NEXT", "LATER"]},
+        "channel": {"enum": ["BANK_PJP", "IASC", "POLICE", "ACCOUNT_SECURITY", "MANUAL_VERIFY"]},
+        "instruction": {"type": "string"},
+        "status": {"enum": ["TODO", "USER_CONFIRMED_DONE", "SKIPPED"]}
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor", "scope", "snapshot_hash", "approved_at", "notice_version"],
+      "properties": {
+        "actor": {"const": "USER"},
+        "scope": {"enum": ["PRE_BRIEF", "POST_CASE_PACK"]},
+        "snapshot_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "approved_at": {"type": "string", "format": "date-time"},
+        "notice_version": {"type": "string"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_id", "type", "sha256", "verify_status", "source_snapshot_hash"],
+      "properties": {
+        "artifact_id": {"type": "string"},
+        "type": {"enum": ["VERIFICATION_BRIEF", "ACTION_PLAN", "EVIDENCE_PACK", "CASE_JSON", "CHECKLIST", "MANIFEST", "CASE_ZIP"]},
+        "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "verify_status": {"enum": ["PENDING", "PASS", "FAIL"]},
+        "source_snapshot_hash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+      }
+    },
+    "receipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "ticket_value_masked", "format_status", "local_match_status", "official_status"],
+      "properties": {
+        "source": {"enum": ["USER_INPUT", "RECEIPT_OCR", "BOTH"]},
+        "ticket_value_masked": {"type": "string"},
+        "format_status": {"enum": ["NOT_CHECKED", "PLAUSIBLE", "UNRECOGNIZED"]},
+        "local_match_status": {"enum": ["NOT_APPLICABLE", "MATCH", "MISMATCH"]},
+        "official_status": {"const": "NOT_VERIFIED"}
+      }
+    }
+  }
+}
+

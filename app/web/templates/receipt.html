@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Catat bukti{% endblock %}
+{% block content %}
+<h1>Sudah menyerahkan laporan? Catat buktinya.</h1>
+{% if receipt %}
+<ul>
+  <li>Nomor dicatat pengguna: {{ receipt.ticket_value_masked }}</li>
+  <li>Format diperiksa secara lokal: {{ receipt.format_status.value }}</li>
+  <li>Cocok dengan screenshot receipt: {{ receipt.local_match_status.value }}</li>
+  <li>Status resmi belum diverifikasi</li>
+</ul>
+{% else %}
+<form id="rcpt">
+  <label for="ticket">Nomor tiket</label>
+  <input id="ticket" name="ticket_text" type="text">
+  <p><button class="btn" type="submit">Simpan catatan</button></p>
+</form>
+<p class="muted">Aplikasi tidak menampilkan “laporan resmi berhasil”.</p>
+<script>
+document.getElementById("rcpt").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const ticket_text = document.getElementById("ticket").value;
+  await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
+    method: "POST",
+    headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
+    body: JSON.stringify({ticket_text})
+  });
+  location.reload();
+});
+</script>
+{% endif %}
+<form method="post" action="#" onsubmit="return purgeNow(event)">
+  <button class="btn danger" type="submit">Hapus kasus ini</button>
+</form>
+<script>
+async function purgeNow(ev) {
+  ev.preventDefault();
+  if (!confirm("Hapus permanen?")) return false;
+  await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
+  location.href = "/";
+  return false;
+}
+</script>
+{% endblock %}

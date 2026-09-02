@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Tinjau fakta{% endblock %}
+{% block content %}
+<h1>Periksa fakta sebelum paket dibuat</h1>
+{% for conflict in conflicts if conflict.severity == "BLOCKING" and conflict.status == "OPEN" %}
+<article class="card block">
+  <h2>Ada dua nilai berbeda</h2>
+  <p>Tanggap60 tidak akan memilih sendiri. Tentukan nilai yang benar sebelum paket final dibuat.</p>
+  <form class="row" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
+    {% for fid in conflict.fact_ids %}
+    <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}">Pakai {{ fid[-6:] }}</button>
+    {% endfor %}
+  </form>
+</article>
+{% endfor %}
+{% for fact in facts %}
+<article class="card">
+  <p><strong>{{ fact.raw_value }}</strong></p>
+  <p class="muted">{{ fact.type }} · sumber {{ fact.source_locator }} · {{ fact.review_status }}</p>
+  <form class="row" onsubmit="return patchFact(event, '{{ fact.fact_id }}')">
+    <button class="btn" data-action="confirm">Benar</button>
+    <button class="btn ghost" data-action="reject">Bukan ini</button>
+    <button class="btn ghost" data-action="unavailable">Belum tersedia</button>
+  </form>
+</article>
+{% endfor %}
+<p><a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana</a></p>
+<script>
+const VERSION = {{ case.version }};
+const CASE = "{{ case.case_id }}";
+async function patchFact(ev, id) {
+  ev.preventDefault();
+  const action = ev.submitter.getAttribute("data-action");
+  await fetch(`/api/v1/cases/${CASE}/facts/${id}`, {
+    method: "PATCH",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({action, expected_version: VERSION})
+  });
+  location.reload();
+  return false;
+}
+async function resolveConflict(ev, id) {
+  ev.preventDefault();
+  await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({resolution_fact_id: ev.submitter.value, expected_version: VERSION})
+  });
+  location.reload();
+  return false;
+}
+</script>
+{% endblock %}
+{% block rail %}
+<h2>{{ case.state.value }}</h2>
+<p class="muted">Versi kasus {{ case.version }}</p>
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Rencana tindakan{% endblock %}
+{% block content %}
+<h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Indikator untuk diperiksa{% else %}Rencana tindakan darurat{% endif %}</h1>
+<p class="lede">Semakin cepat melapor dapat membantu penanganan, tetapi Tanggap60 tidak menjamin dana kembali.</p>
+{% for action in actions %}
+<article class="card">
+  <p class="muted">{{ action.priority.value }} · {{ action.channel.value }}</p>
+  <p>{{ action.instruction }}</p>
+</article>
+{% endfor %}
+<p class="muted">Snapshot {{ snapshot_hash[:16] }}…</p>
+<p><a class="btn" href="/cases/{{ case.case_id }}/approval">Tinjau persetujuan</a></p>
+{% if case.route.value == "PRE_INCIDENT_CHECK" %}
+<form class="row" id="decision">
+  <button class="btn ghost" data-d="CANCELLED_ACTION">Batalkan tindakan</button>
+  <button class="btn" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Verifikasi lewat kanal resmi</button>
+  <button class="btn ghost" data-d="PROCEED_BY_USER">Saya memilih lanjut sendiri</button>
+</form>
+<script>
+document.getElementById("decision").addEventListener("click", async (ev) => {
+  const d = ev.target.getAttribute("data-d");
+  if (!d) return;
+  ev.preventDefault();
+  await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
+});
+</script>
+{% endif %}
+{% endblock %}

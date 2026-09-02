@@ -1,0 +1,18 @@
+[Unit]
+Description=Tanggap60 web
+After=network.target
+
+[Service]
+Type=simple
+User=tanggap60
+Group=tanggap60
+EnvironmentFile=/etc/tanggap60/tanggap60.env
+WorkingDirectory=/opt/tanggap60/app
+ExecStart=/opt/tanggap60/app/.venv/bin/uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000 --workers 1
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Masukkan bukti{% endblock %}
+{% block content %}
+<h1>Masukkan yang Anda punya. Tidak harus rapi.</h1>
+<p class="lede">Screenshot chat, bukti transfer, PDF, URL, atau cerita singkat.</p>
+<p class="notice">Jangan unggah password, OTP, CAPTCHA, atau KTP pada versi demo.</p>
+<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data">
+  <label for="files">Berkas (JPG, PNG, PDF · maks 8 · 25 MB)</label>
+  <input id="files" name="files" type="file" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
+  <label for="text">Cerita singkat</label>
+  <textarea id="text" name="text" placeholder="Contoh: saya transfer tadi pagi lalu penjual hilang."></textarea>
+  <label for="url">URL (opsional, tidak dibuka oleh server)</label>
+  <input id="url" name="url" type="text" placeholder="https://">
+  <p><button class="btn" type="submit">Analisis bukti saya</button></p>
+</form>
+{% endblock %}
+{% block rail %}
+<h2>Kasus</h2>
+<p class="badge">{{ case.state.value }}</p>
+<p class="muted">{{ case.route_reason }}</p>
+{% endblock %}

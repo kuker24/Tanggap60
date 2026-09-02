@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Memproses{% endblock %}
+{% block content %}
+<h1>Memeriksa dan menyusun fakta</h1>
+<p class="lede">Bukan persentase palsu. Ini status tool yang benar-benar berjalan.</p>
+<p id="state-live" class="live" aria-live="polite">{{ case.state.value }}</p>
+<ul class="timeline">
+  {% for event in events %}
+  <li><span class="badge {% if event.result_code == 'OK' %}ok{% endif %}">{{ event.tool_name or event.event_type }}</span> {{ event.duration_ms or 0 }} ms</li>
+  {% else %}
+  <li>Memeriksa keamanan file</li>
+  <li>Membaca bukti</li>
+  <li>Menyusun fakta dan sumber</li>
+  <li>Mencari data yang bertentangan</li>
+  {% endfor %}
+</ul>
+<p class="muted">RSS {{ rss }} MB · RAM tersedia {{ ram }} MB</p>
+<p><a class="btn ghost" href="/cases/{{ case.case_id }}/review">Buka tinjauan bila sudah siap</a></p>
+<script>
+  document.body.setAttribute("data-case", "{{ case.case_id }}");
+  document.body.setAttribute("data-page", "processing");
+</script>
+{% endblock %}
+{% block rail %}
+<h2>Alat</h2>
+<p class="muted">Hermes memilih tool dari allowlist. LLM tidak memutuskan hukum.</p>
+{% endblock %}

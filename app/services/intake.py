@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+import html
+from io import BytesIO
+
+from PIL import Image, ImageFile
+from pypdf import PdfReader
+from sqlalchemy.orm import Session
+
+from app.config import Settings
+from app.domain.errors import InvalidFileType, InvalidStateTransition, UploadLimitExceeded
+from app.domain.models import EvidenceKind, EvidenceRecord, EvidenceStatus
+from app.domain.policies import sha256_bytes
+from app.domain.states import State
+from app.infrastructure.repositories import EvidenceRepository
+from app.infrastructure.resources import guard_resources
+from app.infrastructure.storage import CaseStorage
+from app.services.cases import CaseService
+from app.services.ids import new_id
+
+ImageFile.LOAD_TRUNCATED_IMAGES = False
+Image.MAX_IMAGE_PIXELS = 20_000_000
+
+JPEG_MAGIC = b"\xff\xd8\xff"
+PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
+PDF_MAGIC = b"%PDF"
+ALLOWED_MIME = {
+    "image/jpeg": EvidenceKind.IMAGE,
+    "image/png": EvidenceKind.IMAGE,
+    "application/pdf": EvidenceKind.PDF,
+}
+
+
+def sniff_mime(header: bytes) -> str:
+    if header.startswith(JPEG_MAGIC):
+        return "image/jpeg"
+    if header.startswith(PNG_MAGIC):
+        return "image/png"
+    if header.startswith(PDF_MAGIC):
+        return "application/pdf"
+    raise InvalidFileType("tipe berkas tidak diizinkan")
+
+
+def pdf_page_count(data: bytes) -> int:
+    reader = PdfReader(BytesIO(data))
+    return len(reader.pages)
+
+
+def check_image_pixels(data: bytes, max_pixels: int) -> None:
+    with Image.open(BytesIO(data)) as image:
+        image.load()
+        pixels = image.width * image.height
+        if pixels > max_pixels:
+            raise InvalidFileType("gambar melebihi batas piksel")
+
+
+class IntakeService:
+    def __init__(
+        self,
+        session: Session,
+        settings: Settings,
+        storage: CaseStorage,
+        cases: CaseService,
+    ) -> None:
+        self.session = session
+        self.settings = settings
+        self.storage = storage
+        self.cases = cases
+        self.evidence = EvidenceRepository(session)
+
+    def upload_bytes(
+        self,
+        case_id: str,
+        session_id: str,
+        filename: str,
+        data: bytes,
+        *,
+        kind_hint: EvidenceKind | None = None,
+    ) -> EvidenceRecord:
+        case = self.cases.get_owned(case_id, session_id)
+        if case.state not in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.FAILED_SAFE}:
+            if case.state.value in {"WAITING_APPROVAL", "GENERATING", "VERIFYING", "HANDOFF_READY"}:
+                raise InvalidStateTransition("tidak bisa mengubah bukti setelah persetujuan")
+        guard_resources(self.settings, str(self.storage.root))
+        existing = self.evidence.list_for_case(case_id)
+        if len(existing) >= self.settings.max_upload_files:
+            raise UploadLimitExceeded("maksimal 8 berkas")
+        total = sum(item.size_bytes for item in existing) + len(data)
+        if total > self.settings.max_upload_bytes or len(data) > self.settings.max_upload_bytes:
+            raise UploadLimitExceeded("ukuran unggahan melebihi 25 MB")
+        mime = sniff_mime(data[:16] if len(data) >= 16 else data)
+        kind = ALLOWED_MIME[mime]
+        if kind_hint == EvidenceKind.RECEIPT:
+            kind = EvidenceKind.RECEIPT
+        page_count = 1
+        if mime == "application/pdf":
+            page_count = pdf_page_count(data)
+            if page_count > self.settings.max_pdf_pages:
+                raise InvalidFileType("PDF lebih dari 20 halaman")
+        elif mime in {"image/jpeg", "image/png"}:
+            check_image_pixels(data, self.settings.max_image_pixels)
+        storage_key = self.storage.new_key()
+        self.storage.write_atomic(case_id, storage_key, data)
+        record = EvidenceRecord(
+            evidence_id=new_id("ev"),
+            case_id=case_id,
+            kind=kind,
+            original_name_display=html.escape(filename)[:255],
+            storage_key=storage_key,
+            mime=mime,
+            size_bytes=len(data),
+            sha256=sha256_bytes(data),
+            page_count=page_count,
+            status=EvidenceStatus.ACCEPTED,
+            retention_until=case.expires_at,
+        )
+        self.evidence.add(record)
+        if case.state == State.NEW:
+            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        return record
+
+    def add_text(self, case_id: str, session_id: str, text: str) -> EvidenceRecord:
+        payload = text.encode("utf-8")
+        if len(payload) > 100_000:
+            raise UploadLimitExceeded("teks terlalu panjang")
+        case = self.cases.get_owned(case_id, session_id)
+        storage_key = self.storage.new_key()
+        self.storage.write_atomic(case_id, storage_key, payload)
+        record = EvidenceRecord(
+            evidence_id=new_id("ev"),
+            case_id=case_id,
+            kind=EvidenceKind.TEXT,
+            original_name_display="cerita.txt",
+            storage_key=storage_key,
+            mime="text/plain",
+            size_bytes=len(payload),
+            sha256=sha256_bytes(payload),
+            page_count=1,
+            status=EvidenceStatus.ACCEPTED,
+            retention_until=case.expires_at,
+        )
+        self.evidence.add(record)
+        if case.state == State.NEW:
+            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        return record
+
+    def add_url(self, case_id: str, session_id: str, url: str) -> EvidenceRecord:
+        payload = url.strip().encode("utf-8")
+        case = self.cases.get_owned(case_id, session_id)
+        storage_key = self.storage.new_key()
+        self.storage.write_atomic(case_id, storage_key, payload)
+        record = EvidenceRecord(
+            evidence_id=new_id("ev"),
+            case_id=case_id,
+            kind=EvidenceKind.URL,
+            original_name_display="url.txt",
+            storage_key=storage_key,
+            mime="text/uri-list",
+            size_bytes=len(payload),
+            sha256=sha256_bytes(payload),
+            page_count=1,
+            status=EvidenceStatus.ACCEPTED,
+            retention_until=case.expires_at,
+        )
+        self.evidence.add(record)
+        if case.state == State.NEW:
+            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        return record

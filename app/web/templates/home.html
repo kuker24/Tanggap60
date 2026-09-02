@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Ada yang mencurigakan?{% endblock %}
+{% block content %}
+<h1>Ada yang mencurigakan? Mulai dari kondisi Anda.</h1>
+<p class="lede">Pilih satu. Tanggap60 memakai mesin yang sama untuk cek awal dan penanganan setelah kerugian.</p>
+<form class="choices" method="post" action="/start">
+  <input type="hidden" name="mode" value="DEMO">
+  <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">Belum ada kerugian - saya ingin mengecek dulu</button>
+  <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">Sudah terjadi kerugian - bantu saya bertindak</button>
+</form>
+<p class="muted">Mode demo: unggah data dummy. Jangan unggah password, OTP, CAPTCHA, atau KTP.</p>
+{% endblock %}

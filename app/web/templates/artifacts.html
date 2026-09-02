@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Paket kasus{% endblock %}
+{% block content %}
+<h1>Paket terverifikasi secara teknis</h1>
+<table>
+  <thead><tr><th>Artefak</th><th>Status</th><th>Hash</th><th></th></tr></thead>
+  <tbody>
+  {% for a in artifacts %}
+    <tr>
+      <td>{{ a.type }}</td>
+      <td><span class="badge {% if a.verify_status == 'PASS' %}ok{% elif a.verify_status == 'FAIL' %}err{% endif %}">{{ a.verify_status }}</span></td>
+      <td class="muted">{{ a.sha256[:16] }}…</td>
+      <td>{% if a.downloadable %}<a href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>{% else %}terkunci{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+<article class="card">
+  <h2>Handoff resmi</h2>
+  <p>Domain yang akan dibuka: <strong>{{ domain }}</strong></p>
+  <p class="muted">{{ official_url }}</p>
+  <p>Isi identitas dan KTP langsung di portal resmi. Jangan masukkan data tersebut ke Tanggap60 versi demo.</p>
+  <p class="row">
+    <a class="btn" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs resmi IASC</a>
+    <a class="btn ghost" href="/cases/{{ case.case_id }}/receipt">Catat bukti tiket</a>
+  </p>
+</article>
+{% endblock %}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Tanggap60 TTL purge
+
+[Service]
+Type=oneshot
+User=tanggap60
+EnvironmentFile=/etc/tanggap60/tanggap60.env
+WorkingDirectory=/opt/tanggap60/app
+ExecStart=/opt/tanggap60/app/.venv/bin/python /opt/tanggap60/app/scripts/purge_expired.py
