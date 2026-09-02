@@ -54,3 +54,17 @@ ssh -L 9119:127.0.0.1:9119 tanggap60-uji
 Lalu `http://127.0.0.1:9119` — isi API key / model di tab API Keys + Models. Tanpa itu `smoke_hermes.sh` keluar `HERMES_NEEDS_MODEL` dan Tanggap60 fallback deterministic. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji. Jangan restart `hermes-tunnel` jika sudah 1015.
 
 Setelah web hidup: `./scripts/smoke_hermes.sh`, `./scripts/smoke_hero.sh`, `./scripts/benchmark.sh`. Fixture demo: `python scripts/make_demo_fixtures.py`.
+
+## Upgrade Preflight (tanpa tabel baru)
+
+Preflight tidak menambah database, Redis, atau unit systemd. Setelah tes lokal lulus:
+
+1. Catat SHA commit aktif di VPS: `git -C /opt/tanggap60/app rev-parse HEAD`
+2. `sudo ./scripts/backup_competition.sh /tmp/tanggap60-backup-$(date -u +%Y%m%d)`
+3. Pastikan worktree VPS bersih. Jangan `git reset --hard`. Jangan menimpa `/etc/tanggap60/tanggap60.env`.
+4. Deploy source yang sudah lulus CI (fast-forward atau rsync tanpa `.venv`).
+5. Restart hanya `tanggap60-web` dan `tanggap60-worker`. Jangan restart tunnel.
+6. `./scripts/verify_vps.sh && ./scripts/smoke_hermes.sh && ./scripts/smoke_hero.sh`
+7. Cek halaman `/cases/{id}/readiness`, ZIP berisi sembilan berkas pascainsiden, `official_status=NOT_VERIFIED`.
+
+Rollback: kembalikan source ke SHA cadangan, restart web/worker, ulangi health check. Jangan restore DB kecuali ada migrasi schema (Preflight tidak memerlukannya).

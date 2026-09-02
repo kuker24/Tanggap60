@@ -10,7 +10,10 @@
 </article>
 {% endfor %}
 <p class="muted">Snapshot {{ snapshot_hash[:16] }}…</p>
-<p><a class="btn" href="/cases/{{ case.case_id }}/approval">Tinjau persetujuan</a></p>
+<p class="row">
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Cek kesiapan kanal</a>
+  <a class="btn" href="/cases/{{ case.case_id }}/approval">Tinjau persetujuan</a>
+</p>
 {% if case.route.value == "PRE_INCIDENT_CHECK" %}
 <form class="row" id="decision">
   <button class="btn ghost" data-d="CANCELLED_ACTION">Batalkan tindakan</button>
