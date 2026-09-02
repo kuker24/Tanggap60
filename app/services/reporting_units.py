@@ -130,8 +130,8 @@ def compile_reporting_units(
             continue
         # only transaction-like evidences produce units; communication/shared are shared
         if semantics.get(ev.evidence_id) not in {"TRANSACTION"}:
-            # allow if evidence has any transaction fact (AMOUNT/ACCOUNT/DATETIME) even if not full candidate
-            if not any(f.type in {FactType.AMOUNT, FactType.ACCOUNT, FactType.PJP, FactType.DATETIME} for f in fact_list):
+            has_multi = len([f for f in fact_list if f.type in {FactType.ACCOUNT, FactType.PJP}]) > 1 or len([f for f in fact_list if f.type == FactType.AMOUNT]) > 1
+            if not _is_transaction_evidence(fact_list) and not has_multi:
                 continue
         victims = [f for f in fact_list if f.type == FactType.ACCOUNT and "VICTIM" in (f.raw_value or "")]
         victim_val = victims[0].raw_value if victims else None

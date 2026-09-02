@@ -81,7 +81,7 @@ class ApprovalService:
             }
             for a in self.actions.list_for_case(case_id)
         ]
-        # compute reporting units and per-unit readiness for 2.2 snapshot
+        # compute reporting units and per-unit readiness for 2.2 snapshot — only for multi-unit or non-complete
         try:
             from app.infrastructure.repositories import UnitMappingRepository
             from app.services.reporting_units import compile_reporting_units
@@ -92,26 +92,31 @@ class ApprovalService:
             mappings = UnitMappingRepository(self.session).list_for_case(case_id)
             decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
             units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-            # per-unit readiness
-            from app.services.readiness import assess_units as _assess_units
+            # only use 2.2 for multi-unit or incomplete/ambiguous; keep single complete as 2.1 for backward compat
+            should_use_22 = bool(units) and (len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units))
+            if not should_use_22:
+                units_snapshot = None
+                next_action_payload = None
+                units = []
+            else:
+                from app.services.readiness import assess_units as _assess_units
 
-            units_report = _assess_units(
-                case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route
-            )
-            units_snapshot = snapshot_units(units_report)
-            # also include next best action snapshot
-            from app.services.next_action import next_action_to_dict as _natd
-            from app.services.next_action import recommend_next_action as _recommend
+                units_report = _assess_units(
+                    case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route
+                )
+                units_snapshot = snapshot_units(units_report)
+                from app.services.next_action import next_action_to_dict as _natd
+                from app.services.next_action import recommend_next_action as _recommend
 
-            action_units = units
-            next_act = _recommend(
-                case_id=case_id,
-                units=action_units,
-                conflicts=raw_conflicts,
-                readiness_by_unit=units_report.get("readiness_by_unit"),
-                incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
-            )
-            next_action_payload = _natd(next_act)
+                action_units = units
+                next_act = _recommend(
+                    case_id=case_id,
+                    units=action_units,
+                    conflicts=raw_conflicts,
+                    readiness_by_unit=units_report.get("readiness_by_unit"),
+                    incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                )
+                next_action_payload = _natd(next_act)
         except Exception:
             units_snapshot = None
             next_action_payload = None

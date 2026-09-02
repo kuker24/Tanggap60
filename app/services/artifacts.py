@@ -382,7 +382,8 @@ class ArtifactService:
             mappings = UnitMappingRepository(self.session).list_for_case(case_id)
             decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
             units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-            if units and case.route == Route.POST_INCIDENT_RESPONSE:
+            should_use_22 = bool(units) and (len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units))
+            if should_use_22 and case.route == Route.POST_INCIDENT_RESPONSE:
                 schema_version = "2.2"
                 units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
                 reporting_units_payload = [unit_to_dict(u) for u in units]
