@@ -10,7 +10,7 @@ Jangan `make run` di laptop. Sumber kebenaran: `https://github.com/kuker24/Tangg
 - `/var/log/tanggap60`
 - `/etc/tanggap60/tanggap60.env` mode 0640, group `tanggap60`
 
-Wajib di env: `SECRET_KEY` (>=16), `DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db`, `CASE_STORAGE_DIR=/var/lib/tanggap60/cases`, `OFFICIAL_IASC_URL=https://iasc.ojk.go.id/`. `SYNC_JOBS` kosong; worker terpisah. Guard: `MIN_AVAILABLE_RAM_MB=1024`, `MIN_FREE_DISK_MB=2048`. `HERMES_ENDPOINT` dan `MODEL_API_KEY` opsional; kosong = deterministic fallback.
+Wajib di env: `SECRET_KEY` (>=16), `DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db`, `CASE_STORAGE_DIR=/var/lib/tanggap60/cases`, `OFFICIAL_IASC_URL=https://iasc.ojk.go.id/`. `SYNC_JOBS` kosong; worker terpisah. Guard: `MIN_AVAILABLE_RAM_MB=1024`, `MIN_FREE_DISK_MB=2048`. `HERMES_ENDPOINT` opsional (HTTP panitia). VPS uji memakai `HERMES_BIN=/home/hermes/.local/bin/hermes` — Hermes Agent CLI memilih tool; gagal = deterministic fallback. `MODEL_API_KEY` opsional untuk ekstraksi narasi.
 
 ## VPS lomba (satu kali)
 
@@ -51,6 +51,6 @@ Hermes GUI dari laptop (tanpa IP publik):
 ssh -L 9119:127.0.0.1:9119 tanggap60-uji
 ```
 
-Lalu `http://127.0.0.1:9119` — isi API key di tab API Keys. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji.
+Lalu `http://127.0.0.1:9119` — isi API key / model di tab API Keys + Models. Tanpa itu `smoke_hermes.sh` keluar `HERMES_NEEDS_MODEL` dan Tanggap60 fallback deterministic. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji. Jangan restart `hermes-tunnel` jika sudah 1015.
 
-Setelah web hidup: `./scripts/smoke_hero.sh` dan `./scripts/benchmark.sh`. Fixture demo: `python scripts/make_demo_fixtures.py`.
+Setelah web hidup: `./scripts/smoke_hermes.sh`, `./scripts/smoke_hero.sh`, `./scripts/benchmark.sh`. Fixture demo: `python scripts/make_demo_fixtures.py`.

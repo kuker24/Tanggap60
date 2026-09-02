@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import json
+import os
+import subprocess
+from collections.abc import Callable
 from typing import Any, Protocol
 
 import httpx
 
 from app.config import Settings
 from app.hermes.tools.catalog import allowed_tools
+
+Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
 class HermesPort(Protocol):
@@ -42,6 +48,41 @@ class DeterministicHermes:
         return self.ORDER.get(state)
 
 
+def parse_tool_reply(text: str, allowed: set[str]) -> str | None:
+    blob = text.strip()
+    if "```" in blob:
+        parts = blob.split("```")
+        blob = max(parts, key=lambda p: p.count("{"))
+        if blob.lstrip().startswith("json"):
+            blob = blob.lstrip()[4:]
+    start = blob.find("{")
+    end = blob.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("hermes reply is not JSON")
+    data = json.loads(blob[start : end + 1])
+    if not isinstance(data, dict):
+        raise ValueError("hermes reply is not an object")
+    name = data.get("tool")
+    if name in (None, "", "null"):
+        return None
+    tool = str(name)
+    if tool not in allowed:
+        raise ValueError("hermes proposed a tool outside the allowlist")
+    return tool
+
+
+def picker_prompt(state: str, summary: dict[str, Any], allowed: list[str]) -> str:
+    return (
+        "Tanggap60 tool picker. Reply with JSON only: {\"tool\": \"<name>\"} or {\"tool\": null}.\n"
+        f"state={state}\n"
+        f"allowed={allowed}\n"
+        f"route={summary.get('route')}\n"
+        f"candidates_done={bool(summary.get('candidates_done'))}\n"
+        f"handoff_prepared={bool(summary.get('handoff_prepared'))}\n"
+        "Pick exactly one allowed tool to advance the case, or null to pause for the human.\n"
+    )
+
+
 class HttpHermes:
     last_mode = "http"
 
@@ -49,18 +90,56 @@ class HttpHermes:
         self.endpoint = endpoint.rstrip("/")
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
+        allowed = list(allowed_tools(state))
         with httpx.Client(timeout=8.0) as client:
             response = client.post(
                 f"{self.endpoint}/next-tool",
-                json={"state": state, "summary": summary, "allowed_tools": list(allowed_tools(state))},
+                json={"state": state, "summary": summary, "allowed_tools": allowed},
             )
             response.raise_for_status()
-            name = response.json().get("tool")
-            tool = str(name) if name else None
-        allowed = allowed_tools(state)
-        if tool and tool not in allowed:
+            payload = response.json()
+        raw = payload.get("tool")
+        if raw in (None, "", "null"):
+            self.last_mode = "http"
+            return None
+        tool = str(raw)
+        if tool not in set(allowed):
             return None
         self.last_mode = "http"
+        return tool
+
+
+class CliHermes:
+    last_mode = "cli"
+
+    def __init__(
+        self,
+        command: list[str],
+        env: dict[str, str] | None = None,
+        timeout: float = 25.0,
+        runner: Runner = subprocess.run,
+    ) -> None:
+        self.command = command
+        self.env = env
+        self.timeout = timeout
+        self.runner = runner
+
+    def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
+        allowed = list(summary.get("allowed_tools") or allowed_tools(state))
+        prompt = picker_prompt(state, summary, allowed)
+        completed = self.runner(
+            self.command,
+            input=prompt,
+            capture_output=True,
+            text=True,
+            timeout=self.timeout,
+            env=self.env,
+            check=False,
+        )
+        if completed.returncode != 0:
+            raise RuntimeError("hermes cli failed")
+        tool = parse_tool_reply(completed.stdout, set(allowed))
+        self.last_mode = "cli"
         return tool
 
 
@@ -81,8 +160,38 @@ class FallbackHermes:
             return tool
 
 
+def _cli_command(binary: str) -> list[str]:
+    return [
+        binary,
+        "chat",
+        "--oneshot",
+        "--quiet",
+        "--max-turns",
+        "1",
+        "--ignore-rules",
+        "--source",
+        "tool",
+        "--query-file",
+        "-",
+    ]
+
+
+def _cli_env(settings: Settings) -> dict[str, str]:
+    env = os.environ.copy()
+    home = settings.hermes_home or "/home/hermes/.hermes"
+    env["HERMES_HOME"] = home
+    env["HOME"] = "/home/hermes" if home.startswith("/home/hermes") else env.get("HOME", home)
+    env["PATH"] = f"/home/hermes/.local/bin:/home/hermes/.hermes/bin:{env.get('PATH', '')}"
+    return env
+
+
 def build_hermes(settings: Settings) -> HermesPort:
     fallback = DeterministicHermes()
     if settings.hermes_endpoint:
         return FallbackHermes(HttpHermes(settings.hermes_endpoint), fallback)
+    if settings.hermes_bin:
+        return FallbackHermes(
+            CliHermes(_cli_command(settings.hermes_bin), env=_cli_env(settings)),
+            fallback,
+        )
     return fallback

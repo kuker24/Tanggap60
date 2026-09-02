@@ -1,6 +1,17 @@
 from __future__ import annotations
 
-from app.hermes.adapter import DeterministicHermes
+import subprocess
+from pathlib import Path
+from typing import Any
+
+from app.config import Settings
+from app.hermes.adapter import (
+    CliHermes,
+    DeterministicHermes,
+    FallbackHermes,
+    build_hermes,
+    parse_tool_reply,
+)
 from app.hermes.tools.catalog import TOOL_SPECS, tool_names
 
 
@@ -26,3 +37,52 @@ def test_deterministic_handoff_after_verify() -> None:
     assert hermes.propose_tool("HANDOFF_READY", {}) == "prepare_official_handoff"
     assert hermes.propose_tool("HANDOFF_READY", {"handoff_prepared": True}) is None
     assert hermes.propose_tool("VERIFYING", {}) == "verify_artifacts"
+
+
+def test_parse_tool_reply_json_and_fence() -> None:
+    allowed = {"inspect_evidence", "extract_candidate_facts"}
+    assert parse_tool_reply('{"tool": "inspect_evidence"}', allowed) == "inspect_evidence"
+    assert parse_tool_reply("```json\n{\"tool\": null}\n```", allowed) is None
+
+
+def test_parse_tool_reply_rejects_outside_allowlist() -> None:
+    try:
+        parse_tool_reply('{"tool": "purge_case"}', {"inspect_evidence"})
+    except ValueError:
+        return
+    raise AssertionError("expected allowlist error")
+
+
+def test_cli_hermes_reads_stdout(monkeypatch: Any) -> None:
+    def fake_run(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["hermes"],
+            returncode=0,
+            stdout='noise\n{"tool": "inspect_evidence"}\n',
+            stderr="",
+        )
+
+    hermes = CliHermes(command=["hermes"], runner=fake_run)
+    tool = hermes.propose_tool("INGESTING", {"allowed_tools": ["inspect_evidence"]})
+    assert tool == "inspect_evidence"
+    assert hermes.last_mode == "cli"
+
+
+def test_fallback_uses_deterministic_when_cli_fails() -> None:
+    def boom(*_args: Any, **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=["hermes"], returncode=1, stdout="", stderr="fail")
+
+    hermes = FallbackHermes(CliHermes(command=["hermes"], runner=boom), DeterministicHermes())
+    assert hermes.propose_tool("INGESTING", {}) == "inspect_evidence"
+    assert hermes.last_mode == "deterministic"
+
+
+def test_build_hermes_cli_when_bin_set() -> None:
+    settings = Settings(
+        secret_key="xxxxxxxxxxxxxxxx",
+        case_storage_dir=Path("/tmp/cases"),
+        hermes_bin="/home/hermes/.local/bin/hermes",
+    )
+    built = build_hermes(settings)
+    assert isinstance(built, FallbackHermes)
+    assert isinstance(built.primary, CliHermes)

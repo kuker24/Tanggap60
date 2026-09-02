@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     max_image_pixels: int = 20_000_000
     case_storage_quota_bytes: int = 500 * 1024 * 1024
     hermes_endpoint: str | None = None
+    hermes_bin: str | None = None
+    hermes_home: str | None = None
     model_api_key: str | None = None
     model_base_url: str | None = None
     model_name: str = "gpt-4o-mini"
