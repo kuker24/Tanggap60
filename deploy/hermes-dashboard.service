@@ -1,0 +1,19 @@
+[Unit]
+Description=Hermes Agent web dashboard
+After=network.target
+
+[Service]
+Type=simple
+User=hermes
+Group=hermes
+Environment=HOME=/home/hermes
+Environment=HERMES_HOME=/home/hermes/.hermes
+Environment=PATH=/home/hermes/.local/bin:/home/hermes/.hermes/node/bin:/usr/local/bin:/usr/bin
+WorkingDirectory=/home/hermes/.hermes
+ExecStart=/home/hermes/.local/bin/hermes dashboard --host 127.0.0.1 --port 9119 --no-open --skip-build
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

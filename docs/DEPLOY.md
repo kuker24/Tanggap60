@@ -42,4 +42,13 @@ TLS/certbot hanya di VPS lomba jika panitia/IP publik mengizinkan. Jangan ubah `
 cd /opt/tanggap60/app
 sudo ENABLE_TUNNEL=1 ./scripts/bootstrap_vps.sh
 ./scripts/verify_vps.sh
+sudo ./scripts/install_hermes_dashboard.sh
 ```
+
+Hermes GUI dari laptop (tanpa IP publik):
+
+```bash
+ssh -L 9119:127.0.0.1:9119 tanggap60-uji
+```
+
+Lalu `http://127.0.0.1:9119` — isi API key di tab API Keys. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji.
