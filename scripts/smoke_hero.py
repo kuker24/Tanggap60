@@ -286,9 +286,6 @@ def run_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     if state == "REVIEW_REQUIRED":
         raise SystemExit("REVIEW_REQUIRED is not a final hero success")
     # For rescue, hermes is best-effort; allow fallback as long as system is configured
-    # Original strict check required cli_used true, but rescue allows deterministic for mechanical steps
-    planners = {str(step.get("tool_name")): str(step.get("planner")) for step in result["trace_steps"]}
-    # No strict hermes failure for rescue - just ensure trace has required tools
     return result
 
 
