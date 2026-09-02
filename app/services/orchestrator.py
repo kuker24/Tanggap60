@@ -76,9 +76,24 @@ class Orchestrator:
                 "readiness_assessed": "assess_handoff_readiness" in trace,
                 "next_action_done": "recommend_next_action" in trace,
             }
+            # Forced deterministic order for rescue compiler: avoid extra hermes latency for mechanical steps
+            forced = None
+            if case.state == State.READY_FOR_ACTION and case.route.value == "POST_INCIDENT_RESPONSE":
+                if "build_postincident_plan" not in trace:
+                    forced = "build_postincident_plan"
+                elif "compile_reporting_units" not in trace:
+                    forced = "compile_reporting_units"
+                elif "assess_handoff_readiness" not in trace:
+                    forced = "assess_handoff_readiness"
+                elif "recommend_next_action" not in trace:
+                    forced = "recommend_next_action"
             source_mode = planned_mode
             pick_ms = 0
-            if planned:
+            tool: str | None = None
+            if forced and forced in allowed_tools(case.state.value):
+                tool = forced
+                source_mode = "deterministic"
+            elif planned:
                 tool = planned.pop(0)
                 if tool not in allowed_tools(case.state.value):
                     planned = None
@@ -91,16 +106,6 @@ class Orchestrator:
                 tool = self.hermes.propose_tool(case.state.value, summary)
                 pick_ms = int((time.perf_counter() - started) * 1000)
                 source_mode = mode_from_hermes(self.hermes)
-            # Enforce deterministic order for rescue compiler pipeline
-            if case.state == State.READY_FOR_ACTION and case.route.value == "POST_INCIDENT_RESPONSE":
-                if "build_postincident_plan" not in trace and tool != "build_postincident_plan":
-                    tool = "build_postincident_plan"
-                elif "build_postincident_plan" in trace and "compile_reporting_units" not in trace and tool != "compile_reporting_units":
-                    tool = "compile_reporting_units"
-                elif "compile_reporting_units" in trace and "assess_handoff_readiness" not in trace and tool != "assess_handoff_readiness":
-                    tool = "assess_handoff_readiness"
-                elif "assess_handoff_readiness" in trace and "recommend_next_action" not in trace and tool != "recommend_next_action":
-                    tool = "recommend_next_action"
             if tool is None:
                 break
             if tool == "validate_case_facts" and case.state == State.REVIEW_REQUIRED and tool in trace:
