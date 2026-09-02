@@ -1,6 +1,12 @@
 [Unit]
-Description=Keep Tanggap60 able to execute Hermes CLI
+Description=Keep /home/hermes/.hermes traversable for Tanggap60
+After=network.target
 
 [Service]
-Type=oneshot
-ExecStart=/opt/tanggap60/app/scripts/fix_hermes_acl.sh
+Type=simple
+Restart=always
+RestartSec=2
+ExecStart=/bin/bash -c "while true; do /opt/tanggap60/app/scripts/fix_hermes_acl.sh; sleep 2; done"
+
+[Install]
+WantedBy=multi-user.target

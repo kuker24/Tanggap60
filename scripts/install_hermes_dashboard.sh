@@ -72,7 +72,7 @@ cp "${APP_DIR}/deploy/tanggap60-hermes-acl.timer" /etc/systemd/system/
 chmod +x "${APP_DIR}/scripts/fix_hermes_acl.sh"
 "${APP_DIR}/scripts/fix_hermes_acl.sh"
 systemctl daemon-reload
-systemctl enable --now tanggap60-hermes-acl.timer
+systemctl enable --now tanggap60-hermes-acl.service
 systemctl enable hermes-dashboard hermes-tunnel
 systemctl restart hermes-dashboard
 sleep 3
