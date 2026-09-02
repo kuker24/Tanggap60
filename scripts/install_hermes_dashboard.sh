@@ -35,10 +35,16 @@ apt-get install -y --no-install-recommends acl
 chmod 0750 /home/hermes
 chmod 0750 /home/hermes/.hermes
 setfacl -m u:tanggap60:--x /home/hermes
+if [[ -d /home/hermes/.local ]]; then
+  setfacl -R -m u:tanggap60:r-x -m m::rx /home/hermes/.local
+  setfacl -d -m u:tanggap60:r-x -d -m m::rx /home/hermes/.local
+fi
 setfacl -m m::rx /home/hermes/.hermes
 setfacl -m u:tanggap60:r-x /home/hermes/.hermes
+setfacl -d -m u:tanggap60:r-x -d -m m::rx /home/hermes/.hermes
 if [[ -d /home/hermes/.hermes/hermes-agent ]]; then
   setfacl -R -m u:tanggap60:r-x -m m::rx /home/hermes/.hermes/hermes-agent
+  setfacl -R -d -m u:tanggap60:r-x -d -m m::rx /home/hermes/.hermes/hermes-agent
 fi
 if [[ -f /home/hermes/.hermes/config.yaml ]]; then
   setfacl -m u:tanggap60:r-- /home/hermes/.hermes/config.yaml
@@ -61,7 +67,12 @@ printf '[Service]\nSupplementaryGroups=hermes\n' >/etc/systemd/system/tanggap60-
 printf '[Service]\nSupplementaryGroups=hermes\n' >/etc/systemd/system/tanggap60-worker.service.d/hermes.conf
 cp "${APP_DIR}/deploy/hermes-dashboard.service" /etc/systemd/system/
 cp "${APP_DIR}/deploy/hermes-tunnel.service" /etc/systemd/system/
+cp "${APP_DIR}/deploy/tanggap60-hermes-acl.service" /etc/systemd/system/
+cp "${APP_DIR}/deploy/tanggap60-hermes-acl.timer" /etc/systemd/system/
+chmod +x "${APP_DIR}/scripts/fix_hermes_acl.sh"
+"${APP_DIR}/scripts/fix_hermes_acl.sh"
 systemctl daemon-reload
+systemctl enable --now tanggap60-hermes-acl.timer
 systemctl enable hermes-dashboard hermes-tunnel
 systemctl restart hermes-dashboard
 sleep 3

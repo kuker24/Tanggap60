@@ -1,0 +1,11 @@
+[Unit]
+Description=Reapply Hermes ACL for Tanggap60 worker
+
+[Timer]
+OnBootSec=20s
+OnUnitActiveSec=30s
+AccuracySec=5s
+Persistent=yes
+
+[Install]
+WantedBy=timers.target

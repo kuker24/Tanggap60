@@ -1,0 +1,6 @@
+[Unit]
+Description=Keep Tanggap60 able to execute Hermes CLI
+
+[Service]
+Type=oneshot
+ExecStart=/opt/tanggap60/app/scripts/fix_hermes_acl.sh
