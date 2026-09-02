@@ -10,12 +10,23 @@ ROOT = Path(__file__).resolve().parents[1]
 FIX = ROOT / "fixtures" / "demo_tanggap60"
 
 
+def _keep_session(client: httpx.Client, response: httpx.Response) -> None:
+    header = response.headers.get("set-cookie") or ""
+    if "t60_sid=" not in header:
+        return
+    value = header.split("t60_sid=", 1)[1].split(";", 1)[0]
+    client.cookies.set("t60_sid", value)
+
+
 def main() -> None:
     base = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000").rstrip("/")
     client = httpx.Client(base_url=base, timeout=45.0, follow_redirects=True)
-    client.get("/health/live").raise_for_status()
+    live = client.get("/health/live")
+    live.raise_for_status()
+    _keep_session(client, live)
     created = client.post("/api/v1/cases", json={"mode": "DEMO", "declared_condition": "AFTER_LOSS"})
     created.raise_for_status()
+    _keep_session(client, created)
     case_id = created.json()["case_id"]
     if (FIX / "01_chat.png").exists():
         chat = (FIX / "01_chat.png").read_bytes()
