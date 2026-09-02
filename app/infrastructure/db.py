@@ -76,7 +76,7 @@ class FactRow(Base):
     review_status: Mapped[str] = mapped_column(String(20))
     source_evidence_id: Mapped[str] = mapped_column(String(80))
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    source_bbox: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    source_bbox: Mapped[str | None] = mapped_column(String(160), nullable=True)
     source_excerpt_hash: Mapped[str] = mapped_column(String(64))
     corrected_from_fact_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
 

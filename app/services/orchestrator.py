@@ -9,6 +9,7 @@ from app.domain.policies import sha256_text
 from app.domain.states import State, transition
 from app.hermes.adapter import HermesPort
 from app.hermes.tool_registry import ToolContext, execute_tool
+from app.hermes.tools.catalog import allowed_tools
 from app.infrastructure.logging import hash_id
 from app.infrastructure.repositories import CaseRepository, EventRepository, FactRepository
 from app.services.cases import CaseService, now_utc
@@ -35,25 +36,15 @@ class Orchestrator:
 
     def run_until_pause(self, case_id: str, run_id: str) -> dict[str, object]:
         trace: list[str] = []
-        for _ in range(12):
+        for _ in range(16):
             case = self.case_repo.get(case_id)
-            if case.state in {
-                State.REVIEW_REQUIRED,
-                State.WAITING_APPROVAL,
-                State.HANDOFF_READY,
-                State.RECEIPT_RECORDED,
-                State.COMPLETE,
-                State.PURGED,
-            }:
-                if case.state == State.REVIEW_REQUIRED and not self.facts.list_for_case(case_id):
-                    pass
-                elif case.state == State.REVIEW_REQUIRED and "validate_case_facts" in trace:
-                    break
-                elif case.state != State.REVIEW_REQUIRED:
-                    break
+            if self._should_pause(case.state, trace):
+                break
             summary = {
                 "route": case.route.value,
                 "candidates_done": bool(self.facts.list_for_case(case_id)),
+                "allowed_tools": list(allowed_tools(case.state.value)),
+                "handoff_prepared": "prepare_official_handoff" in trace,
             }
             tool = self.hermes.propose_tool(case.state.value, summary)
             if tool is None:
@@ -76,11 +67,14 @@ class Orchestrator:
                 case.state = transition(case.state, State.FAILED_SAFE)
                 self.cases.touch(case)
                 self._trace(case_id, run_id, tool, case.state.value, "ERROR", exc.code, None)
-                return {"status": "FAILED_SAFE", "trace": trace, "error": exc.code}
+                return {
+                    "status": "FAILED_SAFE",
+                    "trace": trace,
+                    "error": exc.code,
+                    "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
+                }
             trace.append(tool)
             case = self.case_repo.get(case_id)
-            if tool == "extract_candidate_facts" and case.state == State.EXTRACTING:
-                pass
             if tool == "build_postincident_plan" or tool == "build_preincident_brief":
                 if case.state == State.READY_FOR_ACTION:
                     self.cases.set_state(case, State.WAITING_APPROVAL, event_type="WAITING_APPROVAL", run_id=run_id)
@@ -97,9 +91,36 @@ class Orchestrator:
                 None,
                 int(result.get("duration_ms") or 0),
             )
-            if case.state in {State.REVIEW_REQUIRED, State.WAITING_APPROVAL, State.HANDOFF_READY}:
+            if self._should_pause(self.case_repo.get(case_id).state, trace):
                 break
-        return {"status": "OK", "trace": trace}
+        return {
+            "status": "OK",
+            "trace": trace,
+            "hermes_mode": getattr(self.hermes, "last_mode", "deterministic"),
+        }
+
+    def run_tool(self, case_id: str, run_id: str, tool: str, extra: dict[str, object] | None = None) -> dict[str, object]:
+        case = self.case_repo.get(case_id)
+        args: dict[str, object] = {
+            "case_id": case_id,
+            "approved_snapshot_hash": case.approved_snapshot_hash,
+            "session_id": case.owner_session_id,
+        }
+        if extra:
+            args.update(extra)
+        result = execute_tool(tool, case.state, args, self.ctx)
+        case = self.case_repo.get(case_id)
+        self._trace(case_id, run_id, tool, case.state.value, "OK", None, int(result.get("duration_ms") or 0))
+        return result
+
+    def _should_pause(self, state: State, trace: list[str]) -> bool:
+        if state in {State.WAITING_APPROVAL, State.RECEIPT_RECORDED, State.COMPLETE, State.PURGED}:
+            return True
+        if state == State.REVIEW_REQUIRED and "validate_case_facts" in trace:
+            return True
+        if state == State.HANDOFF_READY and "prepare_official_handoff" in trace:
+            return True
+        return False
 
     def _trace(
         self,

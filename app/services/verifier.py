@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.errors import ArtifactVerifyFailed
 from app.domain.models import ArtifactType, VerifyStatus
-from app.domain.policies import sha256_bytes
+from app.domain.policies import contains_absolute_copy, sha256_bytes
 from app.infrastructure.repositories import ArtifactRepository
 from app.infrastructure.storage import CaseStorage
 
@@ -53,6 +53,7 @@ class VerifierService:
         results.append({"type": "CASE_JSON", "status": json_art.verify_status.value})
         if not json_ok:
             raise ArtifactVerifyFailed("JSON schema gagal")
+        manifest_map = self._manifest_map(case_id, by_type.get(ArtifactType.MANIFEST))
         for artifact in artifacts:
             data = self.storage.read_bytes(case_id, artifact.storage_key)
             checks: dict[str, object] = {}
@@ -72,18 +73,20 @@ class VerifierService:
                 checks["pages"] = len(reader.pages)
                 if len(reader.pages) < 1:
                     ok = False
-            if artifact.type == ArtifactType.CASE_ZIP:
-                try:
-                    with zipfile.ZipFile(BytesIO(data)) as archive:
-                        bad = archive.testzip()
-                        checks["zip"] = "fail" if bad else "pass"
-                        if bad:
-                            ok = False
-                except zipfile.BadZipFile:
+                pdf_text = "\n".join(page.extract_text() or "" for page in reader.pages)
+                if contains_absolute_copy(pdf_text):
                     ok = False
-                    checks["zip"] = "fail"
+                    checks["copy"] = "fail"
+            if artifact.type in {ArtifactType.CASE_JSON, ArtifactType.CHECKLIST, ArtifactType.MANIFEST}:
+                if contains_absolute_copy(data.decode("utf-8", errors="replace")):
+                    ok = False
+                    checks["copy"] = "fail"
             if artifact.type == ArtifactType.MANIFEST:
-                checks["size"] = len(data)
+                checks["entries"] = len(manifest_map)
+                if not manifest_map:
+                    ok = False
+            if artifact.type == ArtifactType.CASE_ZIP:
+                ok = self._verify_zip(data, manifest_map, checks) and ok
             artifact.verify_status = VerifyStatus.PASS if ok else VerifyStatus.FAIL
             artifact.verify_details = {**artifact.verify_details, **checks}
             self.artifacts.save(artifact)
@@ -91,3 +94,48 @@ class VerifierService:
             if not ok:
                 raise ArtifactVerifyFailed(f"verifikasi {artifact.type.value} gagal")
         return results
+
+    def _manifest_map(self, case_id: str, manifest) -> dict[str, str]:
+        if manifest is None:
+            return {}
+        data = self.storage.read_bytes(case_id, manifest.storage_key)
+        mapping: dict[str, str] = {}
+        for line in data.decode("utf-8", errors="replace").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            parts = line.split()
+            if len(parts) < 2:
+                continue
+            mapping[parts[-1]] = parts[0]
+        return mapping
+
+    def _verify_zip(self, data: bytes, manifest_map: dict[str, str], checks: dict[str, object]) -> bool:
+        ok = True
+        try:
+            with zipfile.ZipFile(BytesIO(data)) as archive:
+                bad = archive.testzip()
+                checks["zip"] = "fail" if bad else "pass"
+                if bad:
+                    return False
+                names = set(archive.namelist())
+                for name in names:
+                    payload = archive.read(name)
+                    digest = sha256_bytes(payload)
+                    if name == "manifest.sha256":
+                        checks[name] = "pass"
+                        continue
+                    expected = manifest_map.get(name)
+                    if expected != digest:
+                        ok = False
+                        checks[name] = "fail"
+                    else:
+                        checks[name] = "pass"
+                for name in manifest_map:
+                    if name not in names:
+                        ok = False
+                        checks[f"missing:{name}"] = "fail"
+        except zipfile.BadZipFile:
+            ok = False
+            checks["zip"] = "fail"
+        return ok

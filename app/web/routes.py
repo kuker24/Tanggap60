@@ -113,12 +113,16 @@ def review(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     facts = FactRepository(request.state.db).list_for_case(case_id)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
+    evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
+    facts_pub = [fact_public(f) for f in facts]
     return TEMPLATES.TemplateResponse(
         "review.html",
         {
             "request": request,
             "case": case,
-            "facts": [fact_public(f) for f in facts],
+            "facts": facts_pub,
+            "facts_by_id": {f["fact_id"]: f for f in facts_pub},
+            "evidence_names": {e.evidence_id: e.original_name_display for e in evidence},
             "conflicts": [conflict_public(c) for c in conflicts],
         },
     )

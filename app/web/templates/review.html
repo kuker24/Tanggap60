@@ -4,11 +4,15 @@
 <h1>Periksa fakta sebelum paket dibuat</h1>
 {% for conflict in conflicts if conflict.severity == "BLOCKING" and conflict.status == "OPEN" %}
 <article class="card block">
-  <h2>Ada dua nilai berbeda</h2>
+  <h2>Ada data yang bertentangan</h2>
   <p>Tanggap60 tidak akan memilih sendiri. Tentukan nilai yang benar sebelum paket final dibuat.</p>
-  <form class="row" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
+  <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
     {% for fid in conflict.fact_ids %}
-    <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}">Pakai {{ fid[-6:] }}</button>
+    {% set fact = facts_by_id.get(fid) %}
+    <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}">
+      Gunakan {{ fact.raw_value if fact else fid[-6:] }}
+      <span class="muted">Sumber: {{ evidence_names.get(fact.source_evidence_id, fact.source_locator) if fact else "bukti" }}</span>
+    </button>
     {% endfor %}
   </form>
 </article>
@@ -16,7 +20,7 @@
 {% for fact in facts %}
 <article class="card">
   <p><strong>{{ fact.raw_value }}</strong></p>
-  <p class="muted">{{ fact.type }} · sumber {{ fact.source_locator }} · {{ fact.review_status }}</p>
+  <p class="muted">{{ fact.type }} · halaman {{ fact.source_page or 1 }} · {{ fact.source_locator }} · {{ fact.review_status }}</p>
   <form class="row" onsubmit="return patchFact(event, '{{ fact.fact_id }}')">
     <button class="btn" data-action="confirm">Benar</button>
     <button class="btn ghost" data-action="reject">Bukan ini</button>

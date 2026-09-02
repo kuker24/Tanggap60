@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     case_storage_quota_bytes: int = 500 * 1024 * 1024
     hermes_endpoint: str | None = None
     model_api_key: str | None = None
+    model_base_url: str | None = None
+    model_name: str = "gpt-4o-mini"
     optional_reputation_api_key: str | None = None
     official_iasc_url: str = DEFAULT_IASC_URL
     resource_guard_enabled: bool = True

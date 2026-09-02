@@ -24,6 +24,12 @@ def test_relative_storage_rejected() -> None:
         Settings(secret_key="xxxxxxxxxxxxxxxx", case_storage_dir=Path("relative"))  # type: ignore[arg-type]
 
 
+def test_resource_guard_defaults() -> None:
+    settings = Settings(secret_key="xxxxxxxxxxxxxxxx", case_storage_dir=Path("/tmp/cases"))  # type: ignore[call-arg]
+    assert settings.min_available_ram_mb == 1024
+    assert settings.min_free_disk_mb == 2048
+
+
 def test_bad_iasc() -> None:
     with pytest.raises(ValidationError):
         Settings(  # type: ignore[call-arg]

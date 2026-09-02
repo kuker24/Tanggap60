@@ -81,9 +81,6 @@ class ArtifactService:
         built.append(self._store_bytes(case_id, ArtifactType.MANIFEST, manifest_body.encode(), "text/plain", snapshot_hash, "manifest.sha256"))
         zip_bytes = self._zip_bytes(case_id, built)
         built.append(self._store_bytes(case_id, ArtifactType.CASE_ZIP, zip_bytes, "application/zip", snapshot_hash, "case-pack.zip"))
-        for artifact in built:
-            if contains_absolute_copy(artifact.sha256):
-                continue
         return built
 
     def _store_pdf(
@@ -94,6 +91,7 @@ class ArtifactService:
         generated_at: str,
         snapshot_hash: str,
     ) -> ArtifactRecord:
+        self._assert_safe_copy("\n".join(lines))
         data = render_lines(artifact_type.value.replace("_", " "), lines, generated_at, snapshot_hash)
         return self._store_bytes(case_id, artifact_type, data, "application/pdf", snapshot_hash, f"{artifact_type.value.lower()}.pdf")
 
@@ -106,6 +104,8 @@ class ArtifactService:
         snapshot_hash: str,
         filename: str,
     ) -> ArtifactRecord:
+        if mime.startswith("text/") or mime == "application/json":
+            self._assert_safe_copy(data.decode("utf-8", errors="replace"))
         key = self.storage.new_key()
         self.storage.write_atomic(case_id, key, data)
         record = ArtifactRecord(
@@ -219,7 +219,7 @@ class ArtifactService:
                     "review_status": f.review_status.value,
                     "source": {
                         "evidence_id": f.source_evidence_id,
-                        "locator": f.source_bbox or "page 1",
+                        "locator": f.source_bbox or f"p{f.source_page or 1}",
                         "excerpt_hash": f.source_excerpt_hash,
                     },
                 }
@@ -300,6 +300,11 @@ class ArtifactService:
             "MANIFEST": "manifest.sha256",
         }
         return mapping.get(type_name, type_name.lower())
+
+
+    def _assert_safe_copy(self, text: str) -> None:
+        if contains_absolute_copy(text):
+            raise ArtifactVerifyFailed("salinan mutlak tidak diizinkan")
 
 
 def payload_notice() -> str:

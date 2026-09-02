@@ -26,6 +26,7 @@ from app.domain.errors import (
 from app.domain.models import VerifyStatus
 from app.domain.policies import sha256_text
 from app.domain.states import DeclaredCondition, Mode, State
+from app.hermes.tools.catalog import TOOL_SPECS
 from app.infrastructure.jobs import JobQueue
 from app.infrastructure.repositories import (
     ActionRepository,
@@ -414,14 +415,20 @@ def post_receipt(
     cached = _idempotency(request, case_id, idempotency_key, raw)
     if cached:
         return cached
-    record = svc(request)["receipt"].record(
+    svc(request)["orchestrator"].run_tool(
         case_id,
-        sid(request),
-        payload.get("ticket_text"),
-        payload.get("ocr_text"),
-        payload.get("evidence_id"),
-        bool(payload.get("user_confirms_unreadable", False)),
+        new_id("run"),
+        "record_handoff_receipt",
+        {
+            "ticket_text": payload.get("ticket_text"),
+            "ocr_text": payload.get("ocr_text"),
+            "evidence_id": payload.get("evidence_id"),
+            "user_confirms_unreadable": bool(payload.get("user_confirms_unreadable", False)),
+        },
     )
+    record = ReceiptRepository(request.state.db).get_for_case(case_id)
+    if record is None:
+        raise ValidationFailed("receipt gagal dicatat")
     if record.official_status != "NOT_VERIFIED":
         record.official_status = "NOT_VERIFIED"
     body = {
@@ -468,6 +475,14 @@ def list_events(case_id: str, request: Request) -> dict[str, Any]:
             }
             for e in events
         ]
+    }
+
+
+@api.get("/agent/tools")
+def agent_tools(request: Request) -> dict[str, Any]:
+    return {
+        "tools": list(TOOL_SPECS),
+        "hermes_mode": getattr(request.app.state.container.hermes, "last_mode", "deterministic"),
     }
 
 

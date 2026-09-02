@@ -35,6 +35,8 @@ h2 { font-size: 1.1rem; margin: 0 0 8px; }
 .btn.ghost { background: transparent; color: var(--ink); }
 .btn.danger { background: var(--red); border-color: var(--red); }
 .row { display: flex; flex-wrap: wrap; gap: 8px; }
+.stack { display: flex; flex-direction: column; gap: 10px; align-items: stretch; }
+.stack .btn { text-align: left; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
 .card { background: var(--panel); border: 1px solid var(--line); padding: 16px; margin: 12px 0; }
 .card.block { border-color: var(--red); }
 .card.warn { border-color: var(--amber); }

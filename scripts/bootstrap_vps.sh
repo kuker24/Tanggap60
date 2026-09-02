@@ -73,8 +73,8 @@ DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db
 CASE_STORAGE_DIR=/var/lib/tanggap60/cases
 OFFICIAL_IASC_URL=https://iasc.ojk.go.id/
 RESOURCE_GUARD_ENABLED=true
-MIN_AVAILABLE_RAM_MB=512
-MIN_FREE_DISK_MB=1024
+MIN_AVAILABLE_RAM_MB=1024
+MIN_FREE_DISK_MB=2048
 EOF
 fi
 chmod 0640 /etc/tanggap60/tanggap60.env

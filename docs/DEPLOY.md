@@ -10,7 +10,7 @@ Jangan `make run` di laptop. Sumber kebenaran: `https://github.com/kuker24/Tangg
 - `/var/log/tanggap60`
 - `/etc/tanggap60/tanggap60.env` mode 0640, group `tanggap60`
 
-Wajib di env: `SECRET_KEY` (>=16), `DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db`, `CASE_STORAGE_DIR=/var/lib/tanggap60/cases`, `OFFICIAL_IASC_URL=https://iasc.ojk.go.id/`. `SYNC_JOBS` kosong; worker terpisah.
+Wajib di env: `SECRET_KEY` (>=16), `DATABASE_URL=sqlite:////var/lib/tanggap60/db/tanggap60.db`, `CASE_STORAGE_DIR=/var/lib/tanggap60/cases`, `OFFICIAL_IASC_URL=https://iasc.ojk.go.id/`. `SYNC_JOBS` kosong; worker terpisah. Guard: `MIN_AVAILABLE_RAM_MB=1024`, `MIN_FREE_DISK_MB=2048`. `HERMES_ENDPOINT` dan `MODEL_API_KEY` opsional; kosong = deterministic fallback.
 
 ## VPS lomba (satu kali)
 
@@ -52,3 +52,5 @@ ssh -L 9119:127.0.0.1:9119 tanggap60-uji
 ```
 
 Lalu `http://127.0.0.1:9119` — isi API key di tab API Keys. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji.
+
+Setelah web hidup: `./scripts/smoke_hero.sh` dan `./scripts/benchmark.sh`. Fixture demo: `python scripts/make_demo_fixtures.py`.

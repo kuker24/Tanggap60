@@ -8,6 +8,14 @@ def test_health(client: TestClient) -> None:
     assert client.get("/health/ready").json()["status"] == "ready"
 
 
+def test_agent_tools_catalog(client: TestClient) -> None:
+    res = client.get("/api/v1/agent/tools")
+    assert res.status_code == 200
+    names = {item["name"] for item in res.json()["tools"]}
+    assert "prepare_official_handoff" in names
+    assert "inspect_evidence" in names
+
+
 def test_home_buttons(client: TestClient) -> None:
     page = client.get("/")
     assert page.status_code == 200
