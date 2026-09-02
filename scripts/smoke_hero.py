@@ -345,17 +345,17 @@ def run_rescue_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     created = _call(client, "POST", "/api/v1/cases", json={"mode": "DEMO", "declared_condition": "AFTER_LOSS"})
     created.raise_for_status()
     case_id = created.json()["case_id"]
-    # upload 3 images: transfer A (2M complete), transfer B (750k complete but will be held), chat image
-    # Use fixtures 04_transfer_a.png, 06_transfer_b_complete.png, 01_chat.png — all as image uploads to keep OCR cost real
+    # upload 3 images: transfer A (2M complete), transfer B ambiguous (2 dests in one image), chat image
+    # Use fixtures 04_transfer_a.png, 07_ambiguous.png, 01_chat.png — all as image uploads to keep OCR cost real
     try:
         a_bytes = _read_fixture("04_transfer_a.png")
-        b_bytes = _read_fixture("06_transfer_b_complete.png")
+        b_bytes = _read_fixture("07_ambiguous.png")
         chat_bytes = _read_fixture("01_chat.png")
     except FileNotFoundError:
         sys.path.insert(0, str(ROOT))
         from tests.fixture_render import CHAT, png_bytes
-        a_bytes = png_bytes("Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED")
-        b_bytes = png_bytes("Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB Dari: DEMO-VICTIM-MASKED")
+        a_bytes = png_bytes("Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED", width=1400, height=300)
+        b_bytes = png_bytes("Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB\nTransfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB", width=1600, height=400)
         chat_bytes = png_bytes(CHAT)
     # upload each separately to capture evidence ids
     up_a = _call(client, "POST", f"/api/v1/cases/{case_id}/evidence", files=[("files", ("transfer_a.png", a_bytes, "image/png"))])
@@ -388,12 +388,21 @@ def run_rescue_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
     if state not in {"REVIEW_REQUIRED", "READY_FOR_ACTION"}:
         raise SystemExit(f"unexpected state after ingest {state} tools={_tools(client, case_id)}")
     _resolve_conflicts(client, case_id)
-    # Human fact review: confirm Unit A fully, and Unit B partially (dest+amount) leaving time CANDIDATE to make B INCOMPLETE
+    # Human fact review: confirm all critical for both transfers (and chat amount) so case becomes WAITING_APPROVAL
+    # For 04+07, this leaves A COMPLETE and B AMBIGUOUS (2 dests) — ready to test isolation
     if evid_a:
         _confirm_facts_for_evidence(client, case_id, evid_a)
     if evid_b:
-        _confirm_facts_for_evidence(client, case_id, evid_b, only_types={"ACCOUNT", "PJP", "AMOUNT"})
-    # chat communication already available as image, no need to confirm
+        _confirm_facts_for_evidence(client, case_id, evid_b)
+    # also confirm chat critical (amount) so global passes
+    # find chat evidence
+    try:
+        evid_list_tmp = _call(client, "GET", f"/api/v1/cases/{case_id}/evidence").json().get("evidence", [])
+        evid_chat_tmp = next((e["evidence_id"] for e in evid_list_tmp if "chat" in e["original_name_display"].lower()), None)
+        if evid_chat_tmp:
+            _confirm_facts_for_evidence(client, case_id, evid_chat_tmp)
+    except Exception:
+        pass
     # Call draft to trigger compile_reporting_units, assess, recommend
     draft = _call(client, "POST", f"/api/v1/cases/{case_id}/draft")
     draft.raise_for_status()
@@ -434,8 +443,31 @@ def run_rescue_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
         raise SystemExit(f"next_best_action target expected Unit A {unit_a.get('unit_id')} got {nxt}")
     if code not in ("CONTACT_BANK_PJP", "PREPARE_IASC_UNIT"):
         raise SystemExit(f"next_best_action expected CONTACT_BANK_PJP or PREPARE_IASC_UNIT got {code} {nxt}")
-    # LAKUKAN SEKARANG act on Unit A — human then fixes Unit B by confirming its remaining facts
-    if evid_b:
+    # LAKUKAN SEKARANG act on Unit A — human then fixes Unit B
+    # If B is AMBIGUOUS, resolve via mapping; if INCOMPLETE, confirm missing time
+    if unit_b.get("mapping_status") == "AMBIGUOUS":
+        # resolve ambiguous mapping by choosing one dest/amount/time
+        # find facts for B's evidence
+        facts_for_b = [f for f in _call(client, "GET", f"/api/v1/cases/{case_id}/facts").json().get("facts", []) if f["fact_id"] in unit_b.get("fact_ids", [])]
+        dests = [f for f in facts_for_b if f["type"] in ("ACCOUNT", "PJP") and "VICTIM" not in f["raw_value"]]
+        amounts = [f for f in facts_for_b if f["type"] == "AMOUNT"]
+        times = [f for f in facts_for_b if f["type"] == "DATETIME"]
+        # choose dest that is not already used by A (prefer DEMO-DEST-B)
+        dest_b = next((d for d in dests if "DEMO-DEST-B" in d["raw_value"]), dests[0] if dests else None)
+        # pick amount 750k for B, and time 09:47 for B if available
+        amt_b = next((a for a in amounts if "750" in a["raw_value"] or str(a.get("normalized_value")) == "750000"), amounts[0] if amounts else None)
+        t_b = next((t for t in times if "09:47" in t["raw_value"]), times[0] if times else amt_b)
+        if dest_b and amt_b and t_b and evid_b:
+            payload = {
+                "target_evidence_id": evid_b,
+                "pairings": [{"destination_fact_id": dest_b["fact_id"], "amount_fact_id": amt_b["fact_id"], "datetime_fact_id": t_b["fact_id"]}],
+                "reason": "resolve ambiguous - choose correct pairing",
+            }
+            r = _call(client, "POST", f"/api/v1/cases/{case_id}/reporting-units/{unit_b['unit_id']}/mapping", json=payload)
+            r.raise_for_status()
+        else:
+            _confirm_facts_for_evidence(client, case_id, evid_b)
+    elif evid_b:
         _confirm_facts_for_evidence(client, case_id, evid_b)
     else:
         _confirm_critical(client, case_id)
