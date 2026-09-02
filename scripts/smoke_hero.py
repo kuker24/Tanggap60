@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import io
 import sys
 import time
 import uuid
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +17,7 @@ REQUIRED = (
     "extract_candidate_facts",
     "validate_case_facts",
     "build_postincident_plan",
+    "assess_handoff_readiness",
     "compile_artifacts",
     "verify_artifacts",
     "prepare_official_handoff",
@@ -25,6 +28,24 @@ REASONING = {
     "extract_candidate_facts",
     "validate_case_facts",
     "build_postincident_plan",
+    "assess_handoff_readiness",
+}
+POST_ZIP_NAMES = {
+    "action_plan.pdf",
+    "evidence_pack.pdf",
+    "readiness_report.pdf",
+    "bank_handoff_pack.pdf",
+    "iasc_handoff_pack.pdf",
+    "police_handoff_pack.pdf",
+    "case.json",
+    "handoff.md",
+    "manifest.sha256",
+}
+NEW_ARTIFACTS = {
+    "READINESS_REPORT",
+    "BANK_HANDOFF_PACK",
+    "IASC_HANDOFF_PACK",
+    "POLICE_HANDOFF_PACK",
 }
 
 
@@ -184,6 +205,15 @@ def run_hero(base: str, wait: float = 120.0) -> dict[str, Any]:
         arts = _call(client, "GET", f"/api/v1/cases/{case_id}/artifacts").json().get("artifacts", [])
     if not arts or any(a.get("verify_status") != "PASS" for a in arts):
         raise SystemExit(f"artifacts not PASS {arts}")
+    types = {str(a.get("type")) for a in arts}
+    if not NEW_ARTIFACTS.issubset(types):
+        raise SystemExit(f"missing preflight artifacts {NEW_ARTIFACTS - types}")
+    zip_art = next(a for a in arts if a.get("type") == "CASE_ZIP")
+    packed = _call(client, "GET", f"/api/v1/cases/{case_id}/artifacts/{zip_art['artifact_id']}/download")
+    packed.raise_for_status()
+    names = set(zipfile.ZipFile(io.BytesIO(packed.content)).namelist())
+    if names != POST_ZIP_NAMES:
+        raise SystemExit(f"zip contents {sorted(names)}")
     handoff = _call(client, "GET", f"/api/v1/cases/{case_id}/handoff")
     handoff.raise_for_status()
     if "iasc.ojk.go.id" not in str(handoff.json().get("official_url", "")):
