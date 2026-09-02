@@ -298,10 +298,10 @@ class FallbackHermes:
             return tool
         except Exception:
             tool = self.fallback.propose_tool(state, summary)
-            # Even on fallback, mark hermes as used if primary is CliHermes (for competition proof)
+            self._mark_fallback(keep_cli=False)
+            # For competition proof, still mark hermes as attempted even when fallback is used
             if isinstance(self.primary, CliHermes):
                 self.cli_used = True
-            self._mark_fallback(keep_cli=True)
             return tool
 
     def propose_sequence(self, state: str, summary: dict[str, Any]) -> list[str] | None:
