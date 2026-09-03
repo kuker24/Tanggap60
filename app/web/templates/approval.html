@@ -25,6 +25,7 @@
 <p class="lede">Paket berisi foto, ringkasan data, dan kode cek keaslian. Kalau nanti ada yang diubah, Anda setujui ulang.</p>
 <form method="post" action="/cases/{{ case.case_id }}/approval" id="approval-form">
   <input type="hidden" name="snapshot_hash" value="{{ snapshot_hash }}">
+  <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
   <label class="check">
     <input id="notice" name="accepted_notice" type="checkbox" value="1" required>
     <span>Saya sudah cek isinya. Saya paham SatuAman tidak mengirim laporan.</span>

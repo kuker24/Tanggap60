@@ -219,6 +219,14 @@ async def intake_submit(case_id: str, request: Request):
             },
             status_code=exc.http_status,
         )
+    # Explicit action trigger (POST): start the pipeline here so that
+    # GET /processing stays a pure, refresh-safe state render.
+    try:
+        from app.api.router import _kick_orchestrator
+
+        _kick_orchestrator(request, case_id)
+    except Exception:
+        pass
     return RedirectResponse(f"/cases/{case_id}/processing", status_code=303)
 
 
@@ -249,12 +257,9 @@ def reset_case(case_id: str, request: Request):
 
 @web.get("/cases/{case_id}/processing")
 def processing(case_id: str, request: Request):
+    # Read-only render: the pipeline is triggered by POST /intake or
+    # POST /api/v1/cases/{id}/runs, so refresh/back never mutates state.
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    if case.state in {State.NEW, State.INGESTING, State.EXTRACTING} and request.app.state.container.settings.sync_jobs:
-        from app.services.ids import new_id
-
-        _svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
-        case = CaseRepository(request.state.db).get(case_id)
     return TEMPLATES.TemplateResponse(
         "processing.html",
         {
@@ -296,12 +301,15 @@ def review(case_id: str, request: Request):
             "has_blocking": bool(blocking),
             "pairing_units": [] if blocking else _pairing_cards(request.state.db, case_id),
             "notice": request.query_params.get("notice", ""),
+            "pairing_key": new_id("pair"),
         },
     )
 
 
 @web.post("/cases/{case_id}/pairing/{unit_id}")
 async def submit_pairing(case_id: str, unit_id: str, request: Request):
+    from app.domain.errors import StaleCaseVersion
+
     _svc(request)["cases"].get_owned(case_id, _sid(request))
     form = await request.form()
     evidence_id = str(form.get("evidence_id") or "")
@@ -322,8 +330,16 @@ async def submit_pairing(case_id: str, unit_id: str, request: Request):
             case_id,
             unit_id,
             request,
-            {"target_evidence_id": evidence_id, "pairings": pairings, "reason": "tinjauan"},
+            {
+                "target_evidence_id": evidence_id,
+                "pairings": pairings,
+                "reason": "tinjauan",
+                "expected_version": str(form.get("expected_version") or ""),
+                "idempotency_key": str(form.get("idempotency_key") or ""),
+            },
         )
+    except StaleCaseVersion:
+        return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-basi", status_code=303)
     except AppError:
         return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-gagal", status_code=303)
     return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-ok", status_code=303)
@@ -396,8 +412,13 @@ def result(case_id: str, request: Request):
             return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
         if case.state == State.READY_FOR_ACTION:
             from app.api.router import _kick_orchestrator
+            from app.infrastructure.jobs import JobQueue
 
-            _kick_orchestrator(request, case_id)
+            # Refresh-safe: never enqueue a duplicate orchestrate job while
+            # one is still pending/running for this case.
+            jobs = JobQueue(request.state.db).list_for_case(case_id)
+            if not any(j.kind == "orchestrate" and j.status in {"pending", "running"} for j in jobs):
+                _kick_orchestrator(request, case_id)
             case = CaseRepository(request.state.db).get(case_id)
     except Exception:
         case = CaseRepository(request.state.db).get(case_id)
@@ -422,7 +443,15 @@ def approval_page(case_id: str, request: Request):
     ambiguous = any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in _case_units(request.state.db, case_id))
     return TEMPLATES.TemplateResponse(
         "approval.html",
-        {"request": request, "case": case, "snapshot_hash": digest, "blocking": blocking, "ambiguous": ambiguous, "notice": request.query_params.get("notice", "")},
+        {
+            "request": request,
+            "case": case,
+            "snapshot_hash": digest,
+            "blocking": blocking,
+            "ambiguous": ambiguous,
+            "notice": request.query_params.get("notice", ""),
+            "idempotency_key": new_id("apprweb"),
+        },
     )
 
 
@@ -432,12 +461,21 @@ def submit_approval(
     request: Request,
     snapshot_hash: str = Form(""),
     accepted_notice: str = Form(""),
+    idempotency_key: str = Form(""),
 ):
-    from app.api.router import _kick_orchestrator
+    import json
+
+    from app.api.router import _idempotency, _kick_orchestrator, _store_idem
     from app.domain.errors import AppError
 
     notice = accepted_notice in {"1", "on", "true", "yes"}
+    if not idempotency_key:
+        return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
+    idem_payload = json.dumps({"snapshot_hash": snapshot_hash, "accepted_notice": notice}, sort_keys=True)
     try:
+        if _idempotency(request, case_id, idempotency_key, idem_payload):
+            # Double submit with the same key: approval already recorded.
+            return RedirectResponse(f"/cases/{case_id}/artifacts", status_code=303)
         _svc(request)["approval"].approve(case_id, _sid(request), snapshot_hash, notice)
     except ValidationFailed as exc:
         if "pasangan" in str(exc.message):
@@ -445,6 +483,7 @@ def submit_approval(
         return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
     except AppError:
         return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
+    _store_idem(request, idempotency_key, case_id, idem_payload, {"status": "approved"})
     _kick_orchestrator(request, case_id)
     return RedirectResponse(f"/cases/{case_id}/artifacts", status_code=303)
 

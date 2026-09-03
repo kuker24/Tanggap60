@@ -54,7 +54,7 @@ def test_buat_paket_form_is_clickable(client: TestClient, ocr: ScriptedOcr) -> N
     assert client.get(f"/api/v1/cases/{case_id}").json()["state"] == "WAITING_APPROVAL"
     ok = client.post(
         f"/cases/{case_id}/approval",
-        data={"snapshot_hash": snap, "accepted_notice": "1"},
+        data={"snapshot_hash": snap, "accepted_notice": "1", "idempotency_key": "reset-case-key"},
         follow_redirects=False,
     )
     assert ok.status_code == 303

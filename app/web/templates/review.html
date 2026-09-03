@@ -17,6 +17,8 @@
 <p class="notice ok" role="status">Pasangan tersimpan. Lanjut ke data berikutnya.</p>
 {% elif notice == "pairing-gagal" %}
 <p class="notice warn" role="alert">Belum tersimpan. Pasangkan dulu rekening dan jumlah uangnya, lalu tekan Simpan pasangan.</p>
+{% elif notice == "pairing-basi" %}
+<p class="notice warn" role="alert">Data berubah sejak terakhir Anda memeriksa. Halaman sudah dimuat ulang — periksa lagi lalu simpan.</p>
 {% endif %}
 
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
@@ -47,6 +49,8 @@
     <p class="muted small">Kami menemukan rekening dan jumlah uang yang sepertinya satu transaksi. Pasangkan yang benar-benar nyambung. Kalau ragu, kosongkan saja dulu.</p>
     <form class="stack" method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
       <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
+      <input type="hidden" name="expected_version" value="{{ case.version }}">
+      <input type="hidden" name="idempotency_key" value="{{ pairing_key }}-{{ unit.unit_id }}">
       {% for row in unit.rows %}
       <article class="card pair-card">
         <h3>Transaksi {{ row + 1 }} dari {{ unit.rows|length }}</h3>

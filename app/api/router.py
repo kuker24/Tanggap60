@@ -22,6 +22,7 @@ from app.domain.errors import (
     InvalidStateTransition,
     NotFound,
     ResourceLimit,
+    StaleCaseVersion,
     ValidationFailed,
 )
 from app.domain.models import ArtifactType, VerifyStatus
@@ -334,9 +335,44 @@ def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dic
     pairings = payload.get("pairings") or payload.get("chosen_pairings") or []
     if not isinstance(pairings, list) or not pairings:
         raise ValidationFailed("pairings required")
+    # idempotency first: same key + same payload replays the stored response
+    # without duplicating (covers double submit after the unit resolved)
+    idem_key = str(payload.get("idempotency_key") or "")
+    idem_payload = json.dumps({"unit_id": unit_id, "evidence_id": evidence_id, "pairings": pairings}, sort_keys=True)
+    if idem_key:
+        cached = _idempotency(request, case_id, idem_key, idem_payload)
+        if cached:
+            return cached
     # verify unit exists (compile current units)
     units, _, _ = _get_units_and_readiness(case_id, request.state.db)
-    # unit_id may be ambiguous unit id to be resolved
+    if unit_id not in {u.unit_id for u in units}:
+        raise ValidationFailed("transaksi tidak ditemukan di kasus ini")
+    # server-side fact/evidence ownership validation (never trust client)
+    owned_facts = {f.fact_id for f in FactRepository(request.state.db).list_for_case(case_id)}
+    owned_evidence = {e.evidence_id for e in EvidenceRepository(request.state.db).list_for_case(case_id)}
+    if evidence_id and evidence_id not in owned_evidence:
+        raise ValidationFailed("bukti tidak ditemukan di kasus ini")
+    for row in pairings:
+        if not isinstance(row, dict):
+            raise ValidationFailed("format pasangan tidak dikenal")
+        dest = str(row.get("destination_fact_id") or "")
+        amount = str(row.get("amount_fact_id") or "")
+        when = str(row.get("datetime_fact_id") or "")
+        if not dest or not amount:
+            raise ValidationFailed("setiap pasangan wajib ada rekening tujuan dan nominal")
+        for fid in (dest, amount, when):
+            if fid and fid not in owned_facts:
+                raise ValidationFailed("data yang dipasangkan bukan dari kasus ini")
+    # optimistic concurrency on the shared case version (same convention as
+    # fact PATCH and conflict resolve): reject stale tabs overwriting newer writes
+    expected = payload.get("expected_version")
+    if expected is not None and expected != "":
+        try:
+            expected_int = int(expected)
+        except (TypeError, ValueError):
+            raise ValidationFailed("versi data tidak dikenal") from None
+        if expected_int != case.version:
+            raise StaleCaseVersion("Data berubah sejak terakhir Anda memeriksa. Buka kembali transaksi sebelum menyimpan.")
     # store decision
     from app.domain.models import UnitMappingDecision
     from app.services.cases import now_utc
@@ -353,6 +389,8 @@ def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dic
         reason=str(payload.get("reason") or ""),
     )
     UnitMappingRepository(request.state.db).add(decision)
+    # advance the shared case version so other open tabs go stale
+    CaseRepository(request.state.db).bump(case, expected_version=case.version)
     # audit
     from app.domain.models import AuditEventRecord
     from app.infrastructure.logging import hash_id
@@ -380,7 +418,10 @@ def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dic
     units2, readiness2, _ = _get_units_and_readiness(case_id, request.state.db)
     from app.services.reporting_units import unit_to_dict
 
-    return {"decision_id": decision.decision_id, "reporting_units": [unit_to_dict(u) for u in units2], "readiness": readiness2}
+    body = {"decision_id": decision.decision_id, "reporting_units": [unit_to_dict(u) for u in units2], "readiness": readiness2}
+    if idem_key:
+        _store_idem(request, idem_key, case_id, idem_payload, body)
+    return body
 
 
 @api.get("/cases/{case_id}/next-action")
