@@ -64,3 +64,9 @@ def test_buat_paket_form_is_clickable(client: TestClient, ocr: ScriptedOcr) -> N
         "VERIFYING",
         "HANDOFF_READY",
     }
+    pack = client.get(f"/cases/{case_id}/paket.zip")
+    assert pack.status_code == 200
+    assert pack.content[:2] == b"PK"
+    listed = client.get(f"/api/v1/cases/{case_id}/artifacts/download?format=zip")
+    assert listed.status_code == 200
+    assert listed.content[:2] == b"PK"

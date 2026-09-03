@@ -13,7 +13,7 @@
 <h1>Paket siap dibawa</h1>
 <p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
 <div class="row" style="margin-top:0">
-  <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/download?format=zip">Unduh semua</a>
+   <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
 </div>
 <ul class="file-list pack">
   {% for a in artifacts if a.downloadable %}

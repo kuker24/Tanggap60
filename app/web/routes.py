@@ -318,6 +318,13 @@ def submit_approval(
     return RedirectResponse(f"/cases/{case_id}/artifacts", status_code=303)
 
 
+@web.get("/cases/{case_id}/paket.zip")
+def download_pack(case_id: str, request: Request):
+    from app.api.router import download_all_artifacts
+
+    return download_all_artifacts(case_id, request)
+
+
 @web.get("/cases/{case_id}/artifacts")
 def artifacts_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))

@@ -20,10 +20,11 @@ from app.domain.errors import (
     Forbidden,
     IdempotencyConflict,
     InvalidStateTransition,
+    NotFound,
     ResourceLimit,
     ValidationFailed,
 )
-from app.domain.models import VerifyStatus
+from app.domain.models import ArtifactType, VerifyStatus
 from app.domain.policies import sha256_text
 from app.domain.states import DeclaredCondition, Mode, State
 from app.hermes.tools.catalog import TOOL_SPECS
@@ -515,6 +516,19 @@ def list_artifacts(case_id: str, request: Request) -> dict[str, Any]:
     svc(request)["cases"].get_owned(case_id, sid(request))
     items = ArtifactRepository(request.state.db).list_for_case(case_id)
     return {"artifacts": [artifact_public(a) for a in items]}
+
+
+@api.get("/cases/{case_id}/artifacts/download")
+def download_all_artifacts(case_id: str, request: Request) -> Response:
+    svc(request)["cases"].get_owned(case_id, sid(request))
+    items = ArtifactRepository(request.state.db).list_for_case(case_id)
+    zip_item = next(
+        (a for a in items if a.type == ArtifactType.CASE_ZIP and a.verify_status == VerifyStatus.PASS),
+        None,
+    )
+    if zip_item is None:
+        raise NotFound("paket belum siap")
+    return download_artifact(case_id, zip_item.artifact_id, request)
 
 
 @api.get("/cases/{case_id}/artifacts/{artifact_id}/download")
