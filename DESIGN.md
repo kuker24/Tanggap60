@@ -19,6 +19,7 @@
 - Tanpa bayangan. Kedalaman dari walnut → bark.
 - Kartu 12px, CTA isi 36px pill, ghost 22.5px. Input garis bawah saja.
 - Divider putus 1px cork. Header sticky walnut. Footer legal uppercase 10px.
+- Museum hidup: grain film, objek mengambang, cincin wait bernapas. Bukan video. `prefers-reduced-motion` mematikan gerak.
 
 ## Layout
 - Full-bleed walnut, isi max 40rem. Satu aksi primer per layar.

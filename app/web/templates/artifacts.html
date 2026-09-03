@@ -12,7 +12,7 @@
 {% if artifacts %}
 <h1>Paket siap dibawa</h1>
 <p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
-<div class="pack-plate">
+<div class="pack-plate object">
   <div class="row flush">
     <a class="btn ember wide" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
   </div>
@@ -35,6 +35,7 @@
 </div>
 {% else %}
 <div class="stage-void">
+<div class="wait-ring" aria-hidden="true"></div>
 <h1>Membuat paket</h1>
 <p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Tunggu sebentar. Halaman ini lanjut sendiri.</p>
 </div>

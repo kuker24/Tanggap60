@@ -10,7 +10,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="dark"' in home.text
     assert 'content="#100904"' in home.text
-    assert "oryzo-inner" in home.text
+    assert "oryzo-live" in home.text
     case_id = create_case(client)
     for path in (
         "intake",
@@ -26,8 +26,14 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
         assert page.status_code == 200, path
         assert 'content="dark"' in page.text, path
         assert 'content="#100904"' in page.text, path
+    processing = client.get(f"/cases/{case_id}/processing")
+    assert "wait-ring" in processing.text
     css = client.get("/static/app.css")
     assert css.status_code == 200
     assert "#100904" in css.text
     assert "#FFFEFB" not in css.text
     assert "#fffefb" not in css.text.lower()
+    assert "feTurbulence" in css.text
+    assert "prefers-reduced-motion" in css.text
+    assert "@keyframes float" in css.text
+    assert "@keyframes breathe" in css.text

@@ -10,6 +10,9 @@
 </nav>
 {% endblock %}
 {% block content %}
+{% if case.state.value not in ["FAILED_SAFE", "REVIEW_REQUIRED"] %}
+<div class="wait-ring" aria-hidden="true"></div>
+{% endif %}
 <h1>Memeriksa bukti Anda</h1>
 <p class="lede status-line" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}<span class="pulse" aria-hidden="true"></span>Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
 {% if case.state.value == "FAILED_SAFE" %}
