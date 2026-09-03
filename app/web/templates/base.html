@@ -2,9 +2,9 @@
 <html lang="id">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="{% block color_scheme %}dark{% endblock %}">
-  <meta name="theme-color" content="{% block theme_color %}#0c1224{% endblock %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="{% block color_scheme %}light{% endblock %}">
+  <meta name="theme-color" content="{% block theme_color %}#faf7f1{% endblock %}">
   <meta name="description" content="SatuAman — susun foto, chat, dan link jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.">
   <title>{% block title %}SatuAman{% endblock %}</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
@@ -16,11 +16,11 @@
 </head>
 <body class="{% block body_mod %}{% endblock %}">
   <!--
-    THESIS: Landing putih Motionsites; kasus = aurora wizard. Menolak void Superwhisper dan walnut ORYZO.
-    OWN-WORLD: Landing #fff + kartu radial kuning/pink/ungu. Kasus indigo #0c1224 + aurora navy–ungu, CTA putih.
-    STORY: Korban paham tawaran di beranda, lalu satu aksi per langkah di kasus; bukan portal resmi.
-    FIRST VIEWPORT: Hero terang, dua CTA kondisi; seksi 3 kartu 1:1 bank; stepper 4 langkah.
-    FORM: Motionsites ai-image-generator-ui (section) + screenshot Periksa (operate).
+    THESIS: Satu dunia terang-tenang dari beranda sampai paket; korban hanya melihat keputusan yang perlu diambil.
+    OWN-WORLD: Warm paper #faf7f1, tinta #1c1917, amber komitmen #92400e, hijau khusus siap, merah khusus blokir, biru khusus fokus.
+    STORY: Bukti berantakan → tahu apa yang terjadi, apa yang kurang, satu tindakan utama. Detail teknis collapsed.
+    FIRST VIEWPORT: H1 + lede + satu aksi primer dominan; task flow max 40rem; langkah 1 Bukti 2 Periksa 3 Konfirmasi 4 Bertindak.
+    FORM: Operate (kasus) + Persuade (landing). Panel gelap hanya untuk jejak teknis.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
   <a class="skip" href="#main">Lewati ke isi</a>
@@ -34,8 +34,8 @@
         </span>
       </a>
       {% if case is defined %}
-      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai dari awal? Foto dan isian di halaman ini akan dihapus dan tidak bisa dikembalikan.')">
-        <button class="btn-text" type="submit">Mulai dari awal</button>
+      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Isi di halaman ini ikut terhapus dan tidak bisa dikembalikan.')">
+        <button class="btn-text" type="submit">Kasus baru</button>
       </form>
       {% endif %}
     </div>

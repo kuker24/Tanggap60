@@ -6,7 +6,7 @@
 <h1>Kirim yang Anda punya</h1>
 <p class="lede" id="coach-lede">Foto, cerita, atau link — satu saja cukup untuk mulai.</p>
 
-<p class="notice" role="note">Demi keamanan: jangan kirim password, kode OTP, atau foto KTP. Data itu tidak kami butuhkan dan berbahaya kalau tersebar.</p>
+<p class="notice" role="note">Demi keamanan: jangan kirim password, kode OTP, atau foto KTP. Data itu tidak kami butuhkan dan berbahaya kalau tersebar. Data demo otomatis dihapus setelah 60 menit.</p>
 
 {% if notice == "kosong" %}
 <p class="notice warn" role="alert">Belum ada yang terkirim. Isi dulu salah satu: foto, cerita, atau link.</p>
@@ -37,7 +37,7 @@
     <div class="file-list pack" aria-label="File tersimpan">
       {% for item in evidence %}
       <div class="file-chip">
-        <span><b>{{ item.original_name_display }}</b></span>
+        <span><b>✓ {{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Cerita{% else %}File{% endif %} · {{ (item.size_bytes / 1024) | round(1) }} KB · sudah masuk</span></span>
         {% if can_delete_evidence %}
         <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus ›</button>
         {% endif %}
@@ -47,6 +47,9 @@
     {% endif %}
     <div class="actions">
       <button class="btn ember" type="button" id="pick-files">Pilih foto atau file</button>
+      {% if evidence %}
+      <button class="btn-text" type="button" id="add-more">Tambah foto atau file lagi ›</button>
+      {% endif %}
       <button class="btn-text" type="button" id="skip-files">Saya tidak punya file, lanjut ›</button>
     </div>
   </div>

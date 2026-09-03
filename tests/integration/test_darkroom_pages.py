@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from tests.hero_support import create_case
 
 
-def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
+def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     home = client.get("/")
     assert home.status_code == 200
     assert 'content="light"' in home.text
@@ -31,8 +31,8 @@ def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
     ):
         page = client.get(f"/cases/{case_id}/{path}")
         assert page.status_code == 200, path
-        assert 'content="dark"' in page.text, path
-        assert 'content="#0c1224"' in page.text, path
+        assert 'content="light"' in page.text, path
+        assert 'content="#faf7f1"' in page.text, path
         assert "is-landing" not in page.text, path
     intake = client.get(f"/cases/{case_id}/intake")
     assert 'id="files"' in intake.text
@@ -42,13 +42,15 @@ def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
     assert "Pilih foto atau file" in intake.text
     processing = client.get(f"/cases/{case_id}/processing")
     assert "wait-ring" in processing.text
-    assert "is-void" in processing.text
+    assert "timeline" in processing.text
+    assert "Lihat proses teknis" in processing.text
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
     css = client.get("/static/app.css")
     assert css.status_code == 200
-    assert "#000000" in css.text
-    assert "--aurora" in css.text
+    assert "#faf7f1" in css.text
+    assert "--amber" in css.text
+    assert "--aurora" not in css.text
     assert "body.is-landing" in css.text
     assert ".c1-card" in css.text
     assert "#100904" not in css.text

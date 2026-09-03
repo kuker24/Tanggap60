@@ -2,7 +2,7 @@
 {% from "_stepper.html" import stepper %}
 {% block body_mod %}{% if not actions %}is-void{% endif %}{% endblock %}
 {% block title %}Langkah lapor — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Paket") }}{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
 {% block content %}
 {% if actions %}
 <h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lapor dengan urutan ini{% endif %}</h1>

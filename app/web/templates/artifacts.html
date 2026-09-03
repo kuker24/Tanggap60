@@ -1,33 +1,54 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block body_mod %}{% if not artifacts %}is-void{% endif %}{% endblock %}
 {% block title %}Paket siap — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Paket") }}{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
 {% block content %}
 {% if artifacts %}
-<h1>Paket siap dibawa</h1>
-<p class="lede">Ini arsip untuk Anda, bukan surat resmi. Unduh, lalu bawa ke situs resmi.</p>
-<div class="pack-plate object">
-  <div class="actions flush">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh paket (ZIP)</a>
+<h1>Paket Anda siap dibawa</h1>
+<p class="lede">Paket belum dikirim ke mana pun. Anda tetap yang mengirimkannya ke situs resmi.</p>
+
+<div class="next-card">
+  <h3>Buka portal resmi IASC</h3>
+  <p class="muted small">Isi data diri di situs mereka, bukan di sini. Mulai dari IASC — kanal resmi OJK untuk melapor penipuan ({{ domain }}).</p>
+  <div class="actions">
+    <a class="btn" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC</a>
+    {% if pack %}
+    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua paket</a>
+    {% endif %}
   </div>
-  <ul class="file-list pack">
-    {% for a in artifacts if a.downloadable %}
+</div>
+
+{% for group in groups %}
+<section class="card" aria-labelledby="grp-{{ group.key }}">
+  <h3 id="grp-{{ group.key }}">{{ group.title }}</h3>
+  <ul class="file-list">
+    {% for a in group.items %}
     <li class="file-chip">
-      <span><b>{{ a.type | human("artifact") }}</b></span>
+      <span><b>{{ a.type | human("artifact") }}</b><br><span class="meta">{{ (a.size_bytes / 1024) | round(1) }} KB · terverifikasi</span></span>
       <a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>
     </li>
     {% endfor %}
   </ul>
+</section>
+{% endfor %}
+
+<div class="actions">
+  <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan ›</a>
 </div>
-<div class="card">
-  <h3>Lapor ke situs resmi</h3>
-  <p class="muted small">Isi data diri di situs mereka, bukan di sini. Mulai dari IASC — kanal resmi OJK untuk melapor penipuan ({{ domain }}). File yang dikasih ke petugas: yang judulnya “Untuk bank”, “Untuk IASC”, atau “Untuk polisi”.</p>
-  <div class="actions">
-    <a class="btn ghost" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC</a>
-    <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan ›</a>
+
+{% if rest %}
+<details class="tech">
+  <summary>Detail teknis &amp; integritas file</summary>
+  <div class="tech-body">
+    <table>
+      <tr><th>Dokumen</th><th>Status</th><th>Kode</th></tr>
+      {% for a in rest %}
+      <tr><td>{{ a.type | human("artifact") }}</td><td>{{ a.verify_status }}</td><td>{{ a.sha256[:20] }}…</td></tr>
+      {% endfor %}
+    </table>
   </div>
-</div>
+</details>
+{% endif %}
 {% else %}
 <div class="stage-void">
 <div class="wait-ring" aria-hidden="true"></div>

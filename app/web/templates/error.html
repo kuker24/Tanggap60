@@ -11,7 +11,10 @@
     {% endif %}
   </div>
   {% if request_id %}
-  <p class="muted small">Kode: {{ request_id }}</p>
+  <details class="tech-lite">
+    <summary>Detail bantuan</summary>
+    <p>{% if detail %}{{ detail }}{% else %}Kode: {{ request_id }}{% endif %}</p>
+  </details>
   {% endif %}
 </div>
 {% endblock %}

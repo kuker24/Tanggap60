@@ -174,7 +174,7 @@ def test_result_get_does_not_duplicate_jobs(client: TestClient, ocr: ScriptedOcr
     client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "p0-dedup-run"})
     confirm_critical(client, case_id)
     settings.sync_jobs = False  # matikan worker: kick hanya boleh enqueue
-    first = client.get(f"/cases/{case_id}/result")
+    first = client.get(f"/cases/{case_id}/readiness")
     assert first.status_code == 200
     from app.infrastructure.db import JobRow
 
@@ -189,7 +189,7 @@ def test_result_get_does_not_duplicate_jobs(client: TestClient, ocr: ScriptedOcr
     with session_factory() as db:
         jobs = _active(db)
     assert len(jobs) == 1
-    second = client.get(f"/cases/{case_id}/result")
+    second = client.get(f"/cases/{case_id}/readiness")
     assert second.status_code == 200
     with session_factory() as db:
         jobs2 = _active(db)

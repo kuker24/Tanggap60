@@ -100,7 +100,7 @@ def _pairing_cards(db, case_id: str) -> list[dict]:
             if fact is None:
                 continue
             kind = fact.type.value
-            item = {"id": fact.fact_id, "label": fact.raw_value}
+            item = {"id": fact.fact_id, "label": fact.raw_value, "src": fact.source_evidence_id}
             if kind in {"ACCOUNT", "PJP"} and "VICTIM" not in (fact.raw_value or ""):
                 dests.append(item)
             elif kind == "AMOUNT":
@@ -108,8 +108,6 @@ def _pairing_cards(db, case_id: str) -> list[dict]:
             elif kind == "DATETIME":
                 times.append(item)
         evid = unit.evidence_ids[0] if unit.evidence_ids else ""
-        rows = max(len(dests), len(amounts), 1)
-        rows = min(rows, 4)
         cards.append(
             {
                 "unit_id": unit.unit_id,
@@ -117,10 +115,73 @@ def _pairing_cards(db, case_id: str) -> list[dict]:
                 "dests": dests,
                 "amounts": amounts,
                 "times": times,
-                "rows": list(range(rows)),
             }
         )
     return cards
+
+
+_ID_MONTHS = {
+    1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
+    7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober", 11: "November", 12: "Desember",
+}
+
+
+def _format_rupiah(value: object) -> str:
+    try:
+        return "Rp" + f"{float(value):,.0f}".replace(",", ".")
+    except (TypeError, ValueError):
+        return str(value)
+
+
+def _mask_account(raw: object) -> str:
+    text = str(raw or "").strip()
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if len(digits) >= 4:
+        prefix = text
+        for chunk in sorted(set(text.split()), key=len, reverse=True):
+            if chunk and any(ch.isdigit() for ch in chunk):
+                prefix = text.replace(chunk, "").strip(" -•")
+                break
+        bank = prefix.split()[0] if prefix else "Rekening"
+        return f"{bank} ••••{digits[-4:]}"
+    return text
+
+
+def _format_when(value: object) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    try:
+        from datetime import datetime
+
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return f"{dt.day} {_ID_MONTHS.get(dt.month, '')} {dt.year} · {dt.hour:02d}:{dt.minute:02d}".strip()
+    except (ValueError, TypeError):
+        return text
+
+
+def _tx_summaries(db, case_id: str, evidence_names: dict[str, str]) -> list[dict]:
+    """Relationship summaries for units that are already resolved (not AMBIGUOUS)."""
+    out = []
+    n = 0
+    for unit in _case_units(db, case_id):
+        status = str(getattr(unit.mapping_status, "value", unit.mapping_status))
+        if status == "AMBIGUOUS":
+            continue
+        n += 1
+        names = [evidence_names.get(e, "") for e in unit.evidence_ids]
+        out.append(
+            {
+                "n": n,
+                "unit_id": unit.unit_id,
+                "status": status,
+                "amount": _format_rupiah(unit.amount) if unit.amount else "",
+                "dest": _mask_account(unit.destination_account) if unit.destination_account else "",
+                "when": _format_when(unit.transferred_at),
+                "src": ", ".join(dict.fromkeys(x for x in names if x)),
+            }
+        )
+    return out
 
 
 @web.get("/favicon.ico")
@@ -300,6 +361,13 @@ def review(case_id: str, request: Request):
             "conflicts": conflicts_pub,
             "has_blocking": bool(blocking),
             "pairing_units": [] if blocking else _pairing_cards(request.state.db, case_id),
+            "summaries": []
+            if blocking
+            else _tx_summaries(
+                request.state.db,
+                case_id,
+                {e.evidence_id: e.original_name_display for e in evidence},
+            ),
             "notice": request.query_params.get("notice", ""),
             "pairing_key": new_id("pair"),
         },
@@ -314,10 +382,17 @@ async def submit_pairing(case_id: str, unit_id: str, request: Request):
     form = await request.form()
     evidence_id = str(form.get("evidence_id") or "")
     pairings: list[dict[str, str]] = []
+    # One-decision form contract: per destination index, chosen amount + time.
     for index in range(4):
-        dest = str(form.get(f"destination_fact_id_{index}") or "")
-        amount = str(form.get(f"amount_fact_id_{index}") or "")
-        when = str(form.get(f"datetime_fact_id_{index}") or "")
+        dest = str(form.get(f"dest_id_{index}") or "")
+        if not dest:
+            # legacy row contract (selects per row)
+            dest = str(form.get(f"destination_fact_id_{index}") or "")
+            amount = str(form.get(f"amount_fact_id_{index}") or "")
+            when = str(form.get(f"datetime_fact_id_{index}") or "")
+        else:
+            amount = str(form.get(f"amount_for_{index}") or "")
+            when = str(form.get(f"time_for_{index}") or "")
         if dest and amount:
             row = {"destination_fact_id": dest, "amount_fact_id": amount}
             if when:
@@ -352,6 +427,23 @@ def readiness_page(case_id: str, request: Request):
     from app.services.next_action import next_action_to_dict, recommend_next_action
     from app.services.readiness import assess, assess_units, public_report
     from app.services.reporting_units import compile_reporting_units
+
+    try:
+        if case.state == State.REVIEW_REQUIRED:
+            _svc(request)["inspect"].validate_case_facts(case_id)
+            case = CaseRepository(request.state.db).get(case_id)
+        if case.state == State.READY_FOR_ACTION:
+            from app.api.router import _kick_orchestrator
+            from app.infrastructure.jobs import JobQueue
+
+            # Refresh-safe: never enqueue a duplicate orchestrate job while
+            # one is still pending/running for this case.
+            jobs = JobQueue(request.state.db).list_for_case(case_id)
+            if not any(j.kind == "orchestrate" and j.status in {"pending", "running"} for j in jobs):
+                _kick_orchestrator(request, case_id)
+            case = CaseRepository(request.state.db).get(case_id)
+    except Exception:
+        case = CaseRepository(request.state.db).get(case_id)
 
     facts = FactRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -390,6 +482,51 @@ def readiness_page(case_id: str, request: Request):
             "reason": soften(next_action.get("reason")),
         }
     gaps = _gap_texts(report, units_report)
+    evidence_names = {e.evidence_id: e.original_name_display for e in evidence}
+    summaries = _tx_summaries(request.state.db, case_id, evidence_names)
+    tx_cards = []
+    has_blocking = False
+    ready_count = 0
+    if units and units_report:
+        reps = {r.get("unit_id"): r for r in units_report.get("units") or []}
+        by_unit = units_report.get("readiness_by_unit") or {}
+        for tx in summaries:
+            rep = reps.get(tx["unit_id"], {})
+            ch_status = by_unit.get(tx["unit_id"], {})
+            missing_blocking: list[str] = []
+            missing_info: list[str] = []
+            for ch in rep.get("channels", []) or []:
+                for ck in ch.get("checks", []) or []:
+                    if ck.get("status") not in {"MISSING", "CONFLICT"}:
+                        continue
+                    text = soften(ck.get("action") or ck.get("label") or "")
+                    if not text:
+                        continue
+                    if ck.get("blocking"):
+                        has_blocking = True
+                        if text not in missing_blocking:
+                            missing_blocking.append(text)
+                    elif text not in missing_info:
+                        missing_info.append(text)
+            financial = [ch_status.get("BANK_PJP"), ch_status.get("IASC")]
+            ready = bool(financial) and all(s == "READY" for s in financial) and not missing_blocking
+            if ready:
+                ready_count += 1
+            tx_cards.append(
+                {
+                    **tx,
+                    "ready": ready,
+                    "channels": [
+                        {"label": "Bank", "status": ch_status.get("BANK_PJP", "")},
+                        {"label": "IASC", "status": ch_status.get("IASC", "")},
+                    ],
+                    "missing_blocking": missing_blocking,
+                    "missing_info": missing_info,
+                }
+            )
+        for ck in (units_report.get("incident_police", {}) or {}).get("checks", []) or []:
+            if ck.get("status") in {"MISSING", "CONFLICT"} and ck.get("blocking"):
+                has_blocking = True
     return TEMPLATES.TemplateResponse(
         "readiness.html",
         {
@@ -397,6 +534,9 @@ def readiness_page(case_id: str, request: Request):
             "case": case,
             "next_view": next_view,
             "gaps": gaps,
+            "tx_cards": tx_cards,
+            "has_blocking": has_blocking,
+            "ready_count": ready_count,
         },
     )
 
@@ -410,6 +550,9 @@ def result(case_id: str, request: Request):
             case = CaseRepository(request.state.db).get(case_id)
         if case.state == State.REVIEW_REQUIRED:
             return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+        if case.route.value != "PRE_INCIDENT_CHECK":
+            # Post-incident plan lives on the rescue dashboard now.
+            return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
         if case.state == State.READY_FOR_ACTION:
             from app.api.router import _kick_orchestrator
             from app.infrastructure.jobs import JobQueue
@@ -441,6 +584,12 @@ def approval_page(case_id: str, request: Request):
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
     blocking = [c for c in conflicts if c.severity.value == "BLOCKING" and c.status.value == "OPEN"]
     ambiguous = any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in _case_units(request.state.db, case_id))
+    evidence_names = {e.evidence_id: e.original_name_display for e in EvidenceRepository(request.state.db).list_for_case(case_id)}
+    scope_units = _tx_summaries(request.state.db, case_id, evidence_names)
+    pending: list[str] = []
+    for u in _case_units(request.state.db, case_id):
+        if str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS":
+            pending.append(soften(getattr(u, "mapping_reason", "") or "transaksi yang belum terpasang"))
     return TEMPLATES.TemplateResponse(
         "approval.html",
         {
@@ -449,6 +598,8 @@ def approval_page(case_id: str, request: Request):
             "snapshot_hash": digest,
             "blocking": blocking,
             "ambiguous": ambiguous,
+            "scope_units": scope_units,
+            "pending": pending,
             "notice": request.query_params.get("notice", ""),
             "idempotency_key": new_id("apprweb"),
         },
@@ -500,12 +651,32 @@ def artifacts_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     items = ArtifactRepository(request.state.db).list_for_case(case_id)
     url = request.app.state.container.settings.official_iasc_url
+    pub = [artifact_public(a) for a in items]
+    roles = [
+        ("bank", "Untuk bank", {"BANK_HANDOFF_PACK", "UNIT_BANK_PACK"}),
+        ("iasc", "Untuk IASC", {"IASC_HANDOFF_PACK", "UNIT_IASC_PACK"}),
+        ("police", "Ringkasan seluruh kejadian", {"POLICE_HANDOFF_PACK", "ACTION_PLAN"}),
+        ("brief", "Ringkasan & cek", {"VERIFICATION_BRIEF", "READINESS_REPORT", "CHECKLIST", "EVIDENCE_PACK"}),
+    ]
+    groups = []
+    used: set[str] = set()
+    for key, title, types in roles:
+        members = [a for a in pub if a["type"] in types and a["downloadable"]]
+        for a in members:
+            used.add(a["artifact_id"])
+        if members:
+            groups.append({"key": key, "title": title, "items": members})
+    rest = [a for a in pub if a["artifact_id"] not in used]
+    pack = next((a for a in pub if a["type"] == "CASE_ZIP" and a["downloadable"]), None)
     return TEMPLATES.TemplateResponse(
         "artifacts.html",
         {
             "request": request,
             "case": case,
-            "artifacts": [artifact_public(a) for a in items],
+            "artifacts": pub,
+            "groups": groups,
+            "rest": rest,
+            "pack": pack,
             "official_url": url,
             "domain": "iasc.ojk.go.id",
         },

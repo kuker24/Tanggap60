@@ -33,12 +33,13 @@ def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict
     case_id = (_CASE_RE.search(path) or [None, None])[1]
     if exc.code in {"CASE_EXPIRED", "NOT_FOUND", "FORBIDDEN"}:
         return {
-            "title": "Sesi ini sudah berakhir",
-            "message": "Kasus tidak ditemukan atau waktunya habis. Mulai lagi dari beranda — cepat dan tidak dipungut biaya.",
+            "title": "Data kasus demo sudah dihapus",
+            "message": "Demi privasi, data demo disimpan maksimal 60 menit. Anda perlu membuat kasus baru.",
             "cta_url": "/",
-            "cta_label": "Mulai dari beranda",
+            "cta_label": "Mulai kasus baru",
             "secondary_url": None,
             "secondary_label": "",
+            "detail": f"Kode bantuan: {request_id}",
         }
     if exc.code in {"INVALID_FILE_TYPE", "UPLOAD_LIMIT_EXCEEDED", "EVIDENCE_PARSE_FAILED"}:
         ctx = {

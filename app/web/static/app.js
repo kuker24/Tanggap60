@@ -57,6 +57,13 @@
     const skipUrl = document.getElementById("skip-url");
     const pickFiles = document.getElementById("pick-files");
     if (pickFiles && filesInput) pickFiles.addEventListener("click", () => filesInput.click());
+    const addMore = document.getElementById("add-more");
+    if (addMore) addMore.addEventListener("click", () => {
+      const filesStep = document.querySelector('[data-step="files"]');
+      if (filesStep) filesStep.classList.remove("submit-ready");
+      showCoach(["files"]);
+      if (filesInput) filesInput.click();
+    });
     if (skipFiles) skipFiles.addEventListener("click", goText);
     if (nextText) nextText.addEventListener("click", goUrl);
     if (skipText) skipText.addEventListener("click", goUrl);
@@ -160,6 +167,42 @@
     fn();
     start();
   }
+  function waitAlertHost() {
+    let host = document.getElementById("wait-alert");
+    if (!host) {
+      host = document.createElement("div");
+      host.id = "wait-alert";
+      const main = document.querySelector("main");
+      if (main) main.prepend(host);
+    }
+    return host;
+  }
+  let waitFails = 0;
+  function waitNoteFail(retry) {
+    waitFails += 1;
+    if (waitFails < 3) return;
+    const host = waitAlertHost();
+    host.innerHTML = "";
+    const el = document.createElement("div");
+    el.className = "alert warning";
+    el.setAttribute("role", "alert");
+    const b = document.createElement("b");
+    b.textContent = "Koneksi terputus-putus";
+    const p = document.createElement("p");
+    p.textContent = "Halaman tidak bisa mengecek status. Bukti Anda tetap tersimpan — tekan Coba lagi.";
+    const row = document.createElement("div");
+    row.className = "actions";
+    const btn = document.createElement("button");
+    btn.className = "btn ghost";
+    btn.type = "button";
+    btn.textContent = "Coba lagi";
+    btn.addEventListener("click", () => { waitFails = 0; host.innerHTML = ""; retry(); });
+    row.appendChild(btn);
+    el.appendChild(b);
+    el.appendChild(p);
+    el.appendChild(row);
+    host.appendChild(el);
+  }
   if (caseId && page === "processing") {
     async function tick() {
       try {
@@ -173,7 +216,7 @@
         else if (state === "WAITING_APPROVAL") location.href = "/cases/" + caseId + "/approval";
         else if (state === "HANDOFF_READY") location.href = "/cases/" + caseId + "/artifacts";
         else if (state === "RECEIPT_RECORDED") location.href = "/cases/" + caseId + "/receipt";
-      } catch (_) {}
+      } catch (_) { waitNoteFail(tick); }
     }
     json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).catch(() => {}).finally(function () {
       poll(tick, 1500);
@@ -200,19 +243,89 @@
         else if (waitKind === "plan" && state === "REVIEW_REQUIRED") location.href = "/cases/" + caseId + "/review";
         else if (waitKind === "plan" && (state === "WAITING_APPROVAL" || state === "HANDOFF_READY")) location.reload();
         else if (state === "FAILED_SAFE") location.href = "/cases/" + caseId + "/review";
-      } catch (_) {}
+      } catch (_) { waitNoteFail(tickWait); }
     }
     json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).catch(() => {}).finally(function () {
       poll(tickWait, 1500);
     });
   }
 
-  window._toast = function (msg, isErr) {
-    const t = document.getElementById("toast");
+  window._toast = function (msg, isErr) {    const t = document.getElementById("toast");
     if (!t) return;
     t.textContent = msg;
     t.setAttribute("role", isErr ? "alert" : "status");
     t.classList.add("show");
     setTimeout(() => t.classList.remove("show"), isErr ? 4000 : 2400);
   };
+
+  window._alert = function (boxId, type, title, msg) {
+    const box = document.getElementById(boxId);
+    if (!box) { window._toast(title + ". " + msg, type === "error"); return; }
+    box.innerHTML = "";
+    const el = document.createElement("div");
+    el.className = "alert " + (type || "info");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("tabindex", "-1");
+    const b = document.createElement("b");
+    b.textContent = title;
+    const p = document.createElement("p");
+    p.textContent = msg;
+    el.appendChild(b);
+    el.appendChild(p);
+    box.appendChild(el);
+    el.focus({ preventScroll: false });
+  };
+
+  async function apiFetch(url, opts) {
+    let res;
+    try {
+      res = await fetch(url, opts);
+    } catch (_) {
+      throw new Error("Koneksi terputus. Periksa internet Anda lalu coba lagi.");
+    }
+    if (res.ok) return res;
+    const j = await res.json().catch(() => ({}));
+    throw new Error(j.message || ("Gagal (kode " + res.status + "). Coba lagi."));
+  }
+
+  // Harden every plain POST form against double submit.
+  document.addEventListener("submit", (e) => {
+    const f = e.target;
+    if (!(f instanceof HTMLFormElement) || f.dataset.noHarden !== undefined) return;
+    if (f.method.toLowerCase() !== "post" || f.enctype === "multipart/form-data") return;
+    const btn = f.querySelector('[type="submit"]');
+    if (btn && !btn.disabled) {
+      btn.disabled = true;
+      if (btn.textContent.trim()) btn.dataset.label = btn.textContent;
+      btn.textContent = "Memproses…";
+      setTimeout(() => {
+        btn.disabled = false;
+        if (btn.dataset.label) btn.textContent = btn.dataset.label;
+      }, 9000);
+    }
+  });
+  // Technical trace: lazy-load only when the user opens the disclosure.
+  const trace = document.getElementById("trace");
+  if (trace && !trace.dataset.loaded) {
+    trace.addEventListener("toggle", async () => {
+      if (!trace.open || trace.dataset.loaded) return;
+      trace.dataset.loaded = "1";
+      const body = document.getElementById("trace-body");
+      const cid = (body && body.getAttribute("data-case")) || caseId;
+      if (!body || !cid) return;
+      try {
+        const data = await apiFetch("/api/v1/cases/" + cid + "/events");
+        const rows = (data.events || []).filter((e) => e.tool_name).map((e) =>
+          "<tr><td>" + escapeHtml(e.tool_name || e.event_type || "") + "</td><td>" +
+          escapeHtml(String(e.duration_ms == null ? "—" : e.duration_ms) + " ms") + "</td><td>" +
+          escapeHtml(e.result_code || "") + "</td><td>" + escapeHtml(e.state_after || "") + "</td></tr>"
+        );
+        body.innerHTML = rows.length
+          ? "<table><tr><th>Alat</th><th>Waktu</th><th>Hasil</th><th>Status</th></tr>" + rows.join("") + "</table>"
+          : "Belum ada jejak teknis.";
+      } catch (err) {
+        body.textContent = err.message || "Gagal memuat jejak teknis.";
+      }
+    });
+  }
 })();

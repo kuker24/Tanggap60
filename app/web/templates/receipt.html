@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Catat nomor laporan — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Paket") }}{% endblock %}
+{% block title %}Nomor laporan — SatuAman{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
 {% block content %}
-<h1>Catat nomor laporan</h1>
-<p class="lede">Nomor yang dikasih bank, IASC, atau polisi setelah Anda melapor. Simpan di sini biar tidak hilang.</p>
+<h1>Sudah mendapat nomor laporan atau tiket?</h1>
+<p class="lede">Nomor yang dikasih bank, IASC, atau polisi setelah Anda melapor. Disimpan di sini biar tidak hilang — hanya tersimpan lokal, status resmi tetap lihat di situs mereka.</p>
 
 {% if receipt %}
 <div class="card">
@@ -21,23 +21,28 @@
   <label for="ticket">Nomor laporan</label>
   <input id="ticket" name="ticket_text" type="text" placeholder="Contoh: LP/123/III/2026 atau IASC-456789" autocomplete="off" aria-describedby="ticket-help">
   <p class="help" id="ticket-help">Biasanya ada di struk, SMS, atau email balasan setelah Anda melapor.</p>
+  <div id="rcpt-alert"></div>
   <div class="actions">
-    <button class="btn ember" type="submit">Simpan</button>
+    <button class="btn ember" type="submit">Catat nomor</button>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/artifacts">Lewati ›</a>
   </div>
 </form>
 <script>
 document.getElementById("rcpt").addEventListener("submit", async (ev) => {
   ev.preventDefault();
-  const t = document.getElementById("toast");
-  const show = (m, isErr) => { t.textContent = m; t.setAttribute("role", isErr ? "alert" : "status"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), isErr ? 4000 : 2200); };
+  const btn = ev.target.querySelector('[type="submit"]');
   const ticket_text = document.getElementById("ticket").value.trim();
-  if(!ticket_text){ show("Isi dulu nomor laporannya.", true); return; }
+  if(!ticket_text){ window._alert("rcpt-alert", "error", "Belum ada nomor", "Isi dulu nomor laporannya, atau tekan Lewati."); document.getElementById("ticket").focus(); return; }
+  btn.disabled = true;
   const res = await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
     method: "POST",
     headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
     body: JSON.stringify({ticket_text})
   });
-  if(res.ok) location.reload(); else { const j=await res.json().catch(()=>({})); show((j.message||"Gagal menyimpan")+". Coba lagi.", true); }
+  if(res.ok){ location.reload(); return; }
+  btn.disabled = false;
+  const j = await res.json().catch(()=>({}));
+  window._alert("rcpt-alert", "error", "Belum tersimpan", (j.message || "Gagal menyimpan") + ". Pilihan Anda masih ada di layar — coba simpan lagi.");
 });
 </script>
 {% endif %}
@@ -45,6 +50,7 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
 <div class="card danger-zone">
   <h3>Hapus semua data kasus ini</h3>
   <p class="muted small">Foto, data, dan paket di kasus ini dihapus permanen dan tidak bisa dikembalikan. Lakukan ini kalau sudah selesai melapor dan tidak butuh arsipnya.</p>
+  <div id="purge-alert"></div>
   <form method="post" action="#" onsubmit="return purgeNow(event)">
     <button class="btn danger" type="submit">Hapus permanen</button>
   </form>
@@ -54,7 +60,9 @@ async function purgeNow(ev) {
   ev.preventDefault();
   if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
   const res = await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
-  if(res.ok) location.href = "/"; else { const j=await res.json().catch(()=>({})); alert((j.message||"Gagal menghapus")+". Coba lagi."); }
+  if(res.ok){ location.href = "/"; return false; }
+  const j = await res.json().catch(()=>({}));
+  window._alert("purge-alert", "error", "Belum terhapus", (j.message || "Gagal menghapus") + ". Coba lagi.");
   return false;
 }
 </script>

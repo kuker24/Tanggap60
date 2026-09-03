@@ -5,8 +5,8 @@
 {% block title %}Ketipu online? Susun buktinya di sini — SatuAman{% endblock %}
 {% block content %}
 <section class="land-hero">
-  <h1>Chat berantakan jadi paket siap lapor</h1>
-  <p class="lede">SatuAman merapikan foto, chat, dan link jadi satu paket (arsip ZIP) yang bisa Anda bawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
+  <h1>Bukti berantakan. Kami bantu tentukan apa yang harus dilakukan sekarang.</h1>
+  <p class="lede">Kirim bukti yang ada — foto, chat, atau link. SatuAman menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
   <form class="choices" method="post" action="/start" aria-label="Pilih kondisi">
     <input type="hidden" name="mode" value="DEMO">
     <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
@@ -53,21 +53,11 @@
   </div>
 </section>
 
-<section class="land-steps" aria-labelledby="steps-title">
-  <h2 id="steps-title">Empat langkah di dalam</h2>
-  <ol class="land-stepper">
-    <li><b>1</b> Bukti — kirim foto, cerita, atau link</li>
-    <li><b>2</b> Cek — kami baca isinya</li>
-    <li><b>3</b> Koreksi — Anda pastikan datanya benar</li>
-    <li><b>4</b> Paket — unduh dan bawa melapor</li>
-  </ol>
-</section>
-
 <section class="land-proof" aria-labelledby="proof-title">
   <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
   <ul class="land-proof-list">
     <li><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</li>
-    <li><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar.</li>
+    <li><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya — tidak menebak.</li>
     <li><b>Paket bisa dicek keasliannya.</b> Ada kode cek di dalamnya supaya isinya terbukti tidak berubah. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</li>
   </ul>
 </section>
@@ -89,6 +79,10 @@
   <details>
     <summary>Apa itu IASC?</summary>
     <p>IASC adalah kanal resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id — bukan di sini.</p>
+  </details>
+  <details>
+    <summary>Berapa lama data saya disimpan?</summary>
+    <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari halaman paket setelah selesai melapor.</p>
   </details>
 </section>
 

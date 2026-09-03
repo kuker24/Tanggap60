@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
 {% block title %}Koreksi data — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(3, "Langkah 3 dari 4: Koreksi") }}{% endblock %}
+{% block stepper %}{{ stepper(3, "Langkah 3 dari 4: Konfirmasi") }}{% endblock %}
 {% block content %}
 {% set ns = namespace(first=none, count=0) %}
 {% for fact in facts %}
@@ -26,7 +26,7 @@
   {% for conflict in blocking_conflicts %}
   <article class="card block">
     <h3>Ada yang tidak cocok</h3>
-    <p class="muted small">Pilih yang benar supaya paketnya akurat.</p>
+    <p class="muted small">Pilih yang benar supaya paketnya akurat. Kami tidak akan menebak.</p>
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
       <fieldset>
         <legend class="muted small">Pilih satu yang benar</legend>
@@ -45,16 +45,52 @@
 {% if pairing_units %}
   {% for unit in pairing_units %}
   <section class="pair-group" aria-labelledby="pair-{{ unit.unit_id }}-title">
-    <h3 id="pair-{{ unit.unit_id }}-title">Pasangkan yang nyambung</h3>
-    <p class="muted small">Kami menemukan rekening dan jumlah uang yang sepertinya satu transaksi. Pasangkan yang benar-benar nyambung. Kalau ragu, kosongkan saja dulu.</p>
-    <form class="stack" method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
+    <h3 id="pair-{{ unit.unit_id }}-title">Kami belum yakin — dan kami tidak akan menebak</h3>
+    <p class="muted small">Jawab satu pertanyaan dalam satu kartu. Kalau ragu, pilih “Tidak ada di pilihan ini” atau kosongkan.</p>
+    <form method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
       <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
       <input type="hidden" name="expected_version" value="{{ case.version }}">
       <input type="hidden" name="idempotency_key" value="{{ pairing_key }}-{{ unit.unit_id }}">
-      {% for row in unit.rows %}
+      {% if unit.dests %}
+      {% for dest in unit.dests %}
+      {% set i = loop.index0 %}
+      <input type="hidden" name="dest_id_{{ i }}" value="{{ dest.id }}">
+      <fieldset class="q">
+        <legend>Jumlah uang mana yang dikirim ke {{ dest.label }}?</legend>
+        <p class="q-hint">Sumber: {{ evidence_names.get(dest.src, "bukti Anda") }}</p>
+        {% for item in unit.amounts %}
+        <label class="radio">
+          <input type="radio" name="amount_for_{{ i }}" value="{{ item.id }}" required>
+          <span class="opt-body">{{ item.label }}<small>dari {{ evidence_names.get(item.src, "bukti Anda") }}</small></span>
+        </label>
+        {% endfor %}
+        <label class="radio none">
+          <input type="radio" name="amount_for_{{ i }}" value="">
+          <span class="opt-body">Tidak ada di pilihan ini<small>Kosongkan dulu, bisa dilengkapi nanti.</small></span>
+        </label>
+      </fieldset>
+      {% if unit.times %}
+      <fieldset class="q">
+        <legend>Kapan dikirim ke {{ dest.label }}?</legend>
+        <p class="q-hint">Satu jawaban saja.</p>
+        {% for item in unit.times %}
+        <label class="radio">
+          <input type="radio" name="time_for_{{ i }}" value="{{ item.id }}">
+          <span class="opt-body">{{ item.label }}<small>dari {{ evidence_names.get(item.src, "bukti Anda") }}</small></span>
+        </label>
+        {% endfor %}
+        <label class="radio none">
+          <input type="radio" name="time_for_{{ i }}" value="" checked>
+          <span class="opt-body">Saya tidak ingat pasti<small>Bisa dilengkapi nanti.</small></span>
+        </label>
+      </fieldset>
+      {% endif %}
+      {% endfor %}
+      {% else %}
+      {% for row in range(unit.amounts|length or 1) %}
       <article class="card pair-card">
-        <h3>Transaksi {{ row + 1 }} dari {{ unit.rows|length }}</h3>
-        <label for="dest-{{ unit.unit_id }}-{{ row }}">Rekening penerima (milik pelaku)</label>
+        <h3>Transaksi {{ row + 1 }}</h3>
+        <label for="dest-{{ unit.unit_id }}-{{ row }}">Rekening penerima</label>
         <select id="dest-{{ unit.unit_id }}-{{ row }}" name="destination_fact_id_{{ row }}">
           <option value="">Pilih…</option>
           {% for item in unit.dests %}
@@ -77,10 +113,33 @@
         </select>
       </article>
       {% endfor %}
-      <div class="actions"><button class="btn ember" type="submit">Simpan pasangan</button></div>
+      {% endif %}
+      <div class="sticky-cta"><button class="btn ember" type="submit">Simpan pasangan</button></div>
     </form>
   </section>
   {% endfor %}
+{% endif %}
+
+{% if summaries %}
+<section aria-labelledby="tx-done-title">
+  <h2 id="tx-done-title" class="muted small" style="margin-top:28px">Transaksi yang sudah jelas</h2>
+  {% for tx in summaries %}
+  <article class="tx" id="tx-{{ tx.unit_id }}">
+    <div class="tx-top">
+      <h3>Transaksi {{ tx.n }} ✓</h3>
+      {% if tx.status == "COMPLETE" %}
+      <span class="badge ok">Data lengkap</span>
+      {% else %}
+      <span class="badge info">Belum lengkap</span>
+      {% endif %}
+    </div>
+    {% if tx.amount %}<p class="tx-amount">{{ tx.amount }}</p>{% endif %}
+    {% if tx.dest %}<p class="tx-route">→ {{ tx.dest }}</p>{% endif %}
+    {% if tx.when %}<p class="tx-when">{{ tx.when }}</p>{% endif %}
+    {% if tx.src %}<p class="tx-when">dari {{ tx.src }}</p>{% endif %}
+  </article>
+  {% endfor %}
+</section>
 {% endif %}
 
 {% if not has_blocking %}
