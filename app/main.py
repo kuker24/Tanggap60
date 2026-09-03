@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
+from app.api.agent_router import agent_api
 from app.api.router import api
 from app.deps import AppContainer, build_container
 from app.domain.errors import AppError
@@ -65,6 +66,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
     app = FastAPI(title="SatuAman Tanggap60", version="2.0.0")
     app.state.container = container or build_container()
     app.include_router(api)
+    app.include_router(agent_api)
     app.include_router(web)
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
