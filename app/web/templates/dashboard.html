@@ -1,7 +1,10 @@
 {% extends "base.html" %}
+{% block body_mod %}is-void{% endblock %}
 {% block title %}SatuAman{% endblock %}
 {% block content %}
-<h1>Tidak ada yang perlu dilihat di sini</h1>
-<p class="lede">Kembali ke beranda untuk mulai.</p>
-<div class="row"><a class="btn ember" href="/">Ke beranda</a></div>
+<div class="empty">
+  <h3>Tidak ada yang perlu dilihat di sini</h3>
+  <p>Kembali ke beranda untuk mulai.</p>
+  <a class="btn ember" href="/">Ke beranda</a>
+</div>
 {% endblock %}

@@ -3,31 +3,31 @@
 <!-- impeccable:design-schema 1 -->
 
 ## World
-**Superwhisper aurora.** Midnight glass, gradien hitam→navy→ungu→lavender. Bukan walnut ORYZO, bukan kertas bone, bukan UI crypto.
+Dua permukaan. **Landing:** Motionsites AI Image Generator UI — kanvas putih, tiga kartu radial kuning–pink–ungu. **Kasus:** aurora wizard seperti layar Periksa — indigo bukan void Superwhisper, bukan walnut ORYZO.
 
 ## Palette
-- Canvas `#000000`, surface `#0f0f10` / `#1c1d1f` / `#001b33`
-- Teks `#ffffff`, muted `#888b91`
-- CTA putih isi, teks hitam. Sinyal `#0088ff` hanya ikon, link, ring fokus
-- OK `#27c93f`, danger `#e6714f`
+- Landing: canvas `#ffffff`, teks `#0f172a`, muted `#64748b`, kartu `#F4F8F9`, aksen `#F5C344` / `#F28482` / `#B567C2`
+- Kasus: canvas `#0c1224`, surface `#030719` / `#001b33`, teks `#ffffff`, muted `#888b91`
+- Kasus CTA putih isi, teks hitam. Sinyal `#0088ff` ikon, tautan, cincin. OK `#27c93f`, danger `#e6714f`
 
 ## Type
-- Inter 400/500/600. H1 32px tracking −1.2px, bukan uppercase paksa.
+- Inter 400/500/600. Landing H1 2.75rem tracking −0.02em. Kasus H1 32px tracking −1.2px.
 - Label 12px muted. Sentuh 44px.
 
 ## Materials
-- Kartu 24px, tombol 9px, nav pill. Tanpa bayangan.
-- Aurora hanya di beranda dan layar tunggu. PDF kop midnight+putih, tanpa aurora.
+- Landing kartu 20px, bayangan `0 10px 30px -10px`. Kasus kartu 24px, tombol 9px, tanpa bayangan.
+- Aurora penuh di semua layar kasus. PDF kop midnight+putih, tanpa aurora.
 
 ## Layout
-- Full-bleed midnight, isi max 40rem. Satu aksi primer putih penuh per layar. Sekunder charcoal. Skip tautan teks.
-- Coach: intake unggah→cerita→tautan→kirim. Tinjau satu fakta. Field tetap di DOM.
+- Landing max 1100px pada seksi fitur; hero/FAQ max 40rem. Dua form `POST /start`.
+- Kasus isi max 40rem. Stepper tengah: Bukti → Periksa → Tinjau → Paket. Satu aksi primer putih penuh. Skip tautan teks.
+- Coach: intake unggah→cerita→tautan→kirim. Tinjau satu fakta.
 
 ## Voice
-- Indonesia sederhana. CTA menamai aksi.
+- Indonesia sederhana. CTA menamai aksi. Tanpa copy generator gambar.
 
 ## Motion
-- Cincin wait: busur sinyal berputar linear (GPU). Aurora di void. `prefers-reduced-motion` mematikan gerak.
+- Kartu landing statis (sesuai bank). Kasus: cincin wait GPU 0.85s linear; stepper 180ms ease-out; `:active scale(0.97)`. `prefers-reduced-motion` mematikan gerak.
 
-## Surface — Operate
-Visitor finishes a task. Technical proof lives in the ZIP, not the UI.
+## Surface — Persuade + Operate
+Landing meyakinkan lalu memulai. Kasus menyelesaikan tugas. Bukti teknis di ZIP, bukan di UI.
