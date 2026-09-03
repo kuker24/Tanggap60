@@ -161,6 +161,10 @@ class InspectService:
         unauthorized_tool = False
         used_model = False
         model_total_ms = 0
+        seen: set[tuple[str, str, str]] = {
+            (f.type.value, f.normalized_value or f.raw_value, f.source_evidence_id)
+            for f in self.facts.list_for_case(case_id)
+        }
         for item in items:
             if not item.extracted_text_ref:
                 continue
@@ -201,6 +205,14 @@ class InspectService:
                         extra.locator = extra.locator or locator_for(extra.raw_value, 1, 0, min(len(extra.raw_value), 1), page.boxes)
                         candidates.append(extra)
                 for candidate in candidates:
+                    key = (
+                        candidate.type.value,
+                        candidate.normalized_value or candidate.raw_value,
+                        item.evidence_id,
+                    )
+                    if key in seen:
+                        continue
+                    seen.add(key)
                     fact = FactRecord(
                         fact_id=new_id("fact"),
                         case_id=case_id,

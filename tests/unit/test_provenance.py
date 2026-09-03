@@ -17,6 +17,18 @@ def test_pdf_amount_on_page_two() -> None:
     assert amounts[0].locator.startswith("p2:")
 
 
+def test_account_regex_skips_invoice_noise() -> None:
+    found = extract_candidates(
+        "Invoice INV-DEMO-20260903 tujuan DEMO-DEST-A id DEMO-A-09013 DEMO-001",
+        page=1,
+    )
+    accounts = [c.raw_value for c in found if c.type.value == "ACCOUNT"]
+    assert "DEMO-DEST-A" in accounts
+    assert "DEMO-A-09013" not in accounts
+    assert "DEMO-001" not in accounts
+    assert "DEMO-20260903" not in accounts
+
+
 def test_page_roundtrip_locator() -> None:
     from app.services.extraction import PageText
 

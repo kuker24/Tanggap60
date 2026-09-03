@@ -114,6 +114,7 @@
           box.innerHTML = '<span class="pulse" aria-hidden="true"></span>' + (STATES[state] || "Sedang berjalan. Halaman ini lanjut sendiri.");
         }
         if (waitKind === "pack" && (state === "HANDOFF_READY" || state === "RECEIPT_RECORDED")) location.reload();
+        else if (waitKind === "plan" && state === "REVIEW_REQUIRED") location.href = "/cases/" + caseId + "/review";
         else if (waitKind === "plan" && (state === "WAITING_APPROVAL" || state === "HANDOFF_READY")) location.reload();
         else if (state === "FAILED_SAFE") location.href = "/cases/" + caseId + "/review";
       } catch (_) {}

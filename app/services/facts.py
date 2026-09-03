@@ -8,7 +8,7 @@ from app.domain.policies import normalize_amount, sha256_text
 from app.services.extraction import locator_for
 
 AMOUNT_RE = re.compile(r"Rp\s?[\d.]+", re.IGNORECASE)
-ACCOUNT_RE = re.compile(r"\b(?:DEMO-[A-Z0-9-]+|\d{8,18})\b")
+ACCOUNT_RE = re.compile(r"\b(?:DEMO-(?:DEST|VICTIM)-[A-Z0-9-]+|\d{8,18})\b")
 MONTHS = (
     r"(?:January|February|March|April|May|June|July|August|September|October|November|December|"
     r"Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)"

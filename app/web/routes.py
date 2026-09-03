@@ -152,11 +152,16 @@ def review(case_id: str, request: Request):
     conflicts_pub = [conflict_public(c) for c in conflicts]
     blocking = [c for c in conflicts_pub if c["severity"] == "BLOCKING" and c["status"] == "OPEN"]
     blocking_ids = {fid for c in blocking for fid in c["fact_ids"]}
-    visible = [
-        f
-        for f in facts_pub
-        if f["review_status"] != "REJECTED" and (not blocking or f["fact_id"] not in blocking_ids)
-    ]
+    visible = []
+    seen_keys: set[tuple[str, str]] = set()
+    for f in facts_pub:
+        if f["review_status"] == "REJECTED" or (blocking and f["fact_id"] in blocking_ids):
+            continue
+        key = (str(f["type"]), str(f.get("normalized_value") or f["raw_value"]))
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        visible.append(f)
     return TEMPLATES.TemplateResponse(
         "review.html",
         {
@@ -234,6 +239,8 @@ def result(case_id: str, request: Request):
         if case.state == State.REVIEW_REQUIRED:
             _svc(request)["inspect"].validate_case_facts(case_id)
             case = CaseRepository(request.state.db).get(case_id)
+        if case.state == State.REVIEW_REQUIRED:
+            return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
         if case.state == State.READY_FOR_ACTION:
             from app.api.router import _kick_orchestrator
 

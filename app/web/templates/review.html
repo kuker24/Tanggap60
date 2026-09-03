@@ -61,7 +61,8 @@
 </div>
 
 <div class="row">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
+  <button class="btn ember" type="button" onclick="return confirmAll()">Semua benar</button>
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
 </div>
 {% endif %}
 
@@ -85,6 +86,28 @@ async function submitCorrect(id){
   if(!v){ toast("Isi nilai perbaikan"); return false; }
   const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
   if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
+  return false;
+}
+async function confirmAll(){
+  const res = await fetch(`/api/v1/cases/${CASE}/facts`);
+  const payload = await res.json().catch(()=>({}));
+  const facts = payload.facts || [];
+  let version = VERSION;
+  for (const fact of facts) {
+    if (fact.review_status !== "CANDIDATE") continue;
+    const ok = await fetch(`/api/v1/cases/${CASE}/facts/${fact.fact_id}`, {
+      method:"PATCH",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({action:"confirm", expected_version: version})
+    });
+    if (!ok.ok) {
+      const e = await ok.json().catch(()=>({}));
+      toast(e.message||e.detail||"Gagal menyimpan");
+      return false;
+    }
+    version += 1;
+  }
+  location.href = `/cases/${CASE}/result`;
   return false;
 }
 async function resolveConflict(ev, id){
