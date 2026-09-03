@@ -161,11 +161,27 @@ textarea{min-height:104px;resize:vertical}
 .empty p{margin:0 0 14px;color:var(--drift)}
 
 .foot{max-width:var(--max);margin:0 auto;padding:18px 20px 32px;border-top:1px solid var(--cork);color:var(--drift);font:500 12px/1.4 var(--sans);width:100%}
+body.is-void .top{background:transparent}
+body.is-void .top .stepper{border-bottom-color:transparent;justify-content:center}
+body.is-void .foot{border-top:0;text-align:center;position:relative;z-index:1}
 
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(12px);background:var(--bark);color:var(--cream);border:1px solid var(--cream);padding:10px 16px;border-radius:var(--radius-ghost);font:500 13px/1 var(--sans);opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:60}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 
-body.is-void .shell,.stage-void{min-height:calc(100dvh - 9.5rem);display:flex;flex-direction:column;justify-content:center;padding-bottom:12vh}
+body.is-void .shell,.stage-void{
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+}
+body.is-void .shell{flex:1;padding-top:24px;padding-bottom:24px}
+.stage-void{min-height:calc(100dvh - 9.5rem);width:100%}
+body.is-void .stage-void{min-height:0}
+body.is-void .shell h1,.stage-void h1,
+body.is-void .shell .lede,.stage-void .lede{margin-left:auto;margin-right:auto}
+body.is-void .status-line,.stage-void .status-line{justify-content:center}
+body.is-void .actions,.stage-void .actions{width:100%;max-width:22rem}
 .btn.wide{width:100%}
 .row.flush,.actions.flush{margin-top:0}
 .btn.stack-left{width:100%;justify-content:space-between;text-align:left;border-radius:var(--radius-ghost);height:auto;min-height:52px;padding:14px 16px;font:400 15px/1.35 var(--sans)}
@@ -178,7 +194,7 @@ body.is-void .shell,.stage-void{min-height:calc(100dvh - 9.5rem);display:flex;fl
   width:72px;
   height:72px;
   position:relative;
-  margin:0 0 32px;
+  margin:0 auto 28px;
   border-radius:50%;
   border:1.5px solid rgba(0,136,255,.2);
 }

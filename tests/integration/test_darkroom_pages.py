@@ -10,7 +10,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="dark"' in home.text
     assert 'content="#000000"' in home.text
-    assert "aurora-spin" in home.text
+    assert "aurora-center" in home.text
     assert "aurora" in home.text
     case_id = create_case(client)
     for path in (
@@ -36,6 +36,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert "choice-arrow" not in home.text
     processing = client.get(f"/cases/{case_id}/processing")
     assert "wait-ring" in processing.text
+    assert "is-void" in processing.text
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
     css = client.get("/static/app.css")

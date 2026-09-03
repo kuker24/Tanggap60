@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% block body_mod %}{% if not artifacts %}is-void{% endif %}{% endblock %}
 {% block title %}Paket — SatuAman{% endblock %}
 {% block stepper %}
 <nav class="stepper" aria-label="Langkah">
