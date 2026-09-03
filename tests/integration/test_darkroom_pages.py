@@ -10,7 +10,7 @@ def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="light"' in home.text
     assert 'content="#ffffff"' in home.text
-    assert "plain-id" in home.text
+    assert "step-pill" in home.text
     assert "is-landing" in home.text
     assert "c1-container" in home.text
     assert "c1-card" in home.text
