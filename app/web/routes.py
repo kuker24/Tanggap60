@@ -299,6 +299,25 @@ def approval_page(case_id: str, request: Request):
     )
 
 
+@web.post("/cases/{case_id}/approval")
+def submit_approval(
+    case_id: str,
+    request: Request,
+    snapshot_hash: str = Form(""),
+    accepted_notice: str = Form(""),
+):
+    from app.api.router import _kick_orchestrator
+    from app.domain.errors import AppError
+
+    notice = accepted_notice in {"1", "on", "true", "yes"}
+    try:
+        _svc(request)["approval"].approve(case_id, _sid(request), snapshot_hash, notice)
+    except AppError:
+        return RedirectResponse(f"/cases/{case_id}/approval", status_code=303)
+    _kick_orchestrator(request, case_id)
+    return RedirectResponse(f"/cases/{case_id}/artifacts", status_code=303)
+
+
 @web.get("/cases/{case_id}/artifacts")
 def artifacts_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))

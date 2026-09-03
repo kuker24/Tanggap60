@@ -18,35 +18,16 @@
   <div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a></div>
 </article>
 {% else %}
-<p class="lede">Paket dikunci setelah Anda setuju. Jika fakta berubah, Anda harus setujui lagi.</p>
-<label class="check">
-  <input id="notice" type="checkbox">
-  <span>Saya sudah meninjau fakta. Saya paham Tanggap60 tidak mengirim laporan.</span>
-</label>
-<div class="row">
-  <button class="btn ember" id="go" disabled>Buat paket</button>
-</div>
-<script>
-const box = document.getElementById("notice");
-const go = document.getElementById("go");
-function syncGo(){ go.disabled = !box.checked; }
-box.addEventListener("change", syncGo);
-box.addEventListener("click", () => setTimeout(syncGo, 0));
-go.addEventListener("click", async () => {
-  if (!box.checked) return;
-  go.disabled = true; go.textContent = "Membuat…";
-  const res = await fetch("/api/v1/cases/{{ case.case_id }}/approval", {
-    method: "POST",
-    headers: {"Content-Type": "application/json", "Idempotency-Key": "appr-{{ case.case_id }}-{{ case.version }}"},
-    body: JSON.stringify({snapshot_hash: "{{ snapshot_hash }}", accepted_notice: true})
-  });
-  if (res.ok) location.href = "/cases/{{ case.case_id }}/artifacts";
-  else {
-    const err = await res.json().catch(()=>({message:await res.text()}));
-    const t=document.getElementById("toast"); t.textContent=err.message || err.detail || "Gagal"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2500);
-    go.disabled = false; go.textContent = "Buat paket";
-  }
-});
-</script>
+<p class="lede">Setelah paket dibuat, mengubah fakta berarti Anda harus setujui lagi.</p>
+<form method="post" action="/cases/{{ case.case_id }}/approval">
+  <input type="hidden" name="snapshot_hash" value="{{ snapshot_hash }}">
+  <label class="check">
+    <input id="notice" name="accepted_notice" type="checkbox" value="1" required>
+    <span>Saya sudah meninjau fakta. Saya paham Tanggap60 tidak mengirim laporan.</span>
+  </label>
+  <div class="row">
+    <button class="btn ember" id="go" type="submit">Buat paket</button>
+  </div>
+</form>
 {% endif %}
 {% endblock %}
