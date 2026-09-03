@@ -5,14 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="{% block color_scheme %}dark{% endblock %}">
   <meta name="theme-color" content="{% block theme_color %}#0c1224{% endblock %}">
-  <meta name="description" content="SatuAman Tanggap60 — susun bukti jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.">
-  <title>{% block title %}SatuAman Tanggap60{% endblock %}</title>
+  <meta name="description" content="SatuAman — susun foto, chat, dan link jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.">
+  <title>{% block title %}SatuAman{% endblock %}</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
-  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
-  <link rel="icon" href="/static/icons/icon-32.png" sizes="32x32" type="image/png">
-  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
-  <link rel="manifest" href="/static/site.webmanifest">
-  <link rel="stylesheet" href="/static/app.css?v=dual-light">
+  <link rel="icon" href="/static/favicon.svg?v=plain-id" type="image/svg+xml">
+  <link rel="icon" href="/static/icons/icon-32.png?v=plain-id" sizes="32x32" type="image/png">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v=plain-id" sizes="180x180">
+  <link rel="manifest" href="/static/site.webmanifest?v=plain-id">
+  <link rel="stylesheet" href="/static/app.css?v=plain-id">
 </head>
 <body class="{% block body_mod %}{% endblock %}">
   <!--
@@ -27,15 +27,15 @@
   <header class="top">
     <div class="top-inner">
       <a href="/" class="brand" aria-label="SatuAman — beranda">
-        <img class="logomark" src="/static/favicon.svg" width="32" height="32" alt="">
+        <img class="logomark" src="/static/favicon.svg?v=plain-id" width="32" height="32" alt="">
         <span class="brand-copy">
           <strong>SatuAman</strong>
           <span class="sub">Tanggap60</span>
         </span>
       </a>
       {% if case is defined %}
-      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Unggahan ini dihapus permanen.')">
-        <button class="btn-text" type="submit">Kasus baru</button>
+      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai dari awal? Foto dan isian di halaman ini akan dihapus dan tidak bisa dikembalikan.')">
+        <button class="btn-text" type="submit">Mulai dari awal</button>
       </form>
       {% endif %}
     </div>
@@ -47,10 +47,10 @@
   </main>
 
   <footer class="foot">
-    <span>Kami tidak mengirim laporan ke bank atau polisi.</span>
+    <span>SatuAman hanya menyusun. Laporan dikirim oleh Anda ke bank, IASC, atau polisi.</span>
   </footer>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=dual-light"></script>
+  <script src="/static/app.js?v=plain-id"></script>
 </body>
 </html>

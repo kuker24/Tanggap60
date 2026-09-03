@@ -153,8 +153,26 @@ def intake(case_id: str, request: Request):
             "evidence": [evidence_public(e) for e in evidence],
             "can_delete_evidence": case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
             "summary": case_summary(request.state.db, case),
+            "notice": request.query_params.get("notice", ""),
+            "notice_text": request.query_params.get("notice_text", ""),
         },
     )
+
+
+_FILE_ERROR_TEXT = (
+    ("tipe berkas tidak diizinkan", "File itu tidak bisa dipakai. Pakai foto (JPG/PNG) atau PDF."),
+    ("PDF lebih dari 20 halaman", "PDF-nya kepanjangan (maks 20 halaman). Kirim halaman yang penting saja."),
+    ("gambar melebihi batas piksel", "Fotonya kegedean. Coba foto dengan resolusi lebih kecil."),
+    ("maksimal 8 berkas", "Kebanyakan. Maksimal 8 file — hapus dulu yang tidak perlu."),
+    ("melebihi 25 MB", "Kegedean. Total file maksimal 25 MB — coba foto yang lebih kecil."),
+)
+
+
+def _friendly_file_error(message: str) -> str:
+    for needle, text in _FILE_ERROR_TEXT:
+        if needle in message:
+            return text
+    return "File itu tidak bisa dipakai. Coba foto atau PDF lain."
 
 
 @web.post("/cases/{case_id}/intake")
@@ -162,17 +180,37 @@ async def intake_submit(case_id: str, request: Request):
     form = await request.form()
     intake = _svc(request)["intake"]
     files = form.getlist("files")
-    for upload in files:
-        if getattr(upload, "filename", None):
-            data = await upload.read()  # type: ignore[union-attr]
-            if data:
-                intake.upload_bytes(case_id, _sid(request), upload.filename, data)  # type: ignore[union-attr]
     text = str(form.get("text") or "").strip()
     url = str(form.get("url") or "").strip()
-    if text:
-        intake.add_text(case_id, _sid(request), text)
-    if url:
-        intake.add_url(case_id, _sid(request), url)
+    has_file = any(getattr(upload, "filename", None) for upload in files)
+    if not has_file and not text and not url:
+        return RedirectResponse(f"/cases/{case_id}/intake?notice=kosong", status_code=303)
+    try:
+        for upload in files:
+            if getattr(upload, "filename", None):
+                data = await upload.read()  # type: ignore[union-attr]
+                if data:
+                    intake.upload_bytes(case_id, _sid(request), upload.filename, data)  # type: ignore[union-attr]
+        if text:
+            intake.add_text(case_id, _sid(request), text)
+        if url:
+            intake.add_url(case_id, _sid(request), url)
+    except AppError as exc:
+        case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+        evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
+        return TEMPLATES.TemplateResponse(
+            "intake.html",
+            {
+                "request": request,
+                "case": case,
+                "evidence": [evidence_public(e) for e in evidence],
+                "can_delete_evidence": case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
+                "summary": case_summary(request.state.db, case),
+                "notice": "file-gagal",
+                "notice_text": _friendly_file_error(exc.message),
+            },
+            status_code=exc.http_status,
+        )
     return RedirectResponse(f"/cases/{case_id}/processing", status_code=303)
 
 
@@ -249,6 +287,7 @@ def review(case_id: str, request: Request):
             "conflicts": conflicts_pub,
             "has_blocking": bool(blocking),
             "pairing_units": [] if blocking else _pairing_cards(request.state.db, case_id),
+            "notice": request.query_params.get("notice", ""),
         },
     )
 
@@ -278,8 +317,8 @@ async def submit_pairing(case_id: str, unit_id: str, request: Request):
             {"target_evidence_id": evidence_id, "pairings": pairings, "reason": "tinjauan"},
         )
     except AppError:
-        pass
-    return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+        return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-gagal", status_code=303)
+    return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-ok", status_code=303)
 
 
 @web.get("/cases/{case_id}/readiness")
@@ -375,7 +414,7 @@ def approval_page(case_id: str, request: Request):
     ambiguous = any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in _case_units(request.state.db, case_id))
     return TEMPLATES.TemplateResponse(
         "approval.html",
-        {"request": request, "case": case, "snapshot_hash": digest, "blocking": blocking, "ambiguous": ambiguous},
+        {"request": request, "case": case, "snapshot_hash": digest, "blocking": blocking, "ambiguous": ambiguous, "notice": request.query_params.get("notice", "")},
     )
 
 
@@ -394,10 +433,10 @@ def submit_approval(
         _svc(request)["approval"].approve(case_id, _sid(request), snapshot_hash, notice)
     except ValidationFailed as exc:
         if "pasangan" in str(exc.message):
-            return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
-        return RedirectResponse(f"/cases/{case_id}/approval", status_code=303)
+            return RedirectResponse(f"/cases/{case_id}/review?notice=pairing-gagal", status_code=303)
+        return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
     except AppError:
-        return RedirectResponse(f"/cases/{case_id}/approval", status_code=303)
+        return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
     _kick_orchestrator(request, case_id)
     return RedirectResponse(f"/cases/{case_id}/artifacts", status_code=303)
 
@@ -438,4 +477,4 @@ def receipt_page(case_id: str, request: Request):
 
 @web.get("/demo/dashboard")
 def dashboard(request: Request):
-    return TEMPLATES.TemplateResponse("dashboard.html", {"request": request, "title": "Dashboard VPS"})
+    return RedirectResponse("/", status_code=303)

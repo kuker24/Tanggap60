@@ -21,10 +21,10 @@
   }
   const lede = document.getElementById("coach-lede");
   const LEDES = {
-    files: "Unggah bukti dulu. Foto chat atau transfer cukup.",
+    files: "Foto, cerita, atau link — satu saja cukup untuk mulai.",
     text: "Ceritakan singkat, atau lewati.",
-    url: "Punya tautan? Tempel di sini, atau lewati.",
-    submit: "Kirim. Kami baca buktinya.",
+    url: "Punya link? Tempel di sini, atau lewati.",
+    submit: "Kirim. Kami baca dulu isinya.",
   };
   function showCoach(names) {
     const steps = document.querySelectorAll(".coach-step");
@@ -84,11 +84,17 @@
     ["dragleave", "drop"].forEach((ev) =>
       drop.addEventListener(ev, (e) => {
         e.preventDefault();
-         if (ev === "drop" && e.dataTransfer) {
-           filesInput.files = e.dataTransfer.files;
-           renderFiles(filesInput.files);
-           if (filesInput.files && filesInput.files.length) showCoach(["text"]);
-         }
+        if (ev === "drop" && e.dataTransfer) {
+          try {
+            filesInput.files = e.dataTransfer.files;
+          } catch (_) {
+            window._toast("File tidak terbaca. Pakai tombol Pilih foto atau file.", true);
+            drop.classList.remove("drag");
+            return;
+          }
+          renderFiles(filesInput.files);
+          if (filesInput.files && filesInput.files.length) showCoach(["text"]);
+        }
         drop.classList.remove("drag");
       })
     );
@@ -106,7 +112,7 @@
       const hasFile = filesInput && filesInput.files && filesInput.files.length;
       if (!hasFile && !String(text).trim() && !String(url).trim()) {
         e.preventDefault();
-        window._toast("Masukkan berkas, cerita, atau tautan.");
+        window._toast("Isi dulu salah satu: foto, cerita, atau link.", true);
         return;
       }
       submitBtn.disabled = true;
@@ -118,41 +124,59 @@
     NEW: "Menyiapkan…",
     INGESTING: "Menerima bukti…",
     EXTRACTING: "Membaca bukti…",
-    REVIEW_REQUIRED: "Siap ditinjau",
+    REVIEW_REQUIRED: "Siap dicek",
     READY_FOR_ACTION: "Menyusun langkah…",
-    WAITING_APPROVAL: "Menunggu persetujuan…",
+    WAITING_APPROVAL: "Menunggu persetujuan Anda…",
     GENERATING: "Membuat paket…",
     VERIFYING: "Memeriksa paket…",
     HANDOFF_READY: "Paket siap",
-    FAILED_SAFE: "Tidak bisa dilanjutkan otomatis. Isi manual di tinjauan.",
+    FAILED_SAFE: "Perlu isi manual. Buka halaman koreksi.",
   };
+  const FALLBACK = "Masih berjalan. Tunggu di halaman ini — pindah sendiri.";
   const caseId = document.body.getAttribute("data-case");
   const page = document.body.getAttribute("data-page");
   const waitKind = document.body.getAttribute("data-wait");
+  let lastState = "";
   async function json(url, opts) {
     const headers = {};
     if (opts && opts.method && opts.method !== "GET") {
       headers["Idempotency-Key"] = "ui-" + caseId + "-" + (waitKind || "run");
     }
     const res = await fetch(url, Object.assign({ headers }, opts || {}));
+    if (!res.ok) throw new Error("http-" + res.status);
     return res.json();
+  }
+  function setLive(text) {
+    const box = document.getElementById("state-live");
+    if (!box || box.getAttribute("data-fixed") === "1") return;
+    if (box.textContent === text) return;
+    box.textContent = text;
+  }
+  function poll(fn, ms) {
+    let timer = 0;
+    const start = () => { if (!timer) timer = setInterval(() => { if (!document.hidden) fn(); }, ms); };
+    const stop = () => { if (timer) { clearInterval(timer); timer = 0; } };
+    document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else { fn(); start(); } });
+    fn();
+    start();
   }
   if (caseId && page === "processing") {
     async function tick() {
       try {
         const data = await json("/api/v1/cases/" + caseId);
         const state = data.state;
-        const box = document.getElementById("state-live");
-        if (box) box.textContent = STATES[state] || "Sedang berjalan. Halaman ini lanjut sendiri.";
-        if (state === "REVIEW_REQUIRED") location.href = "/cases/" + caseId + "/review";
+        if (state !== lastState) {
+          lastState = state;
+          setLive(STATES[state] || FALLBACK);
+        }
+        if (state === "REVIEW_REQUIRED" || state === "FAILED_SAFE") location.href = "/cases/" + caseId + "/review";
         else if (state === "WAITING_APPROVAL") location.href = "/cases/" + caseId + "/approval";
         else if (state === "HANDOFF_READY") location.href = "/cases/" + caseId + "/artifacts";
         else if (state === "RECEIPT_RECORDED") location.href = "/cases/" + caseId + "/receipt";
       } catch (_) {}
     }
-    json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).finally(function () {
-      tick();
-      setInterval(tick, 1500);
+    json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).catch(() => {}).finally(function () {
+      poll(tick, 1500);
     });
   }
   if (caseId && page === "wait") {
@@ -160,9 +184,17 @@
       try {
         const data = await json("/api/v1/cases/" + caseId);
         const state = data.state;
-        const box = document.getElementById("state-live");
-        if (box) {
-          box.innerHTML = '<span class="pulse" aria-hidden="true"></span>' + (STATES[state] || "Sedang berjalan. Halaman ini lanjut sendiri.");
+        if (state !== lastState) {
+          lastState = state;
+          const box = document.getElementById("state-live");
+          if (box && box.getAttribute("data-fixed") !== "1") {
+            box.innerHTML = "";
+            const dot = document.createElement("span");
+            dot.className = "pulse";
+            dot.setAttribute("aria-hidden", "true");
+            box.appendChild(dot);
+            box.appendChild(document.createTextNode(STATES[state] || FALLBACK));
+          }
         }
         if (waitKind === "pack" && (state === "HANDOFF_READY" || state === "RECEIPT_RECORDED")) location.reload();
         else if (waitKind === "plan" && state === "REVIEW_REQUIRED") location.href = "/cases/" + caseId + "/review";
@@ -170,17 +202,17 @@
         else if (state === "FAILED_SAFE") location.href = "/cases/" + caseId + "/review";
       } catch (_) {}
     }
-    json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).finally(function () {
-      tickWait();
-      setInterval(tickWait, 1500);
+    json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).catch(() => {}).finally(function () {
+      poll(tickWait, 1500);
     });
   }
 
-  window._toast = function (msg) {
+  window._toast = function (msg, isErr) {
     const t = document.getElementById("toast");
     if (!t) return;
     t.textContent = msg;
+    t.setAttribute("role", isErr ? "alert" : "status");
     t.classList.add("show");
-    setTimeout(() => t.classList.remove("show"), 2400);
+    setTimeout(() => t.classList.remove("show"), isErr ? 4000 : 2400);
   };
 })();

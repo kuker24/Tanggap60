@@ -10,12 +10,12 @@ def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="light"' in home.text
     assert 'content="#ffffff"' in home.text
-    assert "dual-light" in home.text
+    assert "plain-id" in home.text
     assert "is-landing" in home.text
     assert "c1-container" in home.text
     assert "c1-card" in home.text
-    assert "Sudah terjadi kerugian" in home.text
-    assert "Belum ada kerugian" in home.text
+    assert "Saya sudah kirim uang" in home.text
+    assert "Saya baru curiga, belum kirim uang" in home.text
     assert "choice-arrow" not in home.text
     assert "cheerful cartoon" not in home.text
     case_id = create_case(client)
@@ -39,7 +39,7 @@ def test_landing_is_light_and_case_is_aurora(client: TestClient) -> None:
     assert 'id="text"' in intake.text
     assert 'id="url"' in intake.text
     assert "coach-step" in intake.text
-    assert "Pilih berkas" in intake.text
+    assert "Pilih foto atau file" in intake.text
     processing = client.get(f"/cases/{case_id}/processing")
     assert "wait-ring" in processing.text
     assert "is-void" in processing.text

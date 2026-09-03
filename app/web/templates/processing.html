@@ -1,25 +1,30 @@
 {% extends "base.html" %}
 {% block body_mod %}is-void{% endblock %}
-{% block title %}Memeriksa — SatuAman{% endblock %}
+{% block title %}Kami baca buktinya — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step active"><i>2</i> Periksa</span>
-  <span class="step"><i>3</i> Tinjau</span>
-  <span class="step"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 2 dari 4: Cek">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">2</i> Cek</span>
+    <span role="listitem" class="step"><i aria-hidden="true">3</i> Koreksi</span>
+    <span role="listitem" class="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
 {% if case.state.value not in ["FAILED_SAFE", "REVIEW_REQUIRED"] %}
 <div class="wait-ring" aria-hidden="true"></div>
 {% endif %}
-<h1>Memeriksa bukti Anda</h1>
-<p class="lede status-line" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}<span class="pulse" aria-hidden="true"></span>Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
+<h1>Kami lagi baca bukti Anda</h1>
+<p class="lede status-line" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Ada yang perlu Anda putuskan sendiri, jadi tidak bisa lanjut otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Biasanya 1–2 menit. Tunggu di halaman ini — pindah sendiri kalau sudah selesai.{% endif %}</p>
 {% if case.state.value == "FAILED_SAFE" %}
-<div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual</a></div>
+<div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual (cuma sebentar)</a></div>
 {% elif case.state.value == "REVIEW_REQUIRED" %}
 <script>location.replace("/cases/{{ case.case_id }}/review");</script>
 {% endif %}
+<noscript>
+  <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/review">Buka halaman koreksi manual</a></p>
+</noscript>
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "processing");

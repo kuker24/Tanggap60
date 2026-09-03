@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Ada yang macet — SatuAman{% endblock %}
+{% block content %}
+<div class="empty">
+  <h1>{{ title }}</h1>
+  <p class="lede">{{ message }}</p>
+  <div class="actions">
+    <a class="btn ember" href="{{ cta_url }}">{{ cta_label }}</a>
+    {% if secondary_url %}
+    <a class="btn-text" href="{{ secondary_url }}">{{ secondary_label }}</a>
+    {% endif %}
+  </div>
+  {% if request_id %}
+  <p class="muted small">Kode: {{ request_id }}</p>
+  {% endif %}
+</div>
+{% endblock %}

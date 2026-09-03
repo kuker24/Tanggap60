@@ -1,20 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Kelengkapan — SatuAman{% endblock %}
+{% block title %}Cek kelengkapan — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step done"><i>✓</i> Periksa</span>
-  <span class="step active"><i>3</i> Tinjau</span>
-  <span class="step"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 3 dari 4: Koreksi">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">3</i> Koreksi</span>
+    <span role="listitem" class="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
 {% if gaps %}
-<h1>Masih ada yang kurang</h1>
-<p class="lede">Lengkapi dulu. Anda yang membawa paket ke kanal resmi.</p>
+<h1>Sedikit lagi</h1>
+<p class="lede">Ini yang kurang supaya paketnya kuat. Anda yang bawa paketnya ke situs resmi.</p>
 {% else %}
-<h1>Siap lanjut</h1>
-<p class="lede">Anda yang membawa paket ke kanal resmi.</p>
+<h1>Sudah lengkap</h1>
+<p class="lede">Paket Anda siap disusun. Anda yang bawa ke situs resmi.</p>
 {% endif %}
 
 {% if next_view %}
@@ -34,8 +36,9 @@
 
 <div class="actions">
   {% if gaps %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Lengkapi di tinjauan</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/result">Lanjut saja ›</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Lengkapi dulu</a>
+  <p class="muted small">Kalau lanjut tanpa melengkapi, paket tetap dibuat tapi bisa kurang kuat di bank atau polisi.</p>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/result">Lanjut tanpa melengkapi ›</a>
   {% else %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/result">Lanjut</a>
   {% endif %}

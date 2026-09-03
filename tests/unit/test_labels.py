@@ -2,7 +2,7 @@ from app.web.labels import human, soften
 
 
 def test_human_fact() -> None:
-    assert human("AMOUNT", "fact") == "Nominal"
+    assert human("AMOUNT", "fact") == "Jumlah uang (Rp)"
 
 
 def test_soften_strips_unit_id_and_pjp() -> None:

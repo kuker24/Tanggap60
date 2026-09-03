@@ -1,21 +1,23 @@
 {% extends "base.html" %}
 {% block body_mod %}{% if not artifacts %}is-void{% endif %}{% endblock %}
-{% block title %}Paket — SatuAman{% endblock %}
+{% block title %}Paket siap — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step done"><i>✓</i> Periksa</span>
-  <span class="step done"><i>✓</i> Tinjau</span>
-  <span class="step active"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 4 dari 4: Paket">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Koreksi</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
 {% if artifacts %}
 <h1>Paket siap dibawa</h1>
-<p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
+<p class="lede">Ini arsip untuk Anda, bukan surat resmi. Unduh, lalu bawa ke situs resmi.</p>
 <div class="pack-plate object">
   <div class="actions flush">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
+    <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh paket (ZIP)</a>
   </div>
   <ul class="file-list pack">
     {% for a in artifacts if a.downloadable %}
@@ -27,19 +29,22 @@
   </ul>
 </div>
 <div class="card">
-  <h3>Bawa ke situs resmi</h3>
-  <p class="muted small">Isi identitas di portal mereka, bukan di sini.</p>
+  <h3>Lapor ke situs resmi</h3>
+  <p class="muted small">Isi data diri di situs mereka, bukan di sini. Mulai dari IASC — kanal resmi OJK untuk melapor penipuan ({{ domain }}). File yang dikasih ke petugas: yang judulnya “Untuk bank”, “Untuk IASC”, atau “Untuk polisi”.</p>
   <div class="actions">
-    <a class="btn ghost" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka IASC</a>
-    <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor tiket ›</a>
+    <a class="btn ghost" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC</a>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan ›</a>
   </div>
 </div>
 {% else %}
 <div class="stage-void">
 <div class="wait-ring" aria-hidden="true"></div>
 <h1>Membuat paket</h1>
-<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Tunggu sebentar. Halaman ini lanjut sendiri.</p>
+<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Sebentar, biasanya 1–2 menit. Halaman pindah sendiri.</p>
 </div>
+<noscript>
+  <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/artifacts">Muat ulang halaman ini</a> setelah 1–2 menit.</p>
+</noscript>
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "wait");

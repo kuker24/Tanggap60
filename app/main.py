@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -16,10 +17,47 @@ from app.infrastructure.jobs import JobQueue
 from app.infrastructure.logging import configure_logging
 from app.infrastructure.resources import available_ram_mb, cpu_percent, free_disk_mb, process_rss_mb
 from app.session import COOKIE, error_body, get_session_id, set_session_cookie
-from app.web.routes import web
+from app.web.routes import TEMPLATES, _friendly_file_error, web
 
 LOGGER = configure_logging("tanggap60-web")
 STATIC_DIR = Path(__file__).parent / "web" / "static"
+
+_CASE_RE = re.compile(r"/cases/([A-Za-z0-9-]+)/")
+
+
+def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict | None:
+    accept = request.headers.get("accept", "")
+    if "text/html" not in accept or str(request.url.path).startswith("/api/"):
+        return None
+    path = str(request.url.path)
+    case_id = (_CASE_RE.search(path) or [None, None])[1]
+    if exc.code in {"CASE_EXPIRED", "NOT_FOUND", "FORBIDDEN"}:
+        return {
+            "title": "Sesi ini sudah berakhir",
+            "message": "Kasus tidak ditemukan atau waktunya habis. Mulai lagi dari beranda — cepat dan tidak dipungut biaya.",
+            "cta_url": "/",
+            "cta_label": "Mulai dari beranda",
+            "secondary_url": None,
+            "secondary_label": "",
+        }
+    if exc.code in {"INVALID_FILE_TYPE", "UPLOAD_LIMIT_EXCEEDED", "EVIDENCE_PARSE_FAILED"}:
+        ctx = {
+            "title": "File-nya bermasalah",
+            "message": _friendly_file_error(exc.message),
+            "cta_url": f"/cases/{case_id}/intake" if case_id else "/",
+            "cta_label": "Kembali tambah bukti" if case_id else "Mulai dari beranda",
+            "secondary_url": "/",
+            "secondary_label": "Ke beranda",
+        }
+        return ctx
+    return {
+        "title": "Ada yang macet",
+        "message": "Coba muat ulang halaman ini. Kalau masih macet, mulai dari beranda.",
+        "cta_url": path,
+        "cta_label": "Muat ulang",
+        "secondary_url": "/",
+        "secondary_label": "Ke beranda",
+    }
 
 
 def create_app(container: AppContainer | None = None) -> FastAPI:
@@ -42,10 +80,18 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             db.commit()
         except AppError as exc:
             db.rollback()
-            response = JSONResponse(
-                status_code=exc.http_status,
-                content=error_body(exc.code, exc.message, exc.recoverable, request_id),
-            )
+            page = _web_error_context(request, exc, request_id)
+            if page is None:
+                response = JSONResponse(
+                    status_code=exc.http_status,
+                    content=error_body(exc.code, exc.message, exc.recoverable, request_id),
+                )
+            else:
+                response = TEMPLATES.TemplateResponse(
+                    "error.html",
+                    {"request": request, "request_id": request_id, **page},
+                    status_code=exc.http_status,
+                )
         except Exception:
             db.rollback()
             LOGGER.exception("unhandled", extra={"request_id": request_id})

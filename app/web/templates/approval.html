@@ -1,39 +1,53 @@
 {% extends "base.html" %}
-{% block title %}Setujui paket — SatuAman{% endblock %}
+{% block title %}Buat paket — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step done"><i>✓</i> Periksa</span>
-  <span class="step done"><i>✓</i> Tinjau</span>
-  <span class="step active"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 4 dari 4: Paket">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Koreksi</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
 <h1>Buat paket?</h1>
 
+{% if notice == "coba-lagi" %}
+<p class="notice warn" role="alert">Belum berhasil dibuat. Coba sekali lagi.</p>
+{% endif %}
+
 {% if blocking %}
 <article class="card block">
-  <h3>Tertahan</h3>
-  <p class="muted small">Ada data yang bertentangan. Pilih nilai yang benar dulu.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a></div>
+  <h3>Masih ada yang bentrok</h3>
+  <p class="muted small">Pilih dulu yang benar di halaman koreksi, baru paket bisa dibuat.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Ke halaman koreksi</a></div>
 </article>
 {% elif ambiguous %}
 <article class="card block">
-  <h3>Belum bisa membuat paket</h3>
-  <p class="muted small">Kami menemukan beberapa kemungkinan transaksi dan tidak akan menebak pasangannya.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pilih pasangan</a></div>
+  <h3>Belum bisa dibuat</h3>
+  <p class="muted small">Ada transaksi yang belum terpasang. Pasangkan dulu supaya isinya tidak salah.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pasangkan sekarang</a></div>
 </article>
 {% else %}
-<p class="lede">Setelah paket dibuat, mengubah fakta berarti Anda harus setujui lagi.</p>
-<form method="post" action="/cases/{{ case.case_id }}/approval">
+<p class="lede">Paket berisi foto, ringkasan data, dan kode cek keaslian. Kalau nanti ada yang diubah, Anda setujui ulang.</p>
+<form method="post" action="/cases/{{ case.case_id }}/approval" id="approval-form">
   <input type="hidden" name="snapshot_hash" value="{{ snapshot_hash }}">
   <label class="check">
     <input id="notice" name="accepted_notice" type="checkbox" value="1" required>
-    <span>Saya sudah meninjau fakta. Saya paham Tanggap60 tidak mengirim laporan.</span>
+    <span>Saya sudah cek isinya. Saya paham SatuAman tidak mengirim laporan.</span>
   </label>
   <div class="actions">
     <button class="btn ember" id="go" type="submit">Buat paket</button>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/review">‹ Koreksi lagi</a>
   </div>
 </form>
+<script>
+document.getElementById("approval-form").addEventListener("submit", function(){
+  const b = document.getElementById("go");
+  b.disabled = true;
+  b.textContent = "Membuat…";
+});
+</script>
 {% endif %}
 {% endblock %}

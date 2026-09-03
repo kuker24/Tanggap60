@@ -2,20 +2,20 @@
 {% block body_mod %}is-landing{% endblock %}
 {% block color_scheme %}light{% endblock %}
 {% block theme_color %}#ffffff{% endblock %}
-{% block title %}Ada yang mencurigakan? — SatuAman{% endblock %}
+{% block title %}Ketipu online? Susun buktinya di sini — SatuAman{% endblock %}
 {% block content %}
 <section class="land-hero">
-  <h1>Bukti berantakan jadi paket siap Anda bawa</h1>
-  <p class="lede">Kami susun chat, transfer, dan tautan menjadi paket untuk bank, IASC, atau polisi. Kami tidak mengirim laporan.</p>
+  <h1>Chat berantakan jadi paket siap lapor</h1>
+  <p class="lede">SatuAman merapikan foto, chat, dan link jadi satu paket (arsip ZIP) yang bisa Anda bawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
   <form class="choices" method="post" action="/start" aria-label="Pilih kondisi">
     <input type="hidden" name="mode" value="DEMO">
     <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-      <b>Sudah terjadi kerugian</b>
-      <span class="desc">Unggah bukti. Kami susun agar siap Anda bawa.</span>
+      <b>Saya sudah kirim uang</b>
+      <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
     </button>
     <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-      <b>Belum ada kerugian</b>
-      <span class="desc">Cek dulu. Bukan putusan aman atau tidak aman.</span>
+      <b>Saya baru curiga, belum kirim uang</b>
+      <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
     </button>
   </form>
 </section>
@@ -24,67 +24,71 @@
   <div class="c1-container">
     <p class="c1-badge">Cara kerja</p>
     <h2 class="c1-title" id="c1-title">Dari bukti ke paket, tiga langkah ini</h2>
-    <p class="c1-subtitle">Yang Anda unggah tetap milik Anda.<br>Keputusan resmi di lembaga berwenang.</p>
+    <p class="c1-subtitle">Yang Anda kirim tetap milik Anda.<br>Keputusan resmi tetap di bank, IASC, atau polisi.</p>
     <div class="c1-grid">
       <article class="c1-card c1-card-1">
         <div class="c1-prompt">
-          Foto transfer <span class="c1-blur-text">Rp2.750.000 ke BCA</span> tadi pagi, lalu <span class="c1-blur-text">penjual hilang</span>. Chat dan struk cukup.
+          Transfer <span class="c1-blur-text">Rp2.750.000 ke BCA</span> tadi pagi, lalu <span class="c1-blur-text">penjual hilang</span>. Foto chat dan struk saja cukup.
         </div>
         <span class="c1-add" aria-hidden="true"><span class="c1-spark">✦</span> Tambah detail</span>
         <svg class="c1-cursor" width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 2L20 11L11 13L9 22L4 2Z" fill="#0f172a" stroke="#fff" stroke-width="1"/></svg>
-        <h3>Unggah bukti</h3>
+        <h3>1. Kirim bukti</h3>
       </article>
       <article class="c1-card c1-card-2">
         <div class="c1-api-visual">
-          <img class="c1-network-img" src="/static/landing/network.svg" width="480" height="180" alt="">
+          <img class="c1-network-img" src="/static/landing/network.svg?v=plain-id" width="480" height="180" alt="">
         </div>
-        <h3>Periksa fakta</h3>
+        <h3>2. Kami baca isinya</h3>
       </article>
       <article class="c1-card c1-card-3">
         <div class="c1-mesh" aria-hidden="true"></div>
-        <img class="c1-folder" src="/static/landing/library.svg" width="170" height="124" alt="">
+        <img class="c1-folder" src="/static/landing/library.svg?v=plain-id" width="170" height="124" alt="">
         <span class="c1-search" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#64748b" stroke-width="2" stroke-linecap="round"/><path d="M21 21L16.65 16.65" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Manifest SHA-256
+          Kode cek keaslian
         </span>
-        <h3>Paket siap dibawa</h3>
+        <h3>3. Paket siap dibawa</h3>
       </article>
     </div>
   </div>
 </section>
 
 <section class="land-steps" aria-labelledby="steps-title">
-  <h2 id="steps-title">Empat langkah di dalam kasus</h2>
+  <h2 id="steps-title">Empat langkah di dalam</h2>
   <ol class="land-stepper">
-    <li><b>1</b> Bukti</li>
-    <li><b>2</b> Periksa</li>
-    <li><b>3</b> Tinjau</li>
-    <li><b>4</b> Paket</li>
+    <li><b>1</b> Bukti — kirim foto, cerita, atau link</li>
+    <li><b>2</b> Cek — kami baca isinya</li>
+    <li><b>3</b> Koreksi — Anda pastikan datanya benar</li>
+    <li><b>4</b> Paket — unduh dan bawa melapor</li>
   </ol>
 </section>
 
 <section class="land-proof" aria-labelledby="proof-title">
-  <h2 id="proof-title">Yang kami jamin, dan yang tidak</h2>
+  <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
   <ul class="land-proof-list">
-    <li><b>Tidak mengirim laporan.</b> Anda yang membawa paket ke portal resmi.</li>
-    <li><b>Setiap klaim punya sumber.</b> Fakta yang bentrok ditahan sebelum paket dibuat.</li>
-    <li><b>Paket bisa diverifikasi.</b> ZIP dengan manifest SHA-256. Status resmi tetap tidak terverifikasi.</li>
+    <li><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</li>
+    <li><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar.</li>
+    <li><b>Paket bisa dicek keasliannya.</b> Ada kode cek di dalamnya supaya isinya terbukti tidak berubah. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</li>
   </ul>
 </section>
 
 <section class="land-faq" aria-labelledby="faq-title">
   <h2 id="faq-title">Pertanyaan yang sering muncul</h2>
   <details>
-    <summary>Apakah laporan terkirim otomatis ke bank atau polisi?</summary>
-    <p>Tidak. SatuAman hanya menyusun draf. Pengiriman dilakukan oleh Anda di situs resmi.</p>
+    <summary>Apakah laporan saya langsung terkirim ke bank atau polisi?</summary>
+    <p>Tidak. SatuAman hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
   </details>
   <details>
-    <summary>Apakah dana dijamin kembali?</summary>
-    <p>Tidak. Tidak ada jaminan dana kembali. Keputusan ada di lembaga berwenang.</p>
+    <summary>Apakah uang saya pasti kembali?</summary>
+    <p>Tidak ada yang bisa memastikan itu. Yang bisa kami bantu: bukti Anda rapi sehingga mudah diproses bank atau polisi.</p>
   </details>
   <details>
     <summary>Apa isi paketnya?</summary>
-    <p>Berkas ZIP berisi bukti, ringkasan fakta, dan manifest SHA-256 agar isi bisa dicek.</p>
+    <p>Arsip ZIP berisi foto dan cerita Anda, ringkasan datanya, dan kode cek keaslian supaya isinya terbukti tidak berubah. Cara bukanya sama seperti file ZIP biasa.</p>
+  </details>
+  <details>
+    <summary>Apa itu IASC?</summary>
+    <p>IASC adalah kanal resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id — bukan di sini.</p>
   </details>
 </section>
 
@@ -93,12 +97,12 @@
   <form class="choices" method="post" action="/start" aria-label="Mulai kasus">
     <input type="hidden" name="mode" value="DEMO">
     <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-      <b>Sudah terjadi kerugian</b>
-      <span class="desc">Unggah bukti. Kami susun agar siap Anda bawa.</span>
+      <b>Saya sudah kirim uang</b>
+      <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
     </button>
     <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-      <b>Belum ada kerugian</b>
-      <span class="desc">Cek dulu. Bukan putusan aman atau tidak aman.</span>
+      <b>Saya baru curiga, belum kirim uang</b>
+      <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
     </button>
   </form>
 </section>

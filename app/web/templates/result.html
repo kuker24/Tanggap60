@@ -1,32 +1,40 @@
 {% extends "base.html" %}
 {% block body_mod %}{% if not actions %}is-void{% endif %}{% endblock %}
-{% block title %}Rencana — SatuAman{% endblock %}
+{% block title %}Langkah lapor — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step done"><i>✓</i> Periksa</span>
-  <span class="step done"><i>✓</i> Tinjau</span>
-  <span class="step active"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 4 dari 4: Paket">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Koreksi</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
 {% if actions %}
-<h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lakukan dengan urutan ini{% endif %}</h1>
-<p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini indikator, bukan putusan. Cek lewat kanal resmi.{% else %}Semakin cepat melapor bisa membantu. Tidak ada jaminan dana kembali.{% endif %}</p>
+<h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lapor dengan urutan ini{% endif %}</h1>
+<p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini petunjuk awal, bukan vonis. Pastikan lewat situs resmi.{% else %}Semakin cepat melapor, semakin besar peluang dibantu. Tidak ada yang bisa memastikan uang kembali.{% endif %}</p>
 <ol class="plan">
   {% for action in actions %}
   <li>{{ action.instruction }}</li>
   {% endfor %}
 </ol>
+{% if case.route.value != "PRE_INCIDENT_CHECK" %}
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui paket</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paketnya</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
 </div>
+{% endif %}
 {% else %}
 <div class="stage-void">
 <div class="wait-ring" aria-hidden="true"></div>
 <h1>Menyusun langkah</h1>
-<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Halaman ini lanjut sendiri.</p>
+<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Biasanya 1–2 menit. Halaman pindah sendiri.</p>
 </div>
+<noscript>
+  <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/result">Muat ulang halaman ini</a> setelah 1–2 menit.</p>
+</noscript>
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "wait");
@@ -34,25 +42,36 @@
 </script>
 {% endif %}
 
-{% if case.route.value == "PRE_INCIDENT_CHECK" %}
-<div class="card">
-  <h3>Keputusan Anda</h3>
-  <p class="muted small">Pilih satu. Tidak ada default.</p>
+{% if case.route.value == "PRE_INCIDENT_CHECK" and actions %}
+<div class="card" id="decision-card">
+  <h3>Pilihan Anda</h3>
+  <p class="muted small">Pilih satu. Tidak ada jawaban yang salah.</p>
   <form class="actions" id="decision">
-    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kanal resmi</button>
-    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Batalkan ›</button>
+    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Saya cek ke situs resmi</button>
+    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Tidak jadi, batalkan ›</button>
     <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Saya lanjut sendiri ›</button>
   </form>
+  <div id="decision-next" class="notice" role="status" hidden></div>
 </div>
 <script>
-document.getElementById("decision").addEventListener("click", async (ev) => {
-  const btn = ev.target.closest("[data-d]");
-  if (!btn) return;
-  const d = btn.getAttribute("data-d");
-  ev.preventDefault();
-  const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
-  if(res.ok){ btn.textContent = "Tercatat"; } else { const j=await res.json().catch(()=>({})); const t=document.getElementById("toast"); t.textContent=j.message||"Gagal"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
-});
+(function(){
+  const NEXT = {
+    VERIFY_VIA_OFFICIAL_CHANNEL: "Bagus. Buka situs resmi IASC (iasc.ojk.go.id) dan masukkan datanya di sana. Jangan klik link dari chat yang mencurigakan.",
+    CANCELLED_ACTION: "Oke, tidak ada langkah lanjutan. Mulai lagi kapan saja dari beranda kalau perlu.",
+    PROCEED_BY_USER: "Hati-hati. Jangan transfer dulu sebelum yakin. Kalau nanti ada bukti baru, mulai dari beranda."
+  };
+  document.getElementById("decision").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("[data-d]");
+    if (!btn || btn.disabled) return;
+    const d = btn.getAttribute("data-d");
+    ev.preventDefault();
+    btn.disabled = true;
+    const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
+    const box = document.getElementById("decision-next");
+    if(res.ok){ btn.textContent = "Tercatat ✓"; box.textContent = NEXT[d] || "Tercatat."; box.hidden = false; }
+    else { const j=await res.json().catch(()=>({})); const t=document.getElementById("toast"); t.textContent=(j.message||"Gagal menyimpan")+". Coba lagi."; t.setAttribute("role","alert"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),4000); btn.disabled = false; }
+  });
+})();
 </script>
 {% endif %}
 {% endblock %}

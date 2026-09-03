@@ -1,11 +1,13 @@
 {% extends "base.html" %}
-{% block title %}Tinjau fakta — SatuAman{% endblock %}
+{% block title %}Koreksi data — SatuAman{% endblock %}
 {% block stepper %}
-<nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Bukti</span>
-  <span class="step done"><i>✓</i> Periksa</span>
-  <span class="step active"><i>3</i> Tinjau</span>
-  <span class="step"><i>4</i> Paket</span>
+<nav class="stepper" aria-label="Langkah 3 dari 4: Koreksi">
+  <span role="list">
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">3</i> Koreksi</span>
+    <span role="listitem" class="step"><i aria-hidden="true">4</i> Paket</span>
+  </span>
 </nav>
 {% endblock %}
 {% block content %}
@@ -16,22 +18,31 @@
     {% if ns.first is none %}{% set ns.first = fact.fact_id %}{% endif %}
   {% endif %}
 {% endfor %}
-<h1>Periksa fakta ini</h1>
-<p class="lede" id="coach-lede">{% if has_blocking %}Pilih nilai yang benar.{% elif ns.count %}Fakta 1 dari {{ ns.count }}. Apakah ini benar?{% else %}Jika salah, betulkan.{% endif %}</p>
+<h1>Pastikan datanya benar</h1>
+<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Data 1 dari {{ ns.count }}. Ini benar?{% else %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% endif %}</p>
+
+{% if notice == "pairing-ok" %}
+<p class="notice ok" role="status">Pasangan tersimpan. Lanjut ke data berikutnya.</p>
+{% elif notice == "pairing-gagal" %}
+<p class="notice warn" role="alert">Belum tersimpan. Pasangkan dulu rekening dan jumlah uangnya, lalu tekan Simpan pasangan.</p>
+{% endif %}
 
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
 {% if blocking_conflicts %}
   {% for conflict in blocking_conflicts %}
   <article class="card block">
-    <h3>Ada data yang bertentangan</h3>
-    <p class="muted small">Pilih yang benar sebelum lanjut.</p>
+    <h3>Ada yang tidak cocok</h3>
+    <p class="muted small">Pilih yang benar supaya paketnya akurat.</p>
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
-      {% for fid in conflict.fact_ids %}
-      {% set fact = facts_by_id.get(fid) %}
-      <button class="btn ghost stack-left" name="resolution_fact_id" value="{{ fid }}">
-        <span><b>Gunakan {{ fact.raw_value if fact else "nilai ini" }}</b><br><span class="muted small">{{ evidence_names.get(fact.source_evidence_id, "bukti") if fact else "bukti" }}</span></span>
-      </button>
-      {% endfor %}
+      <fieldset>
+        <legend class="muted small">Pilih satu yang benar</legend>
+        {% for fid in conflict.fact_ids %}
+        {% set fact = facts_by_id.get(fid) %}
+        <button class="btn ghost stack-left" name="resolution_fact_id" value="{{ fid }}">
+          <span><b>Pakai {{ fact.raw_value if fact else "yang ini" }}</b><br><span class="muted small">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") if fact else "bukti" }}</span></span>
+        </button>
+        {% endfor %}
+      </fieldset>
     </form>
   </article>
   {% endfor %}
@@ -40,36 +51,39 @@
 {% if pairing_units %}
   {% for unit in pairing_units %}
   <article class="card block">
-    <h3>Belum bisa membuat paket laporan</h3>
-    <p class="muted small">Kami menemukan beberapa kemungkinan transaksi dan tidak akan menebak pasangannya. Pilih yang benar.</p>
+    <h3>Satu transaksi, infonya kepisah — pasangkan</h3>
+    <p class="muted small">Kami menemukan rekening dan jumlah uang yang sepertinya satu transaksi. Pasangkan yang benar-benar nyambung. Kalau ragu, kosongkan saja dulu.</p>
     <form class="stack" method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
       <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
-      {% for row in unit.rows %}
-      <div class="pair-row">
-        <p class="muted small">Pasangan {{ row + 1 }}</p>
-        <label for="dest-{{ unit.unit_id }}-{{ row }}">Rekening tujuan</label>
-        <select id="dest-{{ unit.unit_id }}-{{ row }}" name="destination_fact_id_{{ row }}">
-          <option value="">—</option>
-          {% for item in unit.dests %}
-          <option value="{{ item.id }}">{{ item.label }}</option>
-          {% endfor %}
-        </select>
-        <label for="amt-{{ unit.unit_id }}-{{ row }}">Nominal</label>
-        <select id="amt-{{ unit.unit_id }}-{{ row }}" name="amount_fact_id_{{ row }}">
-          <option value="">—</option>
-          {% for item in unit.amounts %}
-          <option value="{{ item.id }}">{{ item.label }}</option>
-          {% endfor %}
-        </select>
-        <label for="time-{{ unit.unit_id }}-{{ row }}">Waktu</label>
-        <select id="time-{{ unit.unit_id }}-{{ row }}" name="datetime_fact_id_{{ row }}">
-          <option value="">—</option>
-          {% for item in unit.times %}
-          <option value="{{ item.id }}">{{ item.label }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endfor %}
+      <fieldset>
+        <legend class="muted small">Pasangan transaksi</legend>
+        {% for row in unit.rows %}
+        <div class="pair-row">
+          <p class="muted small">Transaksi {{ row + 1 }}</p>
+          <label for="dest-{{ unit.unit_id }}-{{ row }}">Rekening penerima (milik pelaku)</label>
+          <select id="dest-{{ unit.unit_id }}-{{ row }}" name="destination_fact_id_{{ row }}">
+            <option value="">— pilih —</option>
+            {% for item in unit.dests %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+          <label for="amt-{{ unit.unit_id }}-{{ row }}">Jumlah uang (Rp)</label>
+          <select id="amt-{{ unit.unit_id }}-{{ row }}" name="amount_fact_id_{{ row }}">
+            <option value="">— pilih —</option>
+            {% for item in unit.amounts %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+          <label for="time-{{ unit.unit_id }}-{{ row }}">Waktu kejadian</label>
+          <select id="time-{{ unit.unit_id }}-{{ row }}" name="datetime_fact_id_{{ row }}">
+            <option value="">— pilih —</option>
+            {% for item in unit.times %}
+            <option value="{{ item.id }}">{{ item.label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endfor %}
+      </fieldset>
       <div class="actions"><button class="btn ember" type="submit">Simpan pasangan</button></div>
     </form>
   </article>
@@ -80,30 +94,33 @@
 <div class="fact-grid" id="fact-grid">
 {% for fact in facts %}
 <article class="fact{% if ns.first == fact.fact_id %} is-on{% endif %}" data-fact="{{ fact.fact_id }}">
-  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · dicek{% endif %}</p>
+  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · sudah dicek{% endif %}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
-  <p class="src">{{ evidence_names.get(fact.source_evidence_id, "Cerita Anda") }}</p>
+  <p class="src">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") }}</p>
   {% if fact.review_status == "CANDIDATE" %}
   <div class="fact-actions">
     <button class="btn ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
-    <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Betulkan</button>
+    <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Kurang tepat</button>
   </div>
   {% endif %}
   <div class="correct-box" id="correct-{{ fact.fact_id }}">
-    <label for="input-{{ fact.fact_id }}">Nilai yang benar</label>
-    <input id="input-{{ fact.fact_id }}" type="text" placeholder="Tulis perbaikan">
+    <label for="input-{{ fact.fact_id }}">Yang benar</label>
+    <input id="input-{{ fact.fact_id }}" type="text" placeholder="Contoh: Rp2.750.000 atau BCA 1234567890">
     <div class="actions">
       <button class="btn ember" type="button" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
-      <button class="btn-text" type="button" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan ini ›</button>
+      <button class="btn-text" type="button" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan data saya ›</button>
       <button class="btn-text" type="button" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal ›</button>
     </div>
   </div>
 </article>
 {% else %}
 <article class="empty">
-  <h3>Belum ada fakta</h3>
-  <p>Tambah bukti yang lebih jelas, atau lanjut — kelengkapan akan menandai yang kurang.</p>
-  <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
+  <h3>Belum ada data</h3>
+  <p>Tambah foto yang lebih jelas. Atau lanjut dulu — nanti kami tandai yang kurang.</p>
+  <div class="actions">
+    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">Lanjut dulu ›</a>
+  </div>
 </article>
 {% endfor %}
 </div>
@@ -111,6 +128,7 @@
 {% if ns.count == 0 %}
 <div class="actions">
   <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/intake">‹ Tambah atau ubah bukti</a>
 </div>
 {% endif %}
 {% endif %}
@@ -118,30 +136,30 @@
 <script>
 const VERSION = {{ case.version }};
 const CASE = "{{ case.case_id }}";
-function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+function toast(m, isErr){ const t=document.getElementById("toast"); t.textContent=m; t.setAttribute("role", isErr ? "alert" : "status"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), isErr ? 4000 : 2200); }
 async function patchFact(ev, id){
   ev.preventDefault();
   const btn = ev.currentTarget || ev.submitter;
   const action = btn.getAttribute("data-action");
   if(action==="correct"){ openCorrect(id); return false; }
   const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, expected_version: VERSION}) });
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); } else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan"); }
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); } else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan. Coba lagi.", true); }
   return false;
 }
 function openCorrect(id){ document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
 function closeCorrect(id){ document.getElementById("correct-"+id).classList.remove("open"); return false; }
 async function submitCorrect(id){
   const v=document.getElementById("input-"+id).value.trim();
-  if(!v){ toast("Isi nilai perbaikan"); return false; }
+  if(!v){ toast("Tulis dulu yang benar, contoh: Rp2.750.000", true); return false; }
   const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
   return false;
 }
 async function resolveConflict(ev, id){
   ev.preventDefault();
   const fid = ev.submitter.value;
   const res = await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({resolution_fact_id: fid, expected_version: VERSION})});
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
   return false;
 }
 </script>

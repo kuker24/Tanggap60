@@ -44,7 +44,7 @@ def test_case_approval_rejects_ambiguous(client: TestClient, ocr: ScriptedOcr) -
     )
     assert denied.status_code == 400
     page = client.get(f"/cases/{case_id}/approval")
-    assert "Belum bisa membuat paket" in page.text
+    assert "Belum bisa dibuat" in page.text
     assert 'id="go"' not in page.text
     review = client.get(f"/cases/{case_id}/review")
     assert "Simpan pasangan" in review.text
