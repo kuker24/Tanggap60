@@ -12,7 +12,7 @@ P1 Korban panik (baru transfer, bukti berantakan), P2 Pengguna ragu (belum rugi,
 SatuAman Tanggap60 mengubah bukti berantakan menjadi kasus siap handoff resmi. Intake → ekstraksi → review fakta/konflik → preflight kesiapan per kanal (BANK_PJP, IASC, POLICE) → approval snapshot-bound → artefak ZIP terverifikasi → handoff manual → receipt. Tidak mengirim laporan, tidak menjamin dana kembali, status resmi selalu NOT_VERIFIED.
 
 ## Positioning
-Satu-satunya companion pasca-insiden yang membuktikan setiap klaim dengan sumber bukti, mendeteksi konflik sebelum laporan, dan menghasilkan paket siap-ajar untuk bank/IASC/polisi dengan manifest SHA-256 — bukan chatbot jawaban atau link list.
+SatuAman Tanggap60 — AI Rescue Agent: AI pendamping insiden digital yang menemani korban dari bukti berantakan sampai siap bertindak dan handoff ke kanal resmi. Satu-satunya companion pasca-insiden yang membuktikan setiap klaim dengan sumber bukti, mendeteksi konflik sebelum laporan, dan menghasilkan paket siap-ajar untuk bank/IASC/polisi dengan manifest SHA-256 — bukan chatbot jawaban atau link list. Pendamping chat + pointer + ruang persiapan (lihat AGENT_ARCHITECTURE.md) adalah assistive layer: bicara, menunjuk bagian yang kurang, menyiapkan, meminta persetujuan, berhenti sebelum kredensial/OTP/submit final.
 
 ## Operating Context
 VPS 4 vCPU / 4 GB / 20 GB, 1 web + 1 heavy worker, Nginx, SQLite WAL, Hermes Agent CLI sebagai orkestrator tool (allowlist 9 tool). Flow demo 60 detik tanpa waktu manusia. Offline fallback deterministik jika model tidak tersedia.

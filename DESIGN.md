@@ -30,6 +30,7 @@ Satu dunia terang-tenang dari beranda sampai paket: **WASPADA TENANG**. Warm pap
 ## Voice
 - Indonesia sederhana. “Transaksi” bukan reporting unit; “rekening penerima” tanpa tuduhan; “kami tidak akan menebak”.
 - Error menjawab: apa yang gagal, dampaknya, apa yang bisa dilakukan + Retry.
+- Pendamping AI: ringkas (1–2 kalimat), menunjuk bukan menggurui; “Saya tandai bagian yang perlu Anda cek”, “Sebelum saya menyimpan perubahan ini, pastikan datanya benar”, “Bagian ini perlu Anda isi sendiri”, “Dokumen belum dikirim ke mana pun”. Panel chat drawer desktop / bottom-sheet HP; pointer ring biru + tooltip, hormati prefers-reduced-motion; aria-live polite.
 
 ## Surface — Persuade + Operate
 Landing meyakinkan lalu memulai (satu cerita 3 langkah + FAQ + TTL). Kasus menyelesaikan tugas: bukti → susun → konfirmasi → lakukan sekarang → paket → bawa ke situs resmi.

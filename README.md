@@ -6,6 +6,8 @@ Mengubah bukti digital berantakan menjadi **unit kasus yang dapat ditelusuri**, 
 
 Benang merah: `ONE INCIDENT → EVIDENCE → VERIFIED FACTS → REPORTING UNITS → GAPS → NEXT BEST ACTION → UNIT READINESS → HUMAN APPROVAL → VERIFIED HANDOFF PACK`.
 
+**Rescue Agent (chat + pointer + ruang persiapan):** pendamping state-aware — membaca kondisi kasus, menjalankan tool Tanggap60 via Hermes, menyorot UI yang perlu diklik, meminta persetujuan untuk perubahan, menyiapkan workspace simulasi, berhenti sebelum OTP/kredensial/submit final. Lihat `AGENT_ARCHITECTURE.md`.
+
 Jangan andalkan laptop sebagai lingkungan uji. Jalankan di VPS (systemd + Nginx + venv).
 
 ## Stack
