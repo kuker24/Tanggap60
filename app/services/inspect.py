@@ -30,6 +30,7 @@ from app.services.extraction import (
     excerpt_hash,
     extract_pdf_pages,
     extract_plain,
+    iter_pdf_images,
     locator_for,
 )
 from app.services.facts import extract_candidates
@@ -82,7 +83,34 @@ class InspectService:
                 elif item.mime == "application/pdf":
                     pages = extract_pdf_pages(data)
                     if not any(page.text for page in pages):
-                        warning = "MANUAL_REVIEW_REQUIRED"
+                        by_page: dict[int, list[str]] = {}
+                        boxes_by: dict[int, list[tuple[str, int, int, int, int]]] = {}
+                        for page_no, image_bytes in iter_pdf_images(data):
+                            try:
+                                ocr_start = time.perf_counter()
+                                text = self.ocr.recognize(image_bytes)
+                                ocr_total_ms += int((time.perf_counter() - ocr_start) * 1000)
+                            except Exception:
+                                text = ""
+                            if text:
+                                by_page.setdefault(page_no, []).append(text)
+                            recognize_boxes = getattr(self.ocr, "recognize_boxes", None)
+                            if callable(recognize_boxes):
+                                try:
+                                    boxes_by.setdefault(page_no, []).extend(list(recognize_boxes(image_bytes)))
+                                except Exception:
+                                    pass
+                        if by_page:
+                            pages = [
+                                PageText(
+                                    page=num,
+                                    text="\n".join(by_page[num]),
+                                    boxes=boxes_by.get(num, []),
+                                )
+                                for num in sorted(by_page)
+                            ]
+                        else:
+                            warning = "MANUAL_REVIEW_REQUIRED"
                 else:
                     try:
                         ocr_start = time.perf_counter()

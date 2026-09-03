@@ -83,6 +83,21 @@ def extract_pdf_pages(data: bytes) -> list[PageText]:
     return pages
 
 
+def iter_pdf_images(data: bytes) -> list[tuple[int, bytes]]:
+    reader = PdfReader(BytesIO(data))
+    out: list[tuple[int, bytes]] = []
+    for index, page in enumerate(reader.pages, start=1):
+        try:
+            images = page.images
+        except Exception:
+            continue
+        for image in images:
+            payload = getattr(image, "data", None)
+            if payload:
+                out.append((index, payload))
+    return out
+
+
 def extract_pdf_text(data: bytes) -> str:
     return "\n".join(page.text for page in extract_pdf_pages(data)).strip()
 

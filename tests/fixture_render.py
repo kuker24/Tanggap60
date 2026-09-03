@@ -5,6 +5,7 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 from reportlab.pdfgen import canvas
 
 CHAT = "Kirim dulu Rp2.500.000 ke rekening ini ya biar pesanan diproses"
@@ -24,6 +25,14 @@ def png_bytes(text: str, *, width: int = 900, height: int = 240, size: int = 24)
     draw.text((40, height // 3), text, fill="black", font=font(size))
     buf = BytesIO()
     image.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def image_only_pdf(png: bytes) -> bytes:
+    buf = BytesIO()
+    pdf = canvas.Canvas(buf, pagesize=A4)
+    pdf.drawImage(ImageReader(BytesIO(png)), 72, 600, width=400, height=120)
+    pdf.save()
     return buf.getvalue()
 
 
