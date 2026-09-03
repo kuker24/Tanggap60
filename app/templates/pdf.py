@@ -157,7 +157,16 @@ def render_lines(title: str, lines: Iterable[str], generated_at: str, snapshot_h
             pdf.line(margin, y + 3.5 * mm, margin + max_width, y + 3.5 * mm)
             continue
         if text.startswith("- "):
-            paint("•  " + text[2:], "Times-Roman", 10.5, WARM, 5.4 * mm, 3 * mm)
+            pieces = wrap(text[2:], "Times-Roman", 10.5, max_width - 7 * mm)
+            for index, piece in enumerate(pieces):
+                need(5.4 * mm)
+                if index == 0:
+                    pdf.setFillColor(EMBER)
+                    pdf.circle(margin + 1.5 * mm, y + 1.1 * mm, 1.05 * mm, fill=1, stroke=0)
+                pdf.setFillColor(WARM)
+                pdf.setFont("Times-Roman", 10.5)
+                pdf.drawString(margin + 6 * mm, y, piece)
+                y -= 5.4 * mm
             continue
         paint(text, "Times-Roman", 10.5, WARM, 5.4 * mm)
 
