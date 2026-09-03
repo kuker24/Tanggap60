@@ -4,7 +4,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
@@ -49,10 +49,17 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         except Exception:
             db.rollback()
             LOGGER.exception("unhandled", extra={"request_id": request_id})
-            response = JSONResponse(
-                status_code=500,
-                content=error_body("INTERNAL", "terjadi kesalahan", False, request_id),
-            )
+            accept = request.headers.get("accept", "")
+            if "text/html" in accept and not str(request.url.path).startswith("/api/"):
+                response = HTMLResponse(
+                    "<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>Terjadi gangguan</title></head><body style=\"font-family:system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1.25rem;line-height:1.5\"><h1>Sedang ada gangguan</h1><p>Coba muat ulang halaman ini. Data Anda belum terkirim ke bank atau polisi.</p><p><a href='/'>Kembali ke beranda</a></p></body></html>",
+                    status_code=500,
+                )
+            else:
+                response = JSONResponse(
+                    status_code=500,
+                    content=error_body("INTERNAL", "terjadi kesalahan", False, request_id),
+                )
         finally:
             db.close()
         set_session_cookie(response, app.state.container.settings, request.state.session_id)

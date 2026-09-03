@@ -9,69 +9,35 @@
 </nav>
 {% endblock %}
 {% block content %}
-<h1>Apa yang masih kurang</h1>
-<p class="lede">Lengkapi yang tertahan. Anda yang membawa paket ke kanal resmi.</p>
+{% if gaps %}
+<h1>Masih ada yang kurang</h1>
+<p class="lede">Lengkapi dulu. Anda yang membawa paket ke kanal resmi.</p>
+{% else %}
+<h1>Siap lanjut</h1>
+<p class="lede">Anda yang membawa paket ke kanal resmi.</p>
+{% endif %}
 
-{% if next_action %}
+{% if next_view %}
 <div class="next-card">
-  <h3>{{ next_action.label }}</h3>
-  {% if next_action.reason %}<p class="muted small">{{ next_action.reason }}</p>{% endif %}
+  <h3>{{ next_view.label }}</h3>
+  {% if next_view.reason %}<p class="muted small">{{ next_view.reason }}</p>{% endif %}
 </div>
 {% endif %}
 
-{% if units_report %}
-<div class="stack">
-  {% for urep in units_report.units %}
-  {% set u = units[loop.index0] if units else None %}
-  <article class="card">
-    <div class="card-head">
-      <h3>{% if u and u.amount %}Rp{{ "{:,.0f}".format(u.amount).replace(",", ".") }}{% else %}Transfer{% endif %}</h3>
-      <span class="badge {% if urep.overall_status == 'READY' %}ok{% elif urep.overall_status == 'BLOCKED' %}err{% endif %}">{{ urep.overall_status | human("channel") }}</span>
-    </div>
-    {% if u and u.destination_account %}<p class="muted small">{{ u.destination_account }}{% if u.transferred_at %} · {{ u.transferred_at }}{% endif %}</p>{% endif %}
-    <ul class="gaps">
-      {% for ch in urep.channels %}
-      {% for ck in ch.checks if ck.status in ['MISSING','CONFLICT'] %}
-      <li>{{ ck.label }}{% if ck.action %} — {{ ck.action }}{% endif %}</li>
-      {% endfor %}
-      {% endfor %}
-    </ul>
-  </article>
+{% if gaps %}
+<ul class="gaps">
+  {% for gap in gaps %}
+  <li>{{ gap }}</li>
   {% endfor %}
-  <article class="card">
-    <div class="card-head">
-      <h3>Kepolisian</h3>
-      <span class="badge {% if units_report.incident_police.status == 'READY' %}ok{% elif units_report.incident_police.status == 'BLOCKED' %}err{% endif %}">{{ units_report.incident_police.status | human("channel") }}</span>
-    </div>
-    <ul class="gaps">
-      {% for ck in units_report.incident_police.checks if ck.status in ['MISSING','CONFLICT'] %}
-      <li>{{ ck.label }}{% if ck.action %} — {{ ck.action }}{% endif %}</li>
-      {% endfor %}
-    </ul>
-  </article>
-</div>
-{% else %}
-<div class="stack">
-  {% for channel in report.channels %}
-  <article class="card">
-    <div class="card-head">
-      <h3>{{ channel.label }}</h3>
-      <span class="badge {% if channel.status == 'READY' %}ok{% elif channel.status == 'BLOCKED' %}err{% endif %}">{{ channel.status_label or (channel.status | human("channel")) }}</span>
-    </div>
-    <ul class="gaps">
-      {% for check in channel.checks if check.status in ['MISSING', 'CONFLICT'] %}
-      <li>{{ check.label }}{% if check.action %} — {{ check.action }}{% endif %}</li>
-      {% endfor %}
-    </ul>
-    {% if channel.status != 'READY' %}
-    <div class="row"><a class="btn ghost small" href="/cases/{{ case.case_id }}/review">Lengkapi di tinjauan</a></div>
-    {% endif %}
-  </article>
-  {% endfor %}
-</div>
+</ul>
 {% endif %}
 
 <div class="row">
+  {% if gaps %}
+  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Lengkapi di tinjauan</a>
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/result">Lanjut saja</a>
+  {% else %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/result">Lanjut</a>
+  {% endif %}
 </div>
 {% endblock %}

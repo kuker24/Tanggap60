@@ -9,10 +9,9 @@
 </nav>
 {% endblock %}
 {% block content %}
+{% if artifacts %}
 <h1>Paket siap dibawa</h1>
 <p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
-
-{% if artifacts %}
 <div class="row" style="margin-top:0">
   <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/download?format=zip">Unduh semua</a>
 </div>
@@ -24,14 +23,6 @@
   </li>
   {% endfor %}
 </ul>
-{% else %}
-<article class="empty">
-  <h3>Belum ada paket</h3>
-  <p>Kembali dan buat paket dulu.</p>
-  <a class="btn ghost small" href="/cases/{{ case.case_id }}/approval">Ke persetujuan</a>
-</article>
-{% endif %}
-
 <div class="card">
   <h3>Bawa ke situs resmi</h3>
   <p class="muted small">Isi identitas di portal mereka, bukan di sini.</p>
@@ -40,4 +31,13 @@
     <a class="btn ghost" href="/cases/{{ case.case_id }}/receipt">Catat nomor tiket</a>
   </div>
 </div>
+{% else %}
+<h1>Membuat paket</h1>
+<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Tunggu sebentar. Halaman ini lanjut sendiri.</p>
+<script>
+  document.body.setAttribute("data-case", "{{ case.case_id }}");
+  document.body.setAttribute("data-page", "wait");
+  document.body.setAttribute("data-wait", "pack");
+</script>
+{% endif %}
 {% endblock %}

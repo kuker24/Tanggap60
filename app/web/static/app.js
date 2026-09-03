@@ -20,7 +20,11 @@
     });
   }
   if (filesInput) filesInput.addEventListener("change", () => renderFiles(filesInput.files));
-  if (drop) {
+  if (drop && filesInput) {
+    drop.addEventListener("click", (e) => {
+      if (e.target === filesInput) return;
+      filesInput.click();
+    });
     ["dragenter", "dragover"].forEach((ev) =>
       drop.addEventListener(ev, (e) => {
         e.preventDefault();
@@ -30,7 +34,7 @@
     ["dragleave", "drop"].forEach((ev) =>
       drop.addEventListener(ev, (e) => {
         e.preventDefault();
-        if (ev === "drop" && e.dataTransfer && filesInput) {
+        if (ev === "drop" && e.dataTransfer) {
           filesInput.files = e.dataTransfer.files;
           renderFiles(filesInput.files);
         }
@@ -40,12 +44,20 @@
     drop.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
-        filesInput && filesInput.click();
+        filesInput.click();
       }
     });
   }
   if (form && submitBtn) {
-    form.addEventListener("submit", () => {
+    form.addEventListener("submit", (e) => {
+      const text = (document.getElementById("text") || {}).value || "";
+      const url = (document.getElementById("url") || {}).value || "";
+      const hasFile = filesInput && filesInput.files && filesInput.files.length;
+      if (!hasFile && !String(text).trim() && !String(url).trim()) {
+        e.preventDefault();
+        window._toast("Masukkan berkas, cerita, atau tautan.");
+        return;
+      }
       submitBtn.disabled = true;
       submitBtn.textContent = "Mengirim…";
     });
@@ -65,11 +77,16 @@
   };
   const caseId = document.body.getAttribute("data-case");
   const page = document.body.getAttribute("data-page");
-  if (caseId && page === "processing") {
-    async function json(url, opts) {
-      const res = await fetch(url, Object.assign({ headers: { "Idempotency-Key": "ui-" + caseId } }, opts || {}));
-      return res.json();
+  const waitKind = document.body.getAttribute("data-wait");
+  async function json(url, opts) {
+    const headers = {};
+    if (opts && opts.method && opts.method !== "GET") {
+      headers["Idempotency-Key"] = "ui-" + caseId + "-" + (waitKind || "run");
     }
+    const res = await fetch(url, Object.assign({ headers }, opts || {}));
+    return res.json();
+  }
+  if (caseId && page === "processing") {
     async function tick() {
       try {
         const data = await json("/api/v1/cases/" + caseId);
@@ -85,6 +102,25 @@
     json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).finally(function () {
       tick();
       setInterval(tick, 1500);
+    });
+  }
+  if (caseId && page === "wait") {
+    async function tickWait() {
+      try {
+        const data = await json("/api/v1/cases/" + caseId);
+        const state = data.state;
+        const box = document.getElementById("state-live");
+        if (box) {
+          box.innerHTML = '<span class="pulse" aria-hidden="true"></span>' + (STATES[state] || "Sedang berjalan. Halaman ini lanjut sendiri.");
+        }
+        if (waitKind === "pack" && (state === "HANDOFF_READY" || state === "RECEIPT_RECORDED")) location.reload();
+        else if (waitKind === "plan" && (state === "WAITING_APPROVAL" || state === "HANDOFF_READY")) location.reload();
+        else if (state === "FAILED_SAFE") location.href = "/cases/" + caseId + "/review";
+      } catch (_) {}
+    }
+    json("/api/v1/cases/" + caseId + "/runs", { method: "POST" }).finally(function () {
+      tickWait();
+      setInterval(tickWait, 1500);
     });
   }
 

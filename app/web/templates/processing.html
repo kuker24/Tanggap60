@@ -10,37 +10,12 @@
 {% endblock %}
 {% block content %}
 <h1>Memeriksa bukti Anda</h1>
-<p class="lede" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
+<p class="lede status-line" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}<span class="pulse" aria-hidden="true"></span>Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
 {% if case.state.value == "FAILED_SAFE" %}
 <div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual</a></div>
 {% elif case.state.value == "REVIEW_REQUIRED" %}
 <script>location.replace("/cases/{{ case.case_id }}/review");</script>
 {% endif %}
-
-{% set s = case.state.value %}
-<ul class="timeline" aria-label="Langkah pemeriksaan">
-  <li>
-    <span class="tl-dot {% if s in ['EXTRACTING','REVIEW_REQUIRED','READY_FOR_ACTION','FAILED_SAFE'] %}ok{% else %}run{% endif %}">{% if s in ['EXTRACTING','REVIEW_REQUIRED','READY_FOR_ACTION','FAILED_SAFE'] %}✓{% else %}·{% endif %}</span>
-    <span class="tl-main"><b>Memeriksa berkas</b></span>
-  </li>
-  <li>
-    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% elif s == 'EXTRACTING' %}run{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
-    <span class="tl-main"><b>Membaca bukti</b></span>
-  </li>
-  <li>
-    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
-    <span class="tl-main"><b>Menyusun fakta</b></span>
-  </li>
-  <li>
-    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
-    <span class="tl-main"><b>Mencari yang bertentangan</b></span>
-  </li>
-  <li>
-    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
-    <span class="tl-main"><b>Siap ditinjau</b></span>
-  </li>
-</ul>
-
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "processing");

@@ -1,7 +1,7 @@
 {
   "name": "SatuAman Tanggap60",
   "short_name": "Tanggap60",
-  "description": "Satu pintu bantuan pasca-insiden — bukti berantakan menjadi paket siap handoff.",
+  "description": "Susun bukti jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.",
   "icons": [
     { "src": "/static/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
     { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

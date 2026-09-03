@@ -29,8 +29,11 @@
 <script>
 const box = document.getElementById("notice");
 const go = document.getElementById("go");
-box.addEventListener("change", () => { go.disabled = !box.checked; });
+function syncGo(){ go.disabled = !box.checked; }
+box.addEventListener("change", syncGo);
+box.addEventListener("click", () => setTimeout(syncGo, 0));
 go.addEventListener("click", async () => {
+  if (!box.checked) return;
   go.disabled = true; go.textContent = "Membuat…";
   const res = await fetch("/api/v1/cases/{{ case.case_id }}/approval", {
     method: "POST",

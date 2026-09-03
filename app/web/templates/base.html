@@ -7,6 +7,7 @@
   <meta name="theme-color" content="#271503">
   <meta name="description" content="SatuAman Tanggap60 — susun bukti jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.">
   <title>{% block title %}SatuAman Tanggap60{% endblock %}</title>
+  <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="icon" href="/static/icons/icon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
@@ -24,8 +25,8 @@
           <span class="sub">Tanggap60</span>
         </span>
       </a>
-      {% block stepper %}{% endblock %}
     </div>
+    {% block stepper %}{% endblock %}
   </header>
 
   <main id="main" class="shell">
@@ -33,7 +34,7 @@
   </main>
 
   <footer class="foot">
-    <span>Tidak mengirim laporan.</span>
+    <span>Kami tidak mengirim laporan ke bank atau polisi.</span>
   </footer>
 
   <div id="toast" role="status" aria-live="polite"></div>

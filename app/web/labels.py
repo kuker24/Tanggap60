@@ -1,5 +1,18 @@
 from __future__ import annotations
 
+import re
+
+_UNIT_RE = re.compile(r"\bUnit\s+ru_[0-9a-f]+\s*", re.I)
+_SPACE_RE = re.compile(r"\s+")
+_JARGON = (
+    ("AMBIGUOUS_MAPPING", "pasangan yang belum jelas"),
+    ("Bank/PJP", "Bank"),
+    ("bank/PJP", "bank"),
+    (" atau PJP", ""),
+    ("/PJP", ""),
+    ("PJP", "bank"),
+)
+
 _TABLES: dict[str, dict[str, str]] = {
     "fact": {
         "PERSON_NAME": "Nama",
@@ -94,3 +107,14 @@ def human(value: object, kind: str = "generic") -> str:
         return ""
     text = str(key)
     return _TABLES.get(kind, {}).get(text, text.replace("_", " ").title())
+
+
+def soften(value: object) -> str:
+    text = "" if value is None else str(value)
+    text = _UNIT_RE.sub("", text)
+    for src, dst in _JARGON:
+        text = text.replace(src, dst)
+    text = _SPACE_RE.sub(" ", text).strip(" —–-")
+    if text:
+        text = text[0].upper() + text[1:]
+    return text

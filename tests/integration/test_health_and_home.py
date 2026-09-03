@@ -23,6 +23,11 @@ def test_home_buttons(client: TestClient) -> None:
     assert "Sudah terjadi kerugian" in page.text
 
 
+def test_favicon(client: TestClient) -> None:
+    res = client.get("/favicon.ico")
+    assert res.status_code == 200
+
+
 def test_metrics_no_evidence(client: TestClient) -> None:
     data = client.get("/demo/metrics").json()
     assert "process_rss_mb" in data

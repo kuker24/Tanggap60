@@ -10,14 +10,14 @@
 {% endblock %}
 {% block content %}
 <h1>Periksa fakta ini</h1>
-<p class="lede">Jika salah, betulkan. Jika ada dua nilai, pilih yang benar.</p>
+<p class="lede">{% if has_blocking %}Pilih nilai yang benar.{% else %}Jika salah, betulkan.{% endif %}</p>
 
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
 {% if blocking_conflicts %}
   {% for conflict in blocking_conflicts %}
   <article class="card block">
     <h3>Ada data yang bertentangan</h3>
-    <p class="muted small">Pilih nilai yang benar sebelum paket dibuat.</p>
+    <p class="muted small">Pilih yang benar sebelum lanjut.</p>
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
       {% for fid in conflict.fact_ids %}
       {% set fact = facts_by_id.get(fid) %}
@@ -30,6 +30,7 @@
   {% endfor %}
 {% endif %}
 
+{% if not has_blocking %}
 <div class="fact-grid">
 {% for fact in facts %}
 <article class="fact" data-fact="{{ fact.fact_id }}">
@@ -62,6 +63,7 @@
 <div class="row">
   <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
 </div>
+{% endif %}
 
 <script>
 const VERSION = {{ case.version }};

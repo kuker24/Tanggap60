@@ -48,9 +48,8 @@ def test_hero_readiness_improves_then_packs(client: TestClient, ocr: ScriptedOcr
     assert blocked["overall_status"] == "BLOCKED"
     page = client.get(f"/cases/{case_id}/readiness")
     assert page.status_code == 200
-    assert "Bank/PJP" in page.text
-    assert "IASC" in page.text
-    assert "Kepolisian" in page.text
+    assert "Lengkapi di tinjauan" in page.text
+    assert "Bank/PJP" not in page.text
     resolve_amount_conflict(client, case_id)
     after = client.get(f"/api/v1/cases/{case_id}/readiness").json()
     assert after["overall_status"] != "BLOCKED"

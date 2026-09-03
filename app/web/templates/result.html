@@ -9,26 +9,26 @@
 </nav>
 {% endblock %}
 {% block content %}
+{% if actions %}
 <h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lakukan dengan urutan ini{% endif %}</h1>
 <p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini indikator, bukan putusan. Cek lewat kanal resmi.{% else %}Semakin cepat melapor bisa membantu. Tidak ada jaminan dana kembali.{% endif %}</p>
-
-{% if actions %}
 <ol class="plan">
   {% for action in actions %}
   <li>{{ action.instruction }}</li>
   {% endfor %}
 </ol>
-{% else %}
-<article class="empty">
-  <h3>Belum ada rencana</h3>
-  <p>Kembali ke tinjauan dan pastikan fakta sudah dicek.</p>
-  <a class="btn ghost small" href="/cases/{{ case.case_id }}/review">Ke tinjauan</a>
-</article>
-{% endif %}
-
 <div class="row">
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui paket</a>
 </div>
+{% else %}
+<h1>Menyusun langkah</h1>
+<p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Halaman ini lanjut sendiri.</p>
+<script>
+  document.body.setAttribute("data-case", "{{ case.case_id }}");
+  document.body.setAttribute("data-page", "wait");
+  document.body.setAttribute("data-wait", "plan");
+</script>
+{% endif %}
 
 {% if case.route.value == "PRE_INCIDENT_CHECK" %}
 <div class="card">

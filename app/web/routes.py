@@ -3,30 +3,29 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.api.helpers import artifact_public, case_summary, conflict_public, evidence_public, fact_public
 from app.deps import services_from
 from app.domain.states import DeclaredCondition, Mode, State
-from app.infrastructure.logging import hash_id
 from app.infrastructure.repositories import (
     ActionRepository,
     ArtifactRepository,
     CaseRepository,
     ConflictRepository,
-    EventRepository,
     EvidenceRepository,
     FactRepository,
     ReceiptRepository,
     TransactionRepository,
 )
-from app.infrastructure.resources import available_ram_mb, process_rss_mb
-from app.web.labels import human
+from app.web.labels import human, soften
 
 web = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["human"] = human
+TEMPLATES.env.filters["soften"] = soften
+ICON32 = Path(__file__).parent / "static" / "icons" / "icon-32.png"
 
 
 def _sid(request: Request) -> str:
@@ -35,6 +34,42 @@ def _sid(request: Request) -> str:
 
 def _svc(request: Request) -> dict:
     return services_from(request.state.db, request.app.state.container)
+
+
+def _gap_texts(report: dict | None, units_report: dict | None) -> list[str]:
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def add(item: object) -> None:
+        if not isinstance(item, dict):
+            return
+        if item.get("status") not in {"MISSING", "CONFLICT"}:
+            return
+        text = soften(item.get("action") or item.get("label") or "")
+        if text and text not in seen:
+            seen.add(text)
+            out.append(text)
+
+    if units_report:
+        for urep in units_report.get("units") or []:
+            for ch in urep.get("channels") or []:
+                for ck in ch.get("checks") or []:
+                    add(ck)
+        for ck in (units_report.get("incident_police") or {}).get("checks") or []:
+            add(ck)
+        return out
+    if report:
+        for ch in report.get("channels") or []:
+            for ck in ch.get("checks") or []:
+                add(ck)
+    return out
+
+
+@web.get("/favicon.ico")
+def favicon():
+    if ICON32.exists():
+        return FileResponse(ICON32, media_type="image/png")
+    return RedirectResponse("/static/favicon.svg")
 
 
 @web.get("/")
@@ -98,15 +133,11 @@ def processing(case_id: str, request: Request):
 
         _svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
         case = CaseRepository(request.state.db).get(case_id)
-    events = EventRepository(request.state.db).list_for_case(hash_id(case_id))
     return TEMPLATES.TemplateResponse(
         "processing.html",
         {
             "request": request,
             "case": case,
-            "events": events,
-            "rss": process_rss_mb(),
-            "ram": available_ram_mb(),
         },
     )
 
@@ -118,15 +149,24 @@ def review(case_id: str, request: Request):
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
     facts_pub = [fact_public(f) for f in facts]
+    conflicts_pub = [conflict_public(c) for c in conflicts]
+    blocking = [c for c in conflicts_pub if c["severity"] == "BLOCKING" and c["status"] == "OPEN"]
+    blocking_ids = {fid for c in blocking for fid in c["fact_ids"]}
+    visible = [
+        f
+        for f in facts_pub
+        if f["review_status"] != "REJECTED" and (not blocking or f["fact_id"] not in blocking_ids)
+    ]
     return TEMPLATES.TemplateResponse(
         "review.html",
         {
             "request": request,
             "case": case,
-            "facts": facts_pub,
+            "facts": visible,
             "facts_by_id": {f["fact_id"]: f for f in facts_pub},
             "evidence_names": {e.evidence_id: e.original_name_display for e in evidence},
-            "conflicts": [conflict_public(c) for c in conflicts],
+            "conflicts": conflicts_pub,
+            "has_blocking": bool(blocking),
         },
     )
 
@@ -169,25 +209,44 @@ def readiness_page(case_id: str, request: Request):
         units = []
         units_report = None
         next_action = None
+    next_view = None
+    if next_action:
+        next_view = {
+            "label": soften(next_action.get("label")),
+            "reason": soften(next_action.get("reason")),
+        }
+    gaps = _gap_texts(report, units_report)
     return TEMPLATES.TemplateResponse(
         "readiness.html",
-        {"request": request, "case": case, "report": report, "units": units, "units_report": units_report, "next_action": next_action},
+        {
+            "request": request,
+            "case": case,
+            "next_view": next_view,
+            "gaps": gaps,
+        },
     )
 
 
 @web.get("/cases/{case_id}/result")
 def result(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    if case.state == State.REVIEW_REQUIRED:
-        _svc(request)["inspect"].validate_case_facts(case_id)
-        case = CaseRepository(request.state.db).get(case_id)
-    if case.state == State.READY_FOR_ACTION:
-        from app.services.ids import new_id
+    try:
+        if case.state == State.REVIEW_REQUIRED:
+            _svc(request)["inspect"].validate_case_facts(case_id)
+            case = CaseRepository(request.state.db).get(case_id)
+        if case.state == State.READY_FOR_ACTION:
+            from app.api.router import _kick_orchestrator
 
-        _svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+            _kick_orchestrator(request, case_id)
+            case = CaseRepository(request.state.db).get(case_id)
+    except Exception:
         case = CaseRepository(request.state.db).get(case_id)
     actions = ActionRepository(request.state.db).list_for_case(case_id)
-    _, digest = _svc(request)["approval"].current_snapshot(case_id)
+    digest = ""
+    try:
+        _, digest = _svc(request)["approval"].current_snapshot(case_id)
+    except Exception:
+        digest = ""
     return TEMPLATES.TemplateResponse(
         "result.html",
         {"request": request, "case": case, "actions": actions, "snapshot_hash": digest},

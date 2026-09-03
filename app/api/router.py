@@ -151,6 +151,20 @@ def _scoped_key(case_id: str, key: str) -> str:
     return f"{case_id}:{key}"
 
 
+def _kick_orchestrator(request: Request, case_id: str) -> None:
+    settings = request.app.state.container.settings
+    run_id = new_id("run")
+    if settings.sync_jobs:
+        svc(request)["orchestrator"].run_until_pause(case_id, run_id)
+        return
+    JobQueue(request.state.db).enqueue(
+        case_id=case_id,
+        run_id=run_id,
+        kind="orchestrate",
+        idempotency_key=_scoped_key(case_id, f"kick-{run_id}"),
+    )
+
+
 def _idempotency(request: Request, case_id: str, key: str | None, payload: str) -> dict[str, Any] | None:
     if not key:
         raise ValidationFailed("Idempotency-Key wajib")
@@ -406,8 +420,7 @@ def post_unit_approval(
     if cached:
         return cached
     record = svc(request)["approval"].approve(case_id, sid(request), str(payload.get("snapshot_hash", "")), bool(payload.get("accepted_notice", False)), target_id=unit_id)
-    if request.app.state.container.settings.sync_jobs:
-        svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+    _kick_orchestrator(request, case_id)
     body = {"approval_id": record.approval_id, "snapshot_hash": record.snapshot_hash, "unit_id": unit_id, "state": CaseRepository(request.state.db).get(case_id).state.value}
     _store_idem(request, idempotency_key or record.approval_id, case_id, json.dumps(payload, sort_keys=True) + unit_id, body)
     return body
@@ -459,8 +472,7 @@ def post_approval(
         str(payload.get("snapshot_hash", "")),
         bool(payload.get("accepted_notice", False)),
     )
-    if request.app.state.container.settings.sync_jobs:
-        svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+    _kick_orchestrator(request, case_id)
     body = {
         "approval_id": record.approval_id,
         "snapshot_hash": record.snapshot_hash,
