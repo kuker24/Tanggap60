@@ -289,7 +289,8 @@ def test_action_id_matches_server_computation(client: TestClient, ocr: ScriptedO
     prop = body["proposed_action"]
     assert prop is not None
     payload = _proposal_payload(client, case_id, body)
-    assert prop["action_id"] == action_id_for(case_id, "SET_UNIT_MAPPING", payload, body["case_version"])
+    secret = str(client.app.state.container.settings.secret_key)
+    assert prop["action_id"] == action_id_for(case_id, "SET_UNIT_MAPPING", payload, body["case_version"], secret_key=secret)
 
 
 def test_correction_without_dest_hint_asks_clarification(client: TestClient, ocr: ScriptedOcr) -> None:
@@ -404,7 +405,8 @@ def test_workspace_full_account_in_owner_session_masked_in_context(client: TestC
     # Di workspace milik korban, nomor rekening tujuan tampil unmasked
     assert "DEMO-DEST-B" in resolved_tx["destination_account"]
     assert "••" not in resolved_tx["destination_account"]
-    assert "Yang Tanggap60 siapkan" in ws["action_log"][0] or "menyiapkan" in ws["action_log"][1]
+    assert "teridentifikasi" in ws["action_log"][1]
+    assert ws["confirmed_transactions"] >= 1
 
     # Namun di agent context (yang dilihat AI / model), rekening tujuan TETAP masked
     ctx = client.get(f"/api/v1/cases/{case_id}/agent/context").json()

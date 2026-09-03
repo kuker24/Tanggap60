@@ -15,6 +15,7 @@ Kontrak respons POST messages:
 
 from __future__ import annotations
 
+import threading
 from typing import Any
 
 from fastapi import APIRouter, Request
@@ -30,6 +31,18 @@ from app.services.cases import now_utc
 from app.services.ids import new_id
 
 agent_api = APIRouter(prefix="/api/v1")
+
+# Case-scoped in-process concurrency guard agar requests agent per case tidak tumpang tindih
+_CASE_LOCKS: dict[str, threading.Lock] = {}
+_GLOBAL_LOCK = threading.Lock()
+
+
+def _get_case_lock(case_id: str) -> threading.Lock:
+    with _GLOBAL_LOCK:
+        if case_id not in _CASE_LOCKS:
+            _CASE_LOCKS[case_id] = threading.Lock()
+        return _CASE_LOCKS[case_id]
+
 
 _AGENT_EVENT_TYPES = frozenset(
     {
@@ -51,7 +64,9 @@ _AGENT_EVENT_TYPES = frozenset(
 def post_agent_message(case_id: str, request: Request, payload: dict[str, Any]) -> dict[str, Any]:
     text = str(payload.get("text") or "")[:2000]
     ui_state = payload.get("ui_state") if isinstance(payload.get("ui_state"), dict) else {}
-    return handle_message(request.state.db, request.app.state.container, case_id, sid(request), text, ui_state)
+    lock = _get_case_lock(case_id)
+    with lock:
+        return handle_message(request.state.db, request.app.state.container, case_id, sid(request), text, ui_state)
 
 
 @agent_api.post("/cases/{case_id}/agent/actions/{action_id}/approve")

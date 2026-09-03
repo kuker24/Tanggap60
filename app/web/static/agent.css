@@ -30,14 +30,23 @@
 .agent-quick { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 8px; }
 .agent-quick button {
   border: 1px solid #d8cdb4; background: #fff; border-radius: 999px;
-  padding: 6px 12px; font-size: 13px; cursor: pointer; color: #1c1917;
+  padding: 8px 14px; font-size: 13px; cursor: pointer; color: #1c1917;
+  min-height: 38px; display: inline-flex; align-items: center;
 }
 .agent-quick button:hover { background: #faf7f1; }
-#agent-form { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #e6ddcb; background: #fff; }
-#agent-input { flex: 1; border: 1px solid #d8cdb4; border-radius: 10px; padding: 9px 10px; font-size: 15px; background: #fff; color: #1c1917; }
+#agent-form {
+  display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid #e6ddcb; background: #fff;
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
+#agent-input {
+  flex: 1; border: 1px solid #d8cdb4; border-radius: 10px; padding: 10px 12px;
+  font-size: 16px; /* iOS auto-zoom defense */
+  min-height: 44px; box-sizing: border-box; background: #fff; color: #1c1917;
+}
 #agent-send, #agent-mic {
   border: 1px solid #d8cdb4; background: #faf7f1; border-radius: 10px;
-  padding: 0 12px; cursor: pointer; font-size: 16px; color: #1c1917;
+  padding: 0 14px; cursor: pointer; font-size: 16px; color: #1c1917;
+  min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;
 }
 #agent-send { background: #92400e; color: #fff; border-color: #92400e; }
 #agent-mic[hidden] { display: none; }
@@ -76,6 +85,7 @@
   #agent-panel {
     right: 0; left: 0; bottom: 0; width: 100%; max-height: 82dvh;
     border-radius: 18px 18px 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 @media (prefers-reduced-motion: reduce) {

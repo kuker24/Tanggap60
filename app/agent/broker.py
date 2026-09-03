@@ -99,9 +99,24 @@ class ProposedAction:
     expected_version: int
 
 
-def action_id_for(case_id: str, action_type: str, payload: dict[str, Any], expected_version: int) -> str:
+def action_id_for(
+    case_id: str,
+    action_type: str,
+    payload: dict[str, Any],
+    expected_version: int,
+    secret_key: str | None = None,
+) -> str:
+    """HMAC-SHA256 stateless tamper-proof action identifier.
+    
+    Menggunakan server secret_key agar action_id tidak bisa dipalsukan
+    oleh pihak yang hanya mengetahui case_id, payload, dan version.
+    """
+    import hmac
+
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-    digest = hashlib.sha256(f"{case_id}|{action_type}|{canonical}|{expected_version}".encode()).hexdigest()
+    message = f"{case_id}|{action_type}|{canonical}|{expected_version}".encode()
+    key = (secret_key or "tanggap60-action-broker-key").encode()
+    digest = hmac.new(key, message, hashlib.sha256).hexdigest()
     return f"ag_{digest[:16]}"
 
 

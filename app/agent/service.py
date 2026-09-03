@@ -541,7 +541,7 @@ def _handle_official(intent: Intent, context: dict[str, Any], runner: _Runner, u
         getattr(runner.container.settings, "official_iasc_url", "") or ""
     )
     url = validate_url(configured) or "https://iasc.ojk.go.id/"
-    proposal = _propose(context, "OPEN_OFFICIAL", {"url": url}, {"url": url})
+    proposal = _propose(context, "OPEN_OFFICIAL", {"url": url}, {"url": url}, runner)
     return (
         "Saya siapkan tautan portal resmi IASC. Buka sendiri dan isi datanya — saya tidak akan mengirim apa pun.",
         _guide("official-handoff", "Buka portal resmi", set(context["unit_ids"])),
@@ -632,7 +632,7 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
     ]
     dest_label = dest_pick[0]["value"]
     payload = {"unit_id": unit["unit_id"], "target_evidence_id": evidence_id or "", "pairings": pairings}
-    proposal = _propose(context, "SET_UNIT_MAPPING", {"amount": text_amount, "destination": dest_label}, payload)
+    proposal = _propose(context, "SET_UNIT_MAPPING", {"amount": text_amount, "destination": dest_label}, payload, runner)
     return (
         f"Untuk memastikan: {text_amount} adalah nominal Transaksi {unit['index']} ke rekening {escape(dest_label)}? "
         "Sebelum saya menyimpan perubahan ini, pastikan datanya benar.",
@@ -663,10 +663,11 @@ def _evidence_of(runner: _Runner, fact_id: str) -> str | None:
 
 
 def _propose(
-    context: dict[str, Any], action_type: str, summary: dict[str, Any], payload: dict[str, Any]
+    context: dict[str, Any], action_type: str, summary: dict[str, Any], payload: dict[str, Any], runner: _Runner | None = None
 ) -> ProposedAction:
     version = context["case"]["version"]
-    action_id = action_id_for(context["case"]["case_id"], action_type, payload, version)
+    secret = str(getattr(getattr(runner, "container", None), "settings", None).secret_key) if runner and hasattr(runner, "container") else None
+    action_id = action_id_for(context["case"]["case_id"], action_type, payload, version, secret_key=secret)
     return ProposedAction(
         action_id=action_id,
         action_type=action_type,
@@ -767,7 +768,8 @@ def approve_action(
     case = services["cases"].get_owned(case_id, session_id)
     if action_type not in YELLOW_ACTIONS:
         raise ValidationFailed("aksi tidak dikenal")
-    if action_id != action_id_for(case_id, action_type, payload, expected_version):
+    secret = str(getattr(request.app.state.container.settings, "secret_key", None) or "")
+    if action_id != action_id_for(case_id, action_type, payload, expected_version, secret_key=secret):
         raise ValidationFailed("konfirmasi tidak cocok — minta ulang dari chat")
     if action_type != "OPEN_OFFICIAL":
         if _is_replay(db, case_id, action_id, action_type, payload):

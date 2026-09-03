@@ -68,9 +68,21 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
         chronology.append(f"{index}. Transfer {tx['amount']} ke rekening {tx['destination_account']} {when}.".strip())
 
     evidence_refs = sorted({evidence_names.get(eid, eid) for u in complete for eid in u["evidence_ids"]})
-    confirmed_count = sum(1 for t in transactions if t["amount"] != UNCONFIRMED and t["destination_account"] != UNCONFIRMED)
+    # Taksonomi jelas:
+    # - identified_count: unit dengan nominal & rekening ada (siap ditinjau)
+    # - complete_count: unit COMPLETE dengan nominal, rekening, DAN waktu jelas
+    identified_count = sum(1 for t in transactions if t["amount"] != UNCONFIRMED and t["destination_account"] != UNCONFIRMED)
+    complete_count = sum(
+        1
+        for t in transactions
+        if t["amount"] != UNCONFIRMED and t["destination_account"] != UNCONFIRMED and t["date"] != UNCONFIRMED
+    )
     checklist = [
-        {"item": "Transaksi terkonfirmasi", "done": confirmed_count > 0, "detail": f"{confirmed_count} transaksi"},
+        {
+            "item": "Transaksi teridentifikasi",
+            "done": identified_count > 0,
+            "detail": f"{identified_count} transaksi teridentifikasi ({complete_count} terkonfirmasi lengkap)",
+        },
         {"item": "Nominal jelas", "done": all(t["amount"] != UNCONFIRMED for t in transactions), "detail": ""},
         {"item": "Waktu jelas", "done": all(t["date"] != UNCONFIRMED for t in transactions), "detail": ""},
         {"item": "Identitas korban", "done": False, "detail": "Hanya Anda yang mengisi — AI tidak menyentuh data ini"},
@@ -88,7 +100,7 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
     assert set(fields) <= WORKSPACE_FIELDS | {"transactions"}
     log = [
         "membuka workspace persiapan",
-        f"menyiapkan {len(transactions)} transaksi teridentifikasi",
+        f"menyiapkan {identified_count} transaksi teridentifikasi ({complete_count} lengkap)",
         "menyusun kronologi dari fakta yang ditinjau",
         "identitas korban dibiarkan kosong untuk diisi pengguna sendiri",
     ]
@@ -97,7 +109,8 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
         "simulation_label": "SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI",
         "fields": fields,
         "action_log": log,
-        "confirmed_transactions": confirmed_count,
+        "confirmed_transactions": identified_count,
+        "complete_transactions": complete_count,
         "official_note": "Dokumen belum dikirim ke mana pun. Pengiriman tetap Anda lakukan sendiri di portal resmi.",
     }
 
