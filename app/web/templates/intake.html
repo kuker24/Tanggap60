@@ -1,15 +1,7 @@
 {% extends "base.html" %}
+{% from "_stepper.html" import stepper %}
 {% block title %}Kirim bukti — SatuAman{% endblock %}
-{% block stepper %}
-<nav class="stepper" aria-label="Langkah 1 dari 4: Bukti">
-  <span role="list">
-    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">1</i> Bukti</span>
-    <span role="listitem" class="step"><i aria-hidden="true">2</i> Cek</span>
-    <span role="listitem" class="step"><i aria-hidden="true">3</i> Koreksi</span>
-    <span role="listitem" class="step"><i aria-hidden="true">4</i> Paket</span>
-  </span>
-</nav>
-{% endblock %}
+{% block stepper %}{{ stepper(1, "Langkah 1 dari 4: Bukti") }}{% endblock %}
 {% block content %}
 <h1>Kirim yang Anda punya</h1>
 <p class="lede" id="coach-lede">Foto, cerita, atau link — satu saja cukup untuk mulai.</p>

@@ -1,16 +1,8 @@
 {% extends "base.html" %}
+{% from "_stepper.html" import stepper %}
 {% block body_mod %}is-void{% endblock %}
 {% block title %}Kami baca buktinya — SatuAman{% endblock %}
-{% block stepper %}
-<nav class="stepper" aria-label="Langkah 2 dari 4: Cek">
-  <span role="list">
-    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
-    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">2</i> Cek</span>
-    <span role="listitem" class="step"><i aria-hidden="true">3</i> Koreksi</span>
-    <span role="listitem" class="step"><i aria-hidden="true">4</i> Paket</span>
-  </span>
-</nav>
-{% endblock %}
+{% block stepper %}{{ stepper(2, "Langkah 2 dari 4: Cek") }}{% endblock %}
 {% block content %}
 {% if case.state.value not in ["FAILED_SAFE", "REVIEW_REQUIRED"] %}
 <div class="wait-ring" aria-hidden="true"></div>

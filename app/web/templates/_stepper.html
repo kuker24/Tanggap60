@@ -1,0 +1,16 @@
+{# Satu-satunya sumber markup stepper Bukti→Cek→Koreksi→Paket. #}
+{% macro stepper(active, label) %}
+<nav class="stepper" aria-label="{{ label }}">
+  <span role="list">
+    {% for n, name in [(1, "Bukti"), (2, "Cek"), (3, "Koreksi"), (4, "Paket")] %}
+    {% if n < active %}
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> {{ name }}</span>
+    {% elif n == active %}
+    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
+    {% else %}
+    <span role="listitem" class="step"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
+    {% endif %}
+    {% endfor %}
+  </span>
+</nav>
+{% endmacro %}

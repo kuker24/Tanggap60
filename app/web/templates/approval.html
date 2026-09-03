@@ -1,15 +1,7 @@
 {% extends "base.html" %}
+{% from "_stepper.html" import stepper %}
 {% block title %}Buat paket — SatuAman{% endblock %}
-{% block stepper %}
-<nav class="stepper" aria-label="Langkah 4 dari 4: Paket">
-  <span role="list">
-    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Bukti</span>
-    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Cek</span>
-    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> Koreksi</span>
-    <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">4</i> Paket</span>
-  </span>
-</nav>
-{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Paket") }}{% endblock %}
 {% block content %}
 <h1>Buat paket?</h1>
 
