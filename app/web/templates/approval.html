@@ -24,21 +24,21 @@
 {% else %}
 <p class="lede">Periksa sekali lagi. Tanggap60 tidak mengirim laporan — Anda yang bawa paketnya ke situs resmi.</p>
 {% for tx in scope_units %}
-<article class="tx" id="scope-{{ tx.unit_id }}">
+<article class="tx" id="scope-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
   <div class="tx-top">
     <h3>Transaksi {{ tx.n }} ✓</h3>
     <span class="badge ok">Masuk paket</span>
   </div>
-  {% if tx.amount %}<p class="tx-amount">{{ tx.amount }}</p>{% endif %}
-  {% if tx.dest %}<p class="tx-route">→ {{ tx.dest }}</p>{% endif %}
-  {% if tx.when %}<p class="tx-when">{{ tx.when }}</p>{% endif %}
+  {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
+  {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
+  {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
   <p class="tx-when">Dokumen: Lembar Bank, Lembar IASC</p>
 </article>
 {% endfor %}
 {% for reason in pending %}
 <p class="notice">Satu transaksi belum dibuat: {{ reason }}. Selesaikan di halaman konfirmasi kalau ingin ikut disertakan.</p>
 {% endfor %}
-<form method="post" action="/cases/{{ case.case_id }}/approval" id="approval-form">
+<form method="post" action="/cases/{{ case.case_id }}/approval" id="approval-form" data-guide-id="approve-package">
   <input type="hidden" name="snapshot_hash" value="{{ snapshot_hash }}">
   <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
   <label class="check">

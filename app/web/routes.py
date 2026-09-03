@@ -32,7 +32,7 @@ TEMPLATES.env.filters["soften"] = soften
 
 def _asset_mtimes() -> list[float]:
     static = Path(__file__).parent / "static"
-    return [p.stat().st_mtime for p in (static / "app.css", static / "app.js") if p.exists()]
+    return [p.stat().st_mtime for p in (static / "app.css", static / "app.js", static / "agent.css", static / "agent.js") if p.exists()]
 
 
 TEMPLATES.env.globals["asset_v"] = str(int(max(_asset_mtimes(), default=0)))
@@ -709,6 +709,15 @@ def receipt_page(case_id: str, request: Request):
     return TEMPLATES.TemplateResponse(
         "receipt.html",
         {"request": request, "case": case, "receipt": record},
+    )
+
+
+@web.get("/cases/{case_id}/workspace")
+def workspace_page(case_id: str, request: Request):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    return TEMPLATES.TemplateResponse(
+        "workspace.html",
+        {"request": request, "case": case},
     )
 
 

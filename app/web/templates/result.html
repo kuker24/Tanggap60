@@ -7,7 +7,7 @@
 {% if actions %}
 <h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lapor dengan urutan ini{% endif %}</h1>
 <p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini petunjuk awal, bukan vonis. Pastikan lewat situs resmi.{% else %}Semakin cepat melapor, semakin besar peluang dibantu. Tidak ada yang bisa memastikan uang kembali.{% endif %}</p>
-<ol class="plan">
+<ol class="plan" data-guide-id="next-best-action">
   {% for action in actions %}
   <li>{{ action.instruction | soften }}</li>
   {% endfor %}
@@ -16,6 +16,7 @@
 <div class="actions">
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paketnya</a>
   <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Ruang persiapan ›</a>
 </div>
 {% endif %}
 {% else %}

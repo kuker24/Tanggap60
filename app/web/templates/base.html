@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png?v={{ asset_v }}" sizes="180x180">
   <link rel="manifest" href="/static/site.webmanifest?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
+  <link rel="stylesheet" href="/static/agent.css?v={{ asset_v }}">
 </head>
 <body class="{% block body_mod %}{% endblock %}">
   <!--
@@ -51,6 +52,8 @@
   </footer>
 
   <div id="toast" role="status" aria-live="polite"></div>
+  {% if case is defined %}{% include "_agent_chat.html" %}{% endif %}
   <script src="/static/app.js?v={{ asset_v }}"></script>
+  {% if case is defined %}<script src="/static/agent.js?v={{ asset_v }}"></script>{% endif %}
 </body>
 </html>

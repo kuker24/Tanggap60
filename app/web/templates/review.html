@@ -24,7 +24,7 @@
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
 {% if blocking_conflicts %}
   {% for conflict in blocking_conflicts %}
-  <article class="card block">
+  <article class="card block" data-guide-id="review-facts">
     <h3>Ada yang tidak cocok</h3>
     <p class="muted small">Pilih yang benar supaya paketnya akurat. Kami tidak akan menebak.</p>
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
@@ -44,7 +44,7 @@
 
 {% if pairing_units %}
   {% for unit in pairing_units %}
-  <section class="pair-group" aria-labelledby="pair-{{ unit.unit_id }}-title">
+  <section class="pair-group" data-guide-id="confirm-mapping" data-guide-alt="transaction-{{ unit.unit_id }}" aria-labelledby="pair-{{ unit.unit_id }}-title">
     <h3 id="pair-{{ unit.unit_id }}-title">Kami belum yakin — dan kami tidak akan menebak</h3>
     <p class="muted small">Jawab satu pertanyaan dalam satu kartu. Kalau ragu, pilih “Tidak ada di pilihan ini” atau kosongkan.</p>
     <form method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
@@ -124,7 +124,7 @@
 <section aria-labelledby="tx-done-title">
   <h2 id="tx-done-title" class="muted small" style="margin-top:28px">Transaksi yang sudah jelas</h2>
   {% for tx in summaries %}
-  <article class="tx" id="tx-{{ tx.unit_id }}">
+  <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
     <div class="tx-top">
       <h3>Transaksi {{ tx.n }} ✓</h3>
       {% if tx.status == "COMPLETE" %}
@@ -133,9 +133,9 @@
       <span class="badge info">Belum lengkap</span>
       {% endif %}
     </div>
-    {% if tx.amount %}<p class="tx-amount">{{ tx.amount }}</p>{% endif %}
-    {% if tx.dest %}<p class="tx-route">→ {{ tx.dest }}</p>{% endif %}
-    {% if tx.when %}<p class="tx-when">{{ tx.when }}</p>{% endif %}
+    {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
+    {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
+    {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
     {% if tx.src %}<p class="tx-when">dari {{ tx.src }}</p>{% endif %}
   </article>
   {% endfor %}
@@ -143,7 +143,7 @@
 {% endif %}
 
 {% if not has_blocking %}
-<div class="fact-grid" id="fact-grid">
+<div class="fact-grid" id="fact-grid" data-guide-id="review-facts">
 {% for fact in facts %}
 <article class="fact{% if ns.first == fact.fact_id %} is-on{% endif %}" data-fact="{{ fact.fact_id }}">
   <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · sudah dicek{% endif %}</p>

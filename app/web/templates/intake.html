@@ -24,7 +24,7 @@
 
 <form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" novalidate>
   <div class="coach-step is-on" data-step="files">
-    <div class="drop" id="drop" tabindex="0" role="button" aria-label="Pilih foto atau file bukti. Foto JPG atau PNG, atau PDF. Maksimal 8 file, total 25 MB.">
+    <div class="drop" id="drop" data-guide-id="upload-evidence" tabindex="0" role="button" aria-label="Pilih foto atau file bukti. Foto JPG atau PNG, atau PDF. Maksimal 8 file, total 25 MB.">
       <div class="drop-head">
         <span class="drop-title">Ketuk di sini untuk pilih foto atau file</span>
         <span class="muted small">Foto (JPG/PNG) atau PDF · maks 8 file · total maks 25 MB</span>
@@ -34,7 +34,7 @@
     </div>
     <div id="file-list" class="file-list" aria-live="polite"></div>
     {% if evidence %}
-    <div class="file-list pack" aria-label="File tersimpan">
+    <div class="file-list pack" aria-label="File tersimpan" data-guide-id="evidence-list">
       {% for item in evidence %}
       <div class="file-chip">
         <span><b>✓ {{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Cerita{% else %}File{% endif %} · {{ (item.size_bytes / 1024) | round(1) }} KB · sudah masuk</span></span>
@@ -54,7 +54,7 @@
     </div>
   </div>
 
-  <div class="coach-step" data-step="text">
+  <div class="coach-step" data-step="text" data-guide-id="case-story">
     <label for="text">Ceritakan singkat <span class="opt">(boleh kosong)</span></label>
     <div class="field">
       <textarea id="text" name="text" placeholder="Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang." rows="4"></textarea>

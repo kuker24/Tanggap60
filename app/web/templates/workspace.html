@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_stepper.html" import stepper %}
+{% block title %}Ruang persiapan — SatuAman{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
+{% block content %}
+<section data-guide-id="workspace-open" aria-labelledby="ws-title">
+  <p class="sim-badge" role="note">SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI</p>
+  <h1 id="ws-title">Ruang persiapan laporan</h1>
+  <p class="lede">AI mengisi data yang sudah pasti dari bukti Anda. Sisanya Anda isi sendiri. Dokumen belum dikirim ke mana pun.</p>
+
+  <div id="ws-log" class="card" aria-live="polite">
+    <h3>Yang AI kerjakan</h3>
+    <ul id="ws-log-list" class="plan"></ul>
+  </div>
+
+  <div id="ws-body" hidden>
+    <h2 class="muted small">Transaksi terkonfirmasi</h2>
+    <div id="ws-tx"></div>
+
+    <h2 class="muted small">Kronologi (dari fakta yang ditinjau)</h2>
+    <ol id="ws-chrono" class="plan"></ol>
+
+    <h2 class="muted small">Bukti terlampir</h2>
+    <ul id="ws-ev" class="gaps"></ul>
+
+    <h2 class="muted small">Data yang tetap Anda isi sendiri</h2>
+    <div class="card">
+      <p><b>Rekening &amp; bank Anda:</b> <span class="muted">Belum tersedia — isi sendiri</span></p>
+      <p class="muted small">AI tidak menyentuh identitas dan kredensial Anda.</p>
+    </div>
+
+    <h2 class="muted small">Daftar periksa</h2>
+    <ul id="ws-check" class="gaps"></ul>
+
+    <div class="next-card" data-guide-id="official-handoff">
+      <h3>Buka portal resmi IASC</h3>
+      <p class="muted small">Isi data diri di situs mereka, bukan di sini. Tanggap60 tidak mengirim laporan.</p>
+      <div class="actions">
+        <a class="btn" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Buka situs IASC</a>
+        <a class="btn-text" href="/cases/{{ case.case_id }}/approval">‹ Kembali ke paket</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="ws-empty" class="card" hidden>
+    <h3>Belum ada yang bisa disiapkan</h3>
+    <p class="muted small">Belum ada transaksi terkonfirmasi. Selesaikan konfirmasi dulu.</p>
+    <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Ke halaman konfirmasi</a></div>
+  </div>
+</section>
+<script>
+(function(){
+  const CASE = "{{ case.case_id }}";
+  fetch(`/api/v1/cases/${CASE}/workspace`).then(r => r.json()).then(ws => {
+    const log = document.getElementById("ws-log-list");
+    (ws.action_log || []).forEach(step => {
+      const li = document.createElement("li");
+      li.textContent = "✓ " + step;
+      log.appendChild(li);
+    });
+    if(!ws.fields || !(ws.fields.transactions || []).length){
+      document.getElementById("ws-empty").hidden = false;
+      return;
+    }
+    document.getElementById("ws-body").hidden = false;
+    const txBox = document.getElementById("ws-tx");
+    ws.fields.transactions.forEach((t, i) => {
+      const el = document.createElement("article");
+      el.className = "tx";
+      el.innerHTML = "";
+      const h = document.createElement("h3");
+      h.textContent = "Transaksi " + (i + 1);
+      el.appendChild(h);
+      [["Rekening tujuan", t.destination_account], ["Bank tujuan", t.destination_bank],
+       ["Nama penerima", t.destination_name], ["Nominal", t.amount],
+       ["Tanggal", t.date], ["Waktu", t.time]].forEach(([k, v]) => {
+        const p = document.createElement("p");
+        p.className = "tx-when";
+        p.textContent = k + ": " + v;
+        el.appendChild(p);
+      });
+      txBox.appendChild(el);
+    });
+    const ch = document.getElementById("ws-chrono");
+    (ws.fields.chronology || []).forEach(line => {
+      const li = document.createElement("li");
+      li.textContent = line;
+      ch.appendChild(li);
+    });
+    const ev = document.getElementById("ws-ev");
+    (ws.fields.evidence_refs || []).forEach(name => {
+      const li = document.createElement("li");
+      li.textContent = name;
+      ev.appendChild(li);
+    });
+    const ck = document.getElementById("ws-check");
+    (ws.fields.checklist || []).forEach(item => {
+      const li = document.createElement("li");
+      li.textContent = (item.done ? "✓ " : "○ ") + item.item + (item.detail ? " — " + item.detail : "");
+      ck.appendChild(li);
+    });
+  }).catch(() => {
+    document.getElementById("ws-empty").hidden = false;
+  });
+})();
+</script>
+{% endblock %}
