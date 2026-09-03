@@ -21,8 +21,8 @@
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
       {% for fid in conflict.fact_ids %}
       {% set fact = facts_by_id.get(fid) %}
-      <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}" style="justify-content:space-between;text-align:left">
-        <span style="text-align:left"><b>Gunakan {{ fact.raw_value if fact else "nilai ini" }}</b><br><span class="muted small">{{ evidence_names.get(fact.source_evidence_id, "bukti") if fact else "bukti" }}</span></span>
+      <button class="btn ghost stack-left" name="resolution_fact_id" value="{{ fid }}">
+        <span><b>Gunakan {{ fact.raw_value if fact else "nilai ini" }}</b><br><span class="muted small">{{ evidence_names.get(fact.source_evidence_id, "bukti") if fact else "bukti" }}</span></span>
       </button>
       {% endfor %}
     </form>

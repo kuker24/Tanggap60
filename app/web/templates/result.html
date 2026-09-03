@@ -21,8 +21,10 @@
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui paket</a>
 </div>
 {% else %}
+<div class="stage-void">
 <h1>Menyusun langkah</h1>
 <p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Halaman ini lanjut sendiri.</p>
+</div>
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "wait");

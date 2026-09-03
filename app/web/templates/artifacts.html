@@ -12,17 +12,19 @@
 {% if artifacts %}
 <h1>Paket siap dibawa</h1>
 <p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
-<div class="row" style="margin-top:0">
-   <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
+<div class="pack-plate">
+  <div class="row flush">
+    <a class="btn ember wide" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
+  </div>
+  <ul class="file-list pack">
+    {% for a in artifacts if a.downloadable %}
+    <li class="file-chip">
+      <span><b>{{ a.type | human("artifact") }}</b></span>
+      <a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>
+    </li>
+    {% endfor %}
+  </ul>
 </div>
-<ul class="file-list pack">
-  {% for a in artifacts if a.downloadable %}
-  <li class="file-chip">
-    <span><b>{{ a.type | human("artifact") }}</b></span>
-    <a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>
-  </li>
-  {% endfor %}
-</ul>
 <div class="card">
   <h3>Bawa ke situs resmi</h3>
   <p class="muted small">Isi identitas di portal mereka, bukan di sini.</p>
@@ -32,8 +34,10 @@
   </div>
 </div>
 {% else %}
+<div class="stage-void">
 <h1>Membuat paket</h1>
 <p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Tunggu sebentar. Halaman ini lanjut sendiri.</p>
+</div>
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "wait");

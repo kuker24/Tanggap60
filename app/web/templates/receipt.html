@@ -15,7 +15,7 @@
 {% if receipt %}
 <div class="card">
   <h3>Tercatat</h3>
-  <p><b>{{ receipt.ticket_value_masked }}</b></p>
+  <p class="ticket-value">{{ receipt.ticket_value_masked }}</p>
   <div class="row">
     <a class="btn ghost" href="/cases/{{ case.case_id }}/artifacts">Kembali ke paket</a>
     <a class="btn ghost" href="/">Selesai</a>

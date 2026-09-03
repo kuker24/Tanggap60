@@ -90,7 +90,7 @@ h3{font:500 14px/1.2 var(--sans);letter-spacing:.08em;text-transform:uppercase;m
 .card-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:8px}
 .card-head h3{margin:0}
 
-.drop{position:relative;border:1px dashed var(--cork);background:transparent;border-radius:var(--radius-card);padding:24px 16px;cursor:pointer;min-height:104px}
+.drop{position:relative;border:1px dashed var(--cork);background:transparent;border-radius:var(--radius-card);padding:40px 22px;cursor:pointer;min-height:220px;display:flex;flex-direction:column;justify-content:center}
 .drop.drag{border-color:var(--cream);background:var(--bark)}
 .drop-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:4px}
 .drop-title{font:500 12px/1.2 var(--sans);letter-spacing:.1em;text-transform:uppercase}
@@ -104,6 +104,7 @@ label{display:block;font:500 11px/1 var(--sans);letter-spacing:.12em;text-transf
 label .opt{font-weight:400;letter-spacing:.08em}
 input[type="text"], textarea, select{width:100%;padding:12px 0;border:0;border-bottom:1px solid var(--cork);border-radius:0;background:transparent;font:400 16px/1.5 var(--sans);color:var(--cream)}
 input[type="text"]:focus, textarea:focus, select:focus{border-bottom-color:var(--cream);outline:none;box-shadow:none}
+select, option{background:var(--canvas);color:var(--cream)}
 .pair-row{padding:16px 0;border-top:1px dashed var(--cork)}
 .pair-row:first-of-type{border-top:0;padding-top:0}
 textarea{min-height:104px;resize:vertical}
@@ -124,6 +125,7 @@ textarea{min-height:104px;resize:vertical}
 
 .fact-grid{display:grid;gap:12px}
 .fact{border:1px solid var(--cork);border-radius:var(--radius-card);background:transparent;padding:18px}
+.fact .muted.small{letter-spacing:.14em;text-transform:uppercase;font:500 11px/1.3 var(--sans);color:var(--drift)}
 .fact b.value, .fact strong.value{font:500 22px/1.15 var(--sans);display:block;word-break:break-word;text-transform:none}
 .fact .src{font:400 13px/1.4 var(--sans);color:var(--drift);margin:6px 0 0}
 .fact-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
@@ -151,3 +153,12 @@ textarea{min-height:104px;resize:vertical}
 
 #toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%) translateY(12px);background:var(--bark);color:var(--cream);border:1px solid var(--cream);padding:10px 16px;border-radius:var(--radius-ghost);font:500 12px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:60}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+body.is-void .shell,.stage-void{min-height:calc(100dvh - 9.5rem);display:flex;flex-direction:column;justify-content:center;padding-bottom:12vh}
+.btn.wide{width:100%;max-width:22rem}
+.row.flush{margin-top:0}
+.btn.stack-left{width:100%;justify-content:space-between;text-align:left;border-radius:var(--radius-card);height:auto;min-height:52px;padding:14px 16px;text-transform:none;letter-spacing:0;font:400 15px/1.35 var(--sans)}
+.btn.stack-left b{font:500 15px/1.25 var(--sans);text-transform:none}
+.pack-plate{margin-top:8px;padding:28px 22px;border:1px dashed var(--cork);border-radius:var(--radius-card)}
+.pack-plate .row{margin-top:0;margin-bottom:18px}
+.ticket-value{font:500 28px/.9 var(--sans);letter-spacing:.04em;margin:0}
