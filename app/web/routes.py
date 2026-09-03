@@ -19,6 +19,7 @@ from app.infrastructure.repositories import (
     ReceiptRepository,
     TransactionRepository,
 )
+from app.services.ids import new_id
 from app.web.labels import human, soften
 
 web = APIRouter()
@@ -101,6 +102,7 @@ def intake(case_id: str, request: Request):
             "request": request,
             "case": case,
             "evidence": [evidence_public(e) for e in evidence],
+            "can_delete_evidence": case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
             "summary": case_summary(request.state.db, case),
         },
     )
@@ -123,6 +125,31 @@ async def intake_submit(case_id: str, request: Request):
     if url:
         intake.add_url(case_id, _sid(request), url)
     return RedirectResponse(f"/cases/{case_id}/processing", status_code=303)
+
+
+@web.post("/cases/{case_id}/evidence/{evidence_id}/delete")
+def delete_evidence_web(case_id: str, evidence_id: str, request: Request):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    if case.state not in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING}:
+        return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
+    repo = EvidenceRepository(request.state.db)
+    item = repo.get(evidence_id)
+    if item.case_id != case_id:
+        return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
+    request.app.state.container.storage.delete_key(case_id, item.storage_key)
+    repo.delete(evidence_id)
+    return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
+
+
+@web.post("/cases/{case_id}/baru")
+def reset_case(case_id: str, request: Request):
+    _svc(request)["orchestrator"].run_tool(
+        case_id,
+        new_id("run"),
+        "purge_case",
+        {"confirmation": "PURGE", "user_initiated": True, "session_id": _sid(request)},
+    )
+    return RedirectResponse("/", status_code=303)
 
 
 @web.get("/cases/{case_id}/processing")

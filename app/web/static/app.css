@@ -36,6 +36,8 @@ a.link:hover{color:var(--ember)}
 
 .top{position:sticky;top:0;z-index:30;background:var(--bone);border-bottom:1px solid var(--hairline)}
 .top-inner{max-width:var(--max);margin:0 auto;padding:14px 20px;display:flex;gap:16px;align-items:center}
+.top-reset{margin-left:auto}
+.top-reset .btn{white-space:nowrap}
 @media (max-width:640px){.top-inner{padding:12px 16px}}
 .top .stepper{max-width:var(--max);margin:0 auto;padding:0 20px 12px}
 .brand{display:flex;gap:12px;align-items:center}

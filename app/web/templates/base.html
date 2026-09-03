@@ -25,6 +25,11 @@
           <span class="sub">Tanggap60</span>
         </span>
       </a>
+      {% if case is defined %}
+      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Unggahan ini dihapus permanen.')">
+        <button class="btn ghost small" type="submit">Kasus baru</button>
+      </form>
+      {% endif %}
     </div>
     {% block stepper %}{% endblock %}
   </header>

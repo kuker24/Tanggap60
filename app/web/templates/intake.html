@@ -23,6 +23,20 @@
     <input id="files" name="files" type="file" class="file-input" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
   </div>
   <div id="file-list" class="file-list" aria-live="polite"></div>
+  {% if evidence %}
+  <div class="file-list pack" aria-label="Berkas tersimpan">
+    {% for item in evidence %}
+    <div class="file-chip">
+      <span><b>{{ item.original_name_display }}</b></span>
+      {% if can_delete_evidence %}
+      <form method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete">
+        <button class="btn ghost small" type="submit">Hapus</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   <label for="text">Cerita singkat <span class="opt">opsional</span></label>
   <div class="field">
