@@ -15,6 +15,8 @@ _JARGON = (
     ("PJP", "bank"),
     ("nominal", "jumlah uang"),
     ("Nominal", "Jumlah uang"),
+    ("kanal resmi", "situs resmi"),
+    ("Kanal resmi", "Situs resmi"),
     ("kanal", "cara bayar"),
     ("Kanal", "Cara bayar"),
     ("Unggah", "Kirim"),
