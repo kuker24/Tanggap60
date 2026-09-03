@@ -13,6 +13,12 @@ _JARGON = (
     (" atau PJP", ""),
     ("/PJP", ""),
     ("PJP", "bank"),
+    ("nominal", "jumlah uang"),
+    ("Nominal", "Jumlah uang"),
+    ("kanal", "cara bayar"),
+    ("Kanal", "Cara bayar"),
+    ("Unggah", "Kirim"),
+    ("unggah", "kirim"),
 )
 
 _TABLES: dict[str, dict[str, str]] = {

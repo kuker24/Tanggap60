@@ -17,7 +17,7 @@
 <p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini petunjuk awal, bukan vonis. Pastikan lewat situs resmi.{% else %}Semakin cepat melapor, semakin besar peluang dibantu. Tidak ada yang bisa memastikan uang kembali.{% endif %}</p>
 <ol class="plan">
   {% for action in actions %}
-  <li>{{ action.instruction }}</li>
+  <li>{{ action.instruction | soften }}</li>
   {% endfor %}
 </ol>
 {% if case.route.value != "PRE_INCIDENT_CHECK" %}
