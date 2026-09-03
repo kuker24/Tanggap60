@@ -28,6 +28,14 @@ web = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 TEMPLATES.env.filters["human"] = human
 TEMPLATES.env.filters["soften"] = soften
+
+
+def _asset_mtimes() -> list[float]:
+    static = Path(__file__).parent / "static"
+    return [p.stat().st_mtime for p in (static / "app.css", static / "app.js") if p.exists()]
+
+
+TEMPLATES.env.globals["asset_v"] = str(int(max(_asset_mtimes(), default=0)))
 ICON32 = Path(__file__).parent / "static" / "icons" / "icon-32.png"
 
 
