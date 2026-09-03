@@ -17,7 +17,7 @@
   <li>{{ action.instruction }}</li>
   {% endfor %}
 </ol>
-<div class="row">
+<div class="actions">
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui paket</a>
 </div>
 {% else %}
@@ -37,19 +37,20 @@
 <div class="card">
   <h3>Keputusan Anda</h3>
   <p class="muted small">Pilih satu. Tidak ada default.</p>
-  <form class="row" id="decision">
-    <button class="btn ghost" data-d="CANCELLED_ACTION">Batalkan</button>
-    <button class="btn ember" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kanal resmi</button>
-    <button class="btn ghost" data-d="PROCEED_BY_USER">Saya lanjut sendiri</button>
+  <form class="actions" id="decision">
+    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kanal resmi</button>
+    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Batalkan ›</button>
+    <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Saya lanjut sendiri ›</button>
   </form>
 </div>
 <script>
 document.getElementById("decision").addEventListener("click", async (ev) => {
-  const d = ev.target.getAttribute("data-d");
-  if (!d) return;
+  const btn = ev.target.closest("[data-d]");
+  if (!btn) return;
+  const d = btn.getAttribute("data-d");
   ev.preventDefault();
   const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
-  if(res.ok){ ev.target.textContent = "Tercatat"; } else { const j=await res.json().catch(()=>({})); const t=document.getElementById("toast"); t.textContent=j.message||"Gagal"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+  if(res.ok){ btn.textContent = "Tercatat"; } else { const j=await res.json().catch(()=>({})); const t=document.getElementById("toast"); t.textContent=j.message||"Gagal"; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
 });
 </script>
 {% endif %}

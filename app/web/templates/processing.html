@@ -16,7 +16,7 @@
 <h1>Memeriksa bukti Anda</h1>
 <p class="lede status-line" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}<span class="pulse" aria-hidden="true"></span>Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
 {% if case.state.value == "FAILED_SAFE" %}
-<div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual</a></div>
+<div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual</a></div>
 {% elif case.state.value == "REVIEW_REQUIRED" %}
 <script>location.replace("/cases/{{ case.case_id }}/review");</script>
 {% endif %}

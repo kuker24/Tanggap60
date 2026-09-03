@@ -12,14 +12,14 @@
   <link rel="icon" href="/static/icons/icon-32.png" sizes="32x32" type="image/png">
   <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png" sizes="180x180">
   <link rel="manifest" href="/static/site.webmanifest">
-  <link rel="stylesheet" href="/static/app.css?v=aurora-coach">
+  <link rel="stylesheet" href="/static/app.css?v=aurora-layout">
 </head>
 <body class="{% block body_mod %}{% endblock %}">
   <!--
     THESIS: Paket bukti di aurora midnight; menolak walnut ORYZO dan tombol oranye.
     OWN-WORLD: Canvas #000, CTA putih, sinyal #0088ff, Inter, kartu 24px, tanpa bayangan.
     STORY: Korban paham ini draf yang mereka bawa, bukan portal resmi; satu aksi per layar.
-    FIRST VIEWPORT: Aurora card, H1, dua slab (putih vs ghost), footer legal.
+    FIRST VIEWPORT: Aurora card, H1, dua tombol penuh (putih lalu charcoal), footer legal.
     FORM: Superwhisper (user-pinned Refero superwhisper); seed skip.
     FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
@@ -35,7 +35,7 @@
       </a>
       {% if case is defined %}
       <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Unggahan ini dihapus permanen.')">
-        <button class="btn ghost small" type="submit">Kasus baru</button>
+        <button class="btn-text" type="submit">Kasus baru</button>
       </form>
       {% endif %}
     </div>
@@ -51,6 +51,6 @@
   </footer>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=aurora-coach"></script>
+  <script src="/static/app.js?v=aurora-layout"></script>
 </body>
 </html>

@@ -70,7 +70,7 @@
         </select>
       </div>
       {% endfor %}
-      <div class="row"><button class="btn ember" type="submit">Simpan pasangan</button></div>
+      <div class="actions"><button class="btn ember" type="submit">Simpan pasangan</button></div>
     </form>
   </article>
   {% endfor %}
@@ -84,16 +84,16 @@
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
   <p class="src">{{ evidence_names.get(fact.source_evidence_id, "Cerita Anda") }}</p>
   <div class="fact-actions">
-    <button class="btn small ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
-    <button class="btn ghost small" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Ubah</button>
-    <button class="btn ghost small" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan ini</button>
+    <button class="btn ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
+    <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Betulkan</button>
   </div>
   <div class="correct-box" id="correct-{{ fact.fact_id }}">
     <label for="input-{{ fact.fact_id }}">Nilai yang benar</label>
     <input id="input-{{ fact.fact_id }}" type="text" placeholder="Tulis perbaikan">
-    <div class="row">
-      <button class="btn small ember" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
-      <button class="btn ghost small" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal</button>
+    <div class="actions">
+      <button class="btn ember" type="button" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
+      <button class="btn-text" type="button" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan ini ›</button>
+      <button class="btn-text" type="button" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal ›</button>
     </div>
   </div>
 </article>
@@ -101,15 +101,16 @@
 <article class="empty">
   <h3>Belum ada fakta</h3>
   <p>Tambah bukti yang lebih jelas, atau lanjut — kelengkapan akan menandai yang kurang.</p>
-  <a class="btn ghost small" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
 </article>
 {% endfor %}
 </div>
 
-<div class="row">
-  <button class="btn ember" type="button" onclick="return confirmAll()">Semua benar</button>
-  <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
+{% if ns.count == 0 %}
+<div class="actions">
+  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
 </div>
+{% endif %}
 {% endif %}
 
 <script>
@@ -132,28 +133,6 @@ async function submitCorrect(id){
   if(!v){ toast("Isi nilai perbaikan"); return false; }
   const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
   if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
-  return false;
-}
-async function confirmAll(){
-  const res = await fetch(`/api/v1/cases/${CASE}/facts`);
-  const payload = await res.json().catch(()=>({}));
-  const facts = payload.facts || [];
-  let version = VERSION;
-  for (const fact of facts) {
-    if (fact.review_status !== "CANDIDATE") continue;
-    const ok = await fetch(`/api/v1/cases/${CASE}/facts/${fact.fact_id}`, {
-      method:"PATCH",
-      headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({action:"confirm", expected_version: version})
-    });
-    if (!ok.ok) {
-      const e = await ok.json().catch(()=>({}));
-      toast(e.message||e.detail||"Gagal menyimpan");
-      return false;
-    }
-    version += 1;
-  }
-  location.reload();
   return false;
 }
 async function resolveConflict(ev, id){

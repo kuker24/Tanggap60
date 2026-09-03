@@ -15,13 +15,13 @@
 <article class="card block">
   <h3>Tertahan</h3>
   <p class="muted small">Ada data yang bertentangan. Pilih nilai yang benar dulu.</p>
-  <div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a></div>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Kembali ke tinjauan</a></div>
 </article>
 {% elif ambiguous %}
 <article class="card block">
   <h3>Belum bisa membuat paket</h3>
   <p class="muted small">Kami menemukan beberapa kemungkinan transaksi dan tidak akan menebak pasangannya.</p>
-  <div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pilih pasangan</a></div>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pilih pasangan</a></div>
 </article>
 {% else %}
 <p class="lede">Setelah paket dibuat, mengubah fakta berarti Anda harus setujui lagi.</p>
@@ -31,7 +31,7 @@
     <input id="notice" name="accepted_notice" type="checkbox" value="1" required>
     <span>Saya sudah meninjau fakta. Saya paham Tanggap60 tidak mengirim laporan.</span>
   </label>
-  <div class="row">
+  <div class="actions">
     <button class="btn ember" id="go" type="submit">Buat paket</button>
   </div>
 </form>

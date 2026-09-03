@@ -14,11 +14,19 @@
 
 <p class="notice" role="note">Jangan unggah password, OTP, atau KTP.</p>
 
+{% if evidence %}
+  {% for item in evidence %}
+  {% if can_delete_evidence %}
+  <form id="del-{{ item.evidence_id }}" method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete"></form>
+  {% endif %}
+  {% endfor %}
+{% endif %}
+
 <form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" novalidate>
   <div class="coach-step is-on" data-step="files">
-    <div class="drop object is-focus" id="drop" tabindex="0" aria-label="Unggah berkas">
+    <div class="drop" id="drop" tabindex="0" aria-label="Unggah berkas">
       <div class="drop-head">
-        <span class="drop-title">Seret berkas atau pilih</span>
+        <span class="drop-title">Seret berkas ke sini</span>
         <span class="muted small">JPG, PNG, PDF</span>
       </div>
       <input id="files" name="files" type="file" class="file-input" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
@@ -30,16 +38,15 @@
       <div class="file-chip">
         <span><b>{{ item.original_name_display }}</b></span>
         {% if can_delete_evidence %}
-        <form method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete">
-          <button class="btn ghost small" type="submit">Hapus</button>
-        </form>
+        <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus ›</button>
         {% endif %}
       </div>
       {% endfor %}
     </div>
     {% endif %}
-    <div class="row">
-      <button class="btn ghost" type="button" id="skip-files">Tidak ada berkas</button>
+    <div class="actions">
+      <button class="btn ember" type="button" id="pick-files">Pilih berkas</button>
+      <button class="btn-text" type="button" id="skip-files">Tidak ada berkas ›</button>
     </div>
   </div>
 
@@ -48,9 +55,9 @@
     <div class="field">
       <textarea id="text" name="text" placeholder="Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang." rows="4"></textarea>
     </div>
-    <div class="row">
+    <div class="actions">
       <button class="btn ember" type="button" id="next-text">Lanjut</button>
-      <button class="btn ghost" type="button" id="skip-text">Lewati</button>
+      <button class="btn-text" type="button" id="skip-text">Lewati ›</button>
     </div>
   </div>
 
@@ -59,14 +66,14 @@
     <div class="field">
       <input id="url" name="url" type="text" placeholder="https://" inputmode="url" autocomplete="url">
     </div>
-    <div class="row">
+    <div class="actions">
       <button class="btn ember" type="button" id="next-url">Lanjut</button>
-      <button class="btn ghost" type="button" id="skip-url">Lewati</button>
+      <button class="btn-text" type="button" id="skip-url">Lewati ›</button>
     </div>
   </div>
 
   <div class="coach-step" data-step="submit">
-    <div class="row flush">
+    <div class="actions flush">
       <button class="btn ember" type="submit" id="submit-intake">Analisis bukti saya</button>
     </div>
   </div>

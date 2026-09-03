@@ -20,14 +20,14 @@
 - Aurora hanya di beranda dan layar tunggu. PDF kop midnight+putih, tanpa aurora.
 
 ## Layout
-- Full-bleed midnight, isi max 40rem. Satu aksi primer per layar.
+- Full-bleed midnight, isi max 40rem. Satu aksi primer putih penuh per layar. Sekunder charcoal. Skip tautan teks.
 - Coach: intake unggah→cerita→tautan→kirim. Tinjau satu fakta. Field tetap di DOM.
 
 ## Voice
 - Indonesia sederhana. CTA menamai aksi.
 
 ## Motion
-- Objek mengambang, cincin wait, aurora di void. `prefers-reduced-motion` mematikan gerak.
+- Cincin wait, aurora di void. Tidak mengambangkan permukaan yang punya tombol. `prefers-reduced-motion` mematikan gerak.
 
 ## Surface — Operate
 Visitor finishes a task. Technical proof lives in the ZIP, not the UI.

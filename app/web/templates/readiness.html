@@ -32,10 +32,10 @@
 </ul>
 {% endif %}
 
-<div class="row">
+<div class="actions">
   {% if gaps %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/review">Lengkapi di tinjauan</a>
-  <a class="btn ghost" href="/cases/{{ case.case_id }}/result">Lanjut saja</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/result">Lanjut saja ›</a>
   {% else %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/result">Lanjut</a>
   {% endif %}

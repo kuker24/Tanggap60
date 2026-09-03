@@ -51,6 +51,8 @@
     const skipText = document.getElementById("skip-text");
     const nextUrl = document.getElementById("next-url");
     const skipUrl = document.getElementById("skip-url");
+    const pickFiles = document.getElementById("pick-files");
+    if (pickFiles && filesInput) pickFiles.addEventListener("click", () => filesInput.click());
     if (skipFiles) skipFiles.addEventListener("click", goText);
     if (nextText) nextText.addEventListener("click", goUrl);
     if (skipText) skipText.addEventListener("click", goUrl);

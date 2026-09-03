@@ -13,8 +13,8 @@
 <h1>Paket siap dibawa</h1>
 <p class="lede">Ini draf untuk Anda. Bukan dokumen resmi.</p>
 <div class="pack-plate object">
-  <div class="row flush">
-    <a class="btn ember wide" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
+  <div class="actions flush">
+    <a class="btn ember" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua</a>
   </div>
   <ul class="file-list pack">
     {% for a in artifacts if a.downloadable %}
@@ -28,9 +28,9 @@
 <div class="card">
   <h3>Bawa ke situs resmi</h3>
   <p class="muted small">Isi identitas di portal mereka, bukan di sini.</p>
-  <div class="row">
+  <div class="actions">
     <a class="btn ghost" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka IASC</a>
-    <a class="btn ghost" href="/cases/{{ case.case_id }}/receipt">Catat nomor tiket</a>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor tiket ›</a>
   </div>
 </div>
 {% else %}

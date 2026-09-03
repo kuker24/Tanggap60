@@ -10,7 +10,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="dark"' in home.text
     assert 'content="#000000"' in home.text
-    assert "aurora-coach" in home.text
+    assert "aurora-layout" in home.text
     assert "aurora" in home.text
     case_id = create_case(client)
     for path in (
@@ -32,6 +32,8 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert 'id="text"' in intake.text
     assert 'id="url"' in intake.text
     assert "coach-step" in intake.text
+    assert "Pilih berkas" in intake.text
+    assert "choice-arrow" not in home.text
     processing = client.get(f"/cases/{case_id}/processing")
     assert "wait-ring" in processing.text
     review = client.get(f"/cases/{case_id}/review")
@@ -44,6 +46,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert "#FFFEFB" not in css.text
     assert "#fffefb" not in css.text.lower()
     assert "prefers-reduced-motion" in css.text
-    assert "@keyframes float" in css.text
     assert "@keyframes breathe" in css.text
     assert "coach-enabled" in css.text
+    assert ".btn-text" in css.text
+    assert ".actions" in css.text
