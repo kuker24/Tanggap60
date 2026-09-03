@@ -117,8 +117,12 @@ label .opt{font-weight:400;color:var(--drift)}
 input[type="text"], input[type="url"], textarea, select{width:100%;padding:12px 14px;border:1px solid rgba(255,255,255,.22);border-radius:var(--radius-ghost);background:rgba(255,255,255,.05);font:400 16px/1.5 var(--sans);color:var(--cream)}
 input[type="text"]:focus, input[type="url"]:focus, textarea:focus, select:focus{border-color:var(--ember);outline:2px solid var(--focus);outline-offset:2px}
 select, option{background:#141b36;color:var(--cream)}
-.pair-row{padding:16px 0;border-top:1px solid var(--cork)}
-.pair-row:first-of-type{border-top:0;padding-top:0}
+.pair-group{margin-top:20px}
+.pair-group>h3{font:600 16px/1.3 var(--sans);margin:0 0 6px}
+.pair-group>p{margin:0 0 4px}
+.pair-card{background:rgba(255,255,255,.04)}
+.pair-card h3{font:600 15px/1.3 var(--sans);margin:0 0 2px}
+.pair-card label{margin-top:14px}
 textarea{min-height:104px;resize:vertical}
 .field .help, .help{font:400 13px/1.45 var(--sans);color:var(--drift);margin-top:6px}
 .notice{background:transparent;border:1px solid var(--cork);padding:14px 16px;border-radius:var(--radius-ghost);font:400 14px/1.5 var(--sans);color:var(--cream);margin:0 0 22px}
@@ -141,7 +145,7 @@ legend{padding:0;margin-bottom:4px}
 @keyframes pulse{50%{opacity:.28}}
 .status-line{display:flex;align-items:center;margin:0 0 8px}
 
-.fact-grid{display:grid;gap:12px}
+.fact-grid{display:grid;gap:16px;margin-top:20px}
 .fact{border:1px solid var(--cork);border-radius:var(--radius-card);background:#030719;padding:18px}
 .fact.is-on{border-color:var(--ember)}
 .fact .muted.small{font:500 12px/1.4 var(--sans);color:var(--drift)}

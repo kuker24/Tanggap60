@@ -50,6 +50,17 @@ def test_case_approval_rejects_ambiguous(client: TestClient, ocr: ScriptedOcr) -
     assert "Simpan pasangan" in review.text
 
 
+def test_review_pairing_grouped_per_transaction(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _ambiguous_case(client, ocr)
+    page = client.get(f"/cases/{case_id}/review")
+    assert "Pasangkan yang nyambung" in page.text
+    assert "Transaksi 1 dari 2" in page.text
+    assert "Transaksi 2 dari 2" in page.text
+    assert "pair-card" in page.text
+    assert "pair-row" not in page.text
+    assert "— pilih —" not in page.text
+
+
 def test_pairing_then_pack_omits_ids(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = _ambiguous_case(client, ocr)
     units = client.get(f"/api/v1/cases/{case_id}/reporting-units").json()["reporting_units"]
