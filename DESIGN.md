@@ -27,7 +27,7 @@
 - Indonesia sederhana. CTA menamai aksi.
 
 ## Motion
-- Cincin wait, aurora di void. Tidak mengambangkan permukaan yang punya tombol. `prefers-reduced-motion` mematikan gerak.
+- Cincin wait: busur sinyal berputar linear (GPU). Aurora di void. `prefers-reduced-motion` mematikan gerak.
 
 ## Surface — Operate
 Visitor finishes a task. Technical proof lives in the ZIP, not the UI.
