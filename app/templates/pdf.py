@@ -3,20 +3,22 @@ from __future__ import annotations
 from collections.abc import Iterable
 from io import BytesIO
 
-from reportlab.lib.colors import HexColor, white
+from reportlab.lib.colors import HexColor
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
-WARM = HexColor("#271503")
-EMBER = HexColor("#BE3F00")
-MUTED = HexColor("#5E5750")
-LINEN = HexColor("#F3F2EE")
-HAIR = HexColor("#E5E7EB")
-RED = HexColor("#991B1B")
-RED_SOFT = HexColor("#FFF1F2")
-AMBER = HexColor("#B45309")
-AMBER_SOFT = HexColor("#FFF7ED")
+WARM = HexColor("#100904")
+CREAM = HexColor("#ffedd7")
+EMBER = HexColor("#dc5000")
+MUTED = HexColor("#6c5f51")
+LINEN = HexColor("#ffedd7")
+HAIR = HexColor("#40372e")
+BARK = HexColor("#382416")
+RED = HexColor("#dc5000")
+RED_SOFT = HexColor("#f3e2c8")
+AMBER = HexColor("#382416")
+AMBER_SOFT = HexColor("#f6ead4")
 
 BANNER_DRAF = "DRAF PENGGUNA — BUKAN DOKUMEN RESMI"
 BANNER_STATUS = "STATUS RESMI: NOT_VERIFIED"
@@ -58,22 +60,22 @@ def render_lines(title: str, lines: Iterable[str], generated_at: str, snapshot_h
         pdf.setFillColor(WARM)
         pdf.rect(0, height - 14 * mm, width, 14 * mm, fill=1, stroke=0)
         pdf.setFillColor(EMBER)
-        pdf.rect(0, height - 14 * mm, 3.2 * mm, 14 * mm, fill=1, stroke=0)
-        pdf.setFillColor(white)
-        pdf.setFont("Helvetica-Bold", 12)
+        pdf.rect(0, height - 14 * mm, 2.2 * mm, 14 * mm, fill=1, stroke=0)
+        pdf.setFillColor(CREAM)
+        pdf.setFont("Helvetica-Bold", 11)
         pdf.drawString(margin, height - 9 * mm, "SatuAman")
-        pdf.setFont("Helvetica", 9)
+        pdf.setFont("Helvetica", 8)
         pdf.drawString(margin + 26 * mm, height - 9 * mm, "Tanggap60")
         pdf.setFont("Helvetica-Bold", 8)
         pdf.drawRightString(width - margin, height - 9 * mm, "DRAF")
 
     def footer() -> None:
-        pdf.setFillColor(LINEN)
+        pdf.setFillColor(BARK)
         pdf.rect(0, 0, width, 14 * mm, fill=1, stroke=0)
         pdf.setStrokeColor(HAIR)
         pdf.setLineWidth(0.4)
         pdf.line(0, 14 * mm, width, 14 * mm)
-        pdf.setFillColor(MUTED)
+        pdf.setFillColor(CREAM)
         pdf.setFont("Helvetica", 7.5)
         pdf.drawString(margin, 6 * mm, "Bukan dokumen resmi. Tidak dikirim ke bank atau polisi.")
         stamp = f"{str(generated_at)[:10]}  ·  snapshot {snapshot_hash[:16]}"
@@ -121,8 +123,8 @@ def render_lines(title: str, lines: Iterable[str], generated_at: str, snapshot_h
 
     header()
     pdf.setFillColor(WARM)
-    pdf.setFont("Times-Bold", 20)
-    for piece in wrap(title, "Times-Bold", 20, max_width):
+    pdf.setFont("Helvetica-Bold", 18)
+    for piece in wrap(title, "Helvetica-Bold", 18, max_width):
         pdf.drawString(margin, y, piece)
         y -= 8 * mm
     y -= 2 * mm

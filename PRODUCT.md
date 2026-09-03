@@ -21,7 +21,7 @@ VPS 4 vCPU / 4 GB / 20 GB, 1 web + 1 heavy worker, Nginx, SQLite WAL, Hermes Age
 Must: case anonim, upload JPG/PNG/PDF 8×25MB, SHA-256 + provenance, OCR + fact extraction, routing PRE/POST/OUT_OF_SCOPE, conflict detection, fact review, readiness 2026-09-02.mvp2, action plan, artifact ZIP 9 file, verification, handoff manual, receipt, purge, events. Constraints: no auto-submit, no raw OCR/PII di trace, approval hash-bound, profile fail-safe, guard RAM 1024 / disk 2048.
 
 ## Brand Commitments
-Nama SatuAman Tanggap60. Bahasa Indonesia sederhana. Disclaimer tetap: keputusan resmi di lembaga berwenang. Warna kertas hangat warisan dipertahankan sebagai referensi tapi dunia baru adalah Waspada Tenang (trustworthy government + forensic precision).
+Nama SatuAman Tanggap60. Bahasa Indonesia sederhana. Disclaimer tetap: keputusan resmi di lembaga berwenang. Dunia visual: darkroom ORYZO — walnut void, cream type, ember hanya aksen pada segel. Bukan kertas bone.
 
 ## Evidence on Hand
 Fixtures demo_tanggap60, PRD/UX spec, PREFLIGHT.md, DEPLOY.md. Tidak ada testimoni/customer palsu untuk diinventarisir.

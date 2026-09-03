@@ -3,29 +3,30 @@
 <!-- impeccable:design-schema 1 -->
 
 ## World
-**Aboard, distilled.** Field journal for a panicked person on a phone: bone paper, one ember action, no dossier chrome. Scene: korban di ruang tamu, bukan engineer di VPS.
+**ORYZO darkroom.** Paket bukti sebagai objek museum di kamar gelap: walnut void, huruf cream, satu segel 60. Bukan jurnal kertas, bukan tombol oranye SaaS.
 
 ## Palette
-- Bone #FFFEFB, Linen #F3F2EE, Hairline #E5E7EB, Warm #271503
-- Ember CTA #BE3F00 (text on ember ≥4.5:1), red #991B1B, green #065F46
-- Muted #5E5750. Color only on the one primary action and status text.
+- Canvas Walnut #100904, Bark #382416, Cork #40372e, Cream #ffedd7
+- Ember #dc5000 hanya pada rim segel dan aksen PDF, bukan CTA
+- Drift #cbbba6 muted. OK #b7d3a8, danger #e07050. Tanpa #fff/#000 murni.
 
 ## Type
-- Display: Cormorant Garamond 300, clamp 32–44px, tracking -0.04em — H1 only.
-- UI: Work Sans 400/600/700, 16px body, 44px touch.
-- No mono on victim screens. Measure ~42ch.
+- Satu keluarga: Archivo 400/500. Label, nav, H1, tombol: 500 uppercase.
+- Lede dan nilai fakta: 400 mixed-case. Body 16px, H1 32px/.9, sentuh 44px.
+- Tanpa mono di layar korban.
 
 ## Materials
-- Hairline 1px, card 12px, pill CTA 9999px. No shadow, no glass, no rail, no left-border callouts.
-- Header: sticky bone, logo + stepper. Footer: one legal line.
+- Tanpa bayangan. Kedalaman dari walnut → bark.
+- Kartu 12px, CTA isi 36px pill, ghost 22.5px. Input garis bawah saja.
+- Divider putus 1px cork. Header sticky walnut. Footer legal uppercase 10px.
 
 ## Layout
-- Single column, max 720px. One primary action per screen.
-- Home: H1 + two choices. Case flow: Bukti → Periksa → Tinjau → Paket.
+- Full-bleed walnut, isi max 40rem. Satu aksi primer per layar.
+- Home: H1 + dua slab (bark vs ghost). Alur: Bukti → Periksa → Tinjau → Paket.
 
 ## Voice
-- Indonesia sederhana. Nilai, nama file, langkah manusia. Bukan SHA, tool, enum, atau hash.
-- CTA menamai aksi: Analisis, Lanjut, Buat paket, Unduh semua.
+- Indonesia sederhana. Nilai, nama file, langkah manusia.
+- CTA menamai aksi. CSS mengubah label menjadi uppercase.
 
 ## Surface — Operate
-Visitor finishes a task. Technical proof lives in the ZIP and the demo video, not the UI.
+Visitor finishes a task. Technical proof lives in the ZIP, not the UI.
