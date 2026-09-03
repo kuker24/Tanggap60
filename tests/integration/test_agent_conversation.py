@@ -52,15 +52,16 @@ def test_chat_understands_state_and_uses_tools(client: TestClient, ocr: Scripted
     assert body["message"]
     assert "<script>" not in body["message"]
     tools = [t["tool"] for t in body["tools_used"]]
-    # bukti agentic: tool Tanggap60 benar-benar dijalankan
-    assert "compile_reporting_units" in tools
+    # bukti agentic causal: minimal tool dieksekusi (recommend_next_action)
+    assert len(tools) == 1
+    assert tools[0] in {"recommend_next_action", "compile_reporting_units"}
     assert all(t["planner"] in {"DETERMINISTIC_SAFE", "HERMES_CLI", "HERMES_HTTP"} for t in body["tools_used"])
     unit_ids = {u["unit_id"] for u in client.get(f"/api/v1/cases/{case_id}/reporting-units").json()["reporting_units"]}
     _valid_guidance(body, unit_ids)
     assert body["quick_actions"]
     trail = client.get(f"/api/v1/cases/{case_id}/agent/trail").json()["trail"]
     kinds = {e["event_type"] for e in trail}
-    assert {"AGENT_MESSAGE", "AGENT_TOOL_REQUEST", "AGENT_TOOL_RESULT"} <= kinds
+    assert {"AGENT_MESSAGE", "AGENT_PLANNER_DECISION", "AGENT_TOOL_REQUEST", "AGENT_TOOL_RESULT"} <= kinds
 
 
 def test_pointer_shows_missing(client: TestClient, ocr: ScriptedOcr) -> None:
@@ -331,3 +332,84 @@ def test_core_ui_works_without_chat(client: TestClient, ocr: ScriptedOcr) -> Non
     assert "Tanya AI" in page.text  # panel tersedia tetapi opsional
     ws = client.get(f"/cases/{case_id}/workspace")
     assert ws.status_code == 200
+    assert "Yang Tanggap60 siapkan" in ws.text
+
+
+def test_new_case_uses_local_guide_without_tools(client: TestClient) -> None:
+    """State NEW tidak boleh mencatat fake tool execution (bukti agentic jujur)."""
+    case_id = create_case(client)
+    body = _ask(client, case_id, "Saya harus apa?")
+    assert body["tools_used"] == []
+    assert "LOCAL_GUIDE" in body["technical"]["planner_modes"]
+    trail = client.get(f"/api/v1/cases/{case_id}/agent/trail").json()["trail"]
+    decision = next((e for e in trail if e["event_type"] == "AGENT_PLANNER_DECISION"), None)
+    assert decision is not None
+    assert decision["planner"] == "LOCAL_CONTEXT"
+    assert decision["result_code"] == "LOCAL_GUIDE"
+
+
+def test_mapping_fact_type_validation_rejects_wrong_type(client: TestClient, ocr: ScriptedOcr) -> None:
+    """Server harus menolak pemetaan jika fact yang dipasangkan salah tipe atau bukan candidate."""
+    case_id = _agent_case(client, ocr)
+    facts = client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"]
+    units = client.get(f"/api/v1/cases/{case_id}/reporting-units").json()["reporting_units"]
+    target_unit = next(u for u in units if u["mapping_status"] == "AMBIGUOUS")
+    amt_fact = next(f for f in facts if f["type"] == "AMOUNT")
+
+    # 1. Tukar posisi: destination diisi fact bertipe AMOUNT -> 400
+    bad_payload = {
+        "target_evidence_id": target_unit["evidence_ids"][0],
+        "pairings": [{"destination_fact_id": amt_fact["fact_id"], "amount_fact_id": amt_fact["fact_id"]}],
+    }
+    res1 = client.post(f"/api/v1/cases/{case_id}/reporting-units/{target_unit['unit_id']}/mapping", json=bad_payload)
+    assert res1.status_code == 400
+    assert "rekening" in res1.json()["message"].lower()
+
+    # 2. Pasangkan fact dari kasus lain / bukan candidate unit ini -> 400
+    other_case = create_case(client)
+    txt_other = "Transfer Berhasil Rp500.000 Ke: DEMO-DEST-OTHER 23 September 2026 11:00 WIB"
+    upload_text_png(client, ocr, other_case, "other.png", txt_other)
+    client.post(f"/api/v1/cases/{other_case}/runs", headers={"Idempotency-Key": "run-other"})
+    other_facts = client.get(f"/api/v1/cases/{other_case}/facts").json()["facts"]
+    foreign_dest = next(f for f in other_facts if f["type"] == "ACCOUNT")
+
+    bad_payload2 = {
+        "target_evidence_id": target_unit["evidence_ids"][0],
+        "pairings": [{"destination_fact_id": foreign_dest["fact_id"], "amount_fact_id": amt_fact["fact_id"]}],
+    }
+    res2 = client.post(f"/api/v1/cases/{case_id}/reporting-units/{target_unit['unit_id']}/mapping", json=bad_payload2)
+    assert res2.status_code == 400
+    assert "bukan dari kasus ini" in res2.json()["message"]
+
+
+def test_workspace_full_account_in_owner_session_masked_in_context(client: TestClient, ocr: ScriptedOcr) -> None:
+    """Workspace HTML/API untuk owner menampilkan full account, tetapi agent context tetap masked."""
+    case_id = _agent_case(client, ocr)
+    # Konfirmasi 1 mapping agar unit terpasang (status menjadi INCOMPLETE karena waktu belum terpasang)
+    body = _ask(client, case_id, CORRECTION)
+    prop = body["proposed_action"]
+    payload = _proposal_payload(client, case_id, body)
+    res = client.post(
+        f"/api/v1/cases/{case_id}/agent/actions/{prop['action_id']}/approve",
+        json={
+            "action_type": prop["action_type"],
+            "payload": payload,
+            "expected_version": body["case_version"],
+        },
+    )
+    assert res.status_code == 200
+
+    ws = client.get(f"/api/v1/cases/{case_id}/workspace").json()
+    resolved_tx = next(t for t in ws["fields"]["transactions"] if t["destination_account"] != "Belum tersedia — perlu dikonfirmasi dulu")
+    # Di workspace milik korban, nomor rekening tujuan tampil unmasked
+    assert "DEMO-DEST-B" in resolved_tx["destination_account"]
+    assert "••" not in resolved_tx["destination_account"]
+    assert "Yang Tanggap60 siapkan" in ws["action_log"][0] or "menyiapkan" in ws["action_log"][1]
+
+    # Namun di agent context (yang dilihat AI / model), rekening tujuan TETAP masked
+    ctx = client.get(f"/api/v1/cases/{case_id}/agent/context").json()
+    ctx_unit = next(u for u in ctx["units"] if u["mapping_status"] == "INCOMPLETE")
+    assert ctx_unit["destination_masked"] is not None
+    # Label akun tanpa digit tetap tampil aman, rekening digit ter-mask
+    assert ctx_unit["destination_masked"] == "DEMO-DEST-B"
+

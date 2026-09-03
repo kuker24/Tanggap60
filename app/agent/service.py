@@ -1,12 +1,19 @@
 """ConversationService: pesan → tool Tanggap60 → respons terstruktur.
 
-Bukti agentic (bukan chatbot prompt-panjang):
-1. baca current case state (konteks terstruktur, tanpa PII mentah);
-2. pilih tool Tanggap60 (router deterministik; Hermes CLI/HTTP bila ada);
-3. jalankan tool lewat ``execute_tool`` (allowlist per state);
-4. susun guidance/action dari HASIL tool via template tetap.
-
-Hermes/LLM tidak pernah menulis kalimat pengguna.
+Agentic flow yang causal (bukan chatbot prompt-panjang, bukan decorative tool proof):
+1. RED safety pre-check (deterministik, tolak sebelum menyentuh tool/model).
+2. Baca current case state (konteks terstruktur, tanpa PII mentah).
+3. Hermes / Deterministic Planner:
+   - Evaluasi state. Jika state tidak memiliki allowed tool (misal: NEW),
+     mode LOCAL_GUIDE aktif: TANPA fake tool execution, tools_used kosong.
+   - Jika state mengizinkan tool, pilih MINIMAL tool (1 tool utama) yang relevan.
+   - Catat event AGENT_PLANNER_DECISION (planner, candidate_tools, selected_tools, latency_ms).
+4. Eksekusi HANYA tool yang dipilih via `execute_tool()`:
+   - Catat AGENT_TOOL_REQUEST & AGENT_TOOL_RESULT dengan durasi nyata.
+   - Hasil tool menjadi Observation nyata.
+5. Response Composer:
+   - Handler membaca Observation dari tool yang baru saja dieksekusi.
+   - Template tetap mengonsumsi data observasi (causal).
 """
 
 from __future__ import annotations
@@ -31,7 +38,6 @@ from app.deps import services_from
 from app.domain.errors import StaleCaseVersion, ValidationFailed
 from app.domain.models import AuditEventRecord
 from app.domain.policies import sha256_text
-from app.hermes.telemetry import mode_from_hermes, planner_for
 from app.hermes.tool_registry import ToolContext, execute_tool
 from app.hermes.tools.catalog import allowed_tools
 from app.infrastructure.logging import hash_id
@@ -39,7 +45,8 @@ from app.infrastructure.repositories import EventRepository
 from app.services.cases import now_utc
 from app.services.ids import new_id
 
-_AGENT_READ_TOOLS: dict[str, tuple[str, ...]] = {
+# Tool candidate preferences per intent (diurutkan dari yang paling primer)
+_INTENT_CANDIDATE_TOOLS: dict[str, tuple[str, ...]] = {
     "ASK_NEXT": ("recommend_next_action", "compile_reporting_units"),
     "GREETING": ("recommend_next_action", "compile_reporting_units"),
     "SHOW_MISSING": ("assess_handoff_readiness", "compile_reporting_units"),
@@ -90,7 +97,7 @@ def _audit(
 
 
 class _Runner:
-    """Menjalankan read tool lewat Hermes execute_tool bila diizinkan state."""
+    """Eksekutor causal: memilih minimal tool set dan mengembalikan observation."""
 
     def __init__(self, db: Any, container: Any, case_id: str, state: str) -> None:
         self.db = db
@@ -99,42 +106,80 @@ class _Runner:
         self.state = state
         self.allowed = set(allowed_tools(state))
         self.used: list[dict[str, Any]] = []
+        self.observations: dict[str, Any] = {}
         self.tool_ms = 0
         services = services_from(db, container)
         self.tool_ctx = cast(ToolContext, services["ctx"])
 
-    def hermes_preference(self, candidates: tuple[str, ...]) -> str | None:
-        """Bila Hermes CLI/HTTP terkonfigurasi, biarkan ia memilih tool."""
-        hermes = self.container.hermes
-        if not bool(getattr(hermes, "hermes_cli_configured", False)):
-            return None
-        options = [c for c in candidates if c in self.allowed]
-        if not options:
-            return None
-        try:
-            picked = hermes.propose_tool(self.state, {"allowed_tools": options, "agent": True})
-        except Exception:
-            return None
-        return picked if picked in options else None
+    def plan_and_execute(self, intent_kind: str) -> tuple[str, list[str]]:
+        """Pilih minimal tool yang diizinkan, lalu eksekusi untuk mendapatkan observation."""
+        candidates = _INTENT_CANDIDATE_TOOLS.get(intent_kind, _INTENT_CANDIDATE_TOOLS["UNKNOWN"])
+        valid_options = [c for c in candidates if c in self.allowed]
 
-    def run(self, name: str, summary: str = "") -> dict[str, Any]:
-        """Jalankan tool; catat planner + durasi untuk bukti agentic."""
-        if name in self.allowed:
-            start = time.perf_counter()
-            result = execute_tool(name, self._state_obj(), {"case_id": self.case_id}, self.tool_ctx)
-            duration = int((time.perf_counter() - start) * 1000)
-            planner = planner_for(name, mode_from_hermes(self.container.hermes))
-        else:
-            # State tidak mengizinkan tool ini: pakai hasil konteks yang
-            # dihitung fungsi service yang SAMA (tanpa duplikat logika).
-            result = {"via": "context", "note": f"{name} tidak diizinkan pada {self.state}"}
-            duration = 0
-            planner = "DETERMINISTIC_SAFE"
-        self.used.append({"tool": name, "planner": planner, "duration_ms": duration})
+        hermes = self.container.hermes
+        is_hermes_cli = bool(getattr(hermes, "hermes_cli_configured", False))
+
+        if not valid_options:
+            # State tidak punya allowed tools (misalnya NEW/COMPLETE/FAILED_SAFE)
+            # Jujur: tidak ada tool yang dieksekusi, tidak ada Hermes decision
+            _audit(
+                self.db,
+                self.case_id,
+                "AGENT_PLANNER_DECISION",
+                self.state,
+                tool_name=None,
+                duration_ms=0,
+                result_code="LOCAL_GUIDE",
+                summary=f"mode=LOCAL_GUIDE;state={self.state};no_tools_allowed",
+                planner="LOCAL_CONTEXT",
+            )
+            return ("LOCAL_GUIDE", [])
+
+        # Hermes memilih jika tersedia, jika tidak deterministik ambil first candidate yang valid
+        t0 = time.perf_counter()
+        selected_tool: str | None = None
+        planner_mode = "DETERMINISTIC_SAFE"
+        if is_hermes_cli:
+            try:
+                proposed = hermes.propose_tool(self.state, {"allowed_tools": valid_options, "agent": True})
+                if proposed in valid_options:
+                    selected_tool = proposed
+                    planner_mode = "HERMES_CLI"
+            except Exception:
+                selected_tool = None
+
+        if selected_tool is None:
+            selected_tool = valid_options[0]
+            planner_mode = "DETERMINISTIC_SAFE"
+
+        plan_latency = int((time.perf_counter() - t0) * 1000)
+
+        # Audit event planner decision yang jujur dan dapat diaudit
+        _audit(
+            self.db,
+            self.case_id,
+            "AGENT_PLANNER_DECISION",
+            self.state,
+            tool_name=selected_tool,
+            duration_ms=plan_latency,
+            result_code="OK",
+            summary=f"planner={planner_mode};candidates={','.join(valid_options)};selected={selected_tool}",
+            planner=planner_mode,
+        )
+
+        # Causal execution: hanya jalankan tool yang terpilih
+        self._execute_single(selected_tool, planner_mode)
+        return (planner_mode, [selected_tool])
+
+    def _execute_single(self, name: str, planner: str) -> None:
+        start = time.perf_counter()
+        _audit(self.db, self.case_id, "AGENT_TOOL_REQUEST", self.state, name, None, "OK", None, "", planner)
+        obs = execute_tool(name, self._state_obj(), {"case_id": self.case_id}, self.tool_ctx)
+        duration = int((time.perf_counter() - start) * 1000)
         self.tool_ms += duration
-        _audit(self.db, self.case_id, "AGENT_TOOL_REQUEST", self.state, name, None, "OK", None, summary, planner)
-        _audit(self.db, self.case_id, "AGENT_TOOL_RESULT", self.state, name, duration, "OK", None, summary, planner)
-        return result
+        self.observations[name] = obs
+        self.used.append({"tool": name, "planner": planner, "duration_ms": duration})
+        _audit(self.db, self.case_id, "AGENT_TOOL_RESULT", self.state, name, duration, "OK", None, "", planner)
 
     def _state_obj(self) -> Any:
         from app.domain.states import State
@@ -161,30 +206,37 @@ def handle_message(
         message = red_message(intent.red_category)
         context = build_agent_context(db, case_id)
         _audit(db, case_id, "SENSITIVE_STOP", context["case"]["state"], None, 0, "DENIED", intent.red_category, text)
-        return _response(context, message, None, None, [], started, 0)
+        return _response(context, message, None, None, [], started, 0, "DETERMINISTIC_SAFE", False)
 
     context = build_agent_context(db, case_id)
     state = context["case"]["state"]
     _audit(db, case_id, "AGENT_MESSAGE", state, None, 0, "OK", None, text)
-    runner = _Runner(db, container, case_id, state)
 
-    # Hermes boleh memilih tool kandidat bila terkonfigurasi.
-    candidates = _AGENT_READ_TOOLS.get(intent.kind, _AGENT_READ_TOOLS["UNKNOWN"])
-    preferred = runner.hermes_preference(candidates)
-    ordered = ((preferred,) + tuple(c for c in candidates if c != preferred)) if preferred else candidates
-    for tool_name in ordered:
-        runner.run(tool_name, intent.kind)
+    runner = _Runner(db, container, case_id, state)
+    planner_mode, _ = runner.plan_and_execute(intent.kind)
 
     handler = _HANDLERS.get(intent.kind, _handle_unknown)
     message, guidance, proposal = handler(intent, context, runner, ui_state)
+
     if proposal is not None:
         _audit(
-            db, case_id, "ACTION_PROPOSED", state, None, 0, "OK", None,
+            db,
+            case_id,
+            "ACTION_PROPOSED",
+            state,
+            None,
+            0,
+            "OK",
+            None,
             f"{proposal.action_type} {proposal.action_id}",
         )
     if guidance is not None:
         _audit(db, case_id, "GUIDANCE_SHOWN", state, None, 0, "OK", None, guidance["target"])
-    return _response(context, message, guidance, proposal, runner.used, started, runner.tool_ms)
+
+    hermes_configured = bool(getattr(container.hermes, "hermes_cli_configured", False))
+    return _response(
+        context, message, guidance, proposal, runner.used, started, runner.tool_ms, planner_mode, hermes_configured
+    )
 
 
 def _response(
@@ -195,8 +247,18 @@ def _response(
     tools_used: list[dict[str, Any]],
     started: float,
     tool_ms: int,
+    planner_mode: str,
+    hermes_configured: bool,
 ) -> dict[str, Any]:
     total_ms = int((time.perf_counter() - started) * 1000)
+
+    if not tools_used:
+        fallback_note = "Mode panduan lokal (LOCAL_GUIDE); status kasus tidak memerlukan eksekusi tool."
+    elif hermes_configured:
+        fallback_note = f"Hermes planner aktif ({planner_mode}); mengeksekusi minimal tool set."
+    else:
+        fallback_note = "Hermes CLI/endpoint tidak terkonfigurasi; router deterministik + minimal tool Tanggap60."
+
     body: dict[str, Any] = {
         "message": message,
         "quick_actions": context["quick_actions"],
@@ -208,8 +270,8 @@ def _response(
         "state": context["case"]["state"],
         "case_version": context["case"]["version"],
         "technical": {
-            "planner_modes": sorted({t["planner"] for t in tools_used}),
-            "fallback_note": "Hermes CLI/endpoint tidak terkonfigurasi; router deterministik + tool Tanggap60.",
+            "planner_modes": [planner_mode] if tools_used else ["LOCAL_GUIDE"],
+            "fallback_note": fallback_note,
         },
     }
     if proposal is not None:
@@ -218,12 +280,9 @@ def _response(
             "action_type": proposal.action_type,
             "risk": proposal.risk,
             "summary": proposal.summary,
-            # payload dikembalikan agar klien bisa approve; server verifikasi
-            # ulang action_id + ownership + versi (anti-tamper).
             "payload": proposal.payload,
             "expected_version": proposal.expected_version,
         }
-        # Keputusan lewat kartu Simpan/Batal agar eksplisit (tanpa duplikasi chip).
         body["quick_actions"] = []
     return body
 
@@ -246,11 +305,12 @@ def _unit_label(unit: dict[str, Any]) -> str:
     if dest:
         bits.append(f"ke {dest}")
     if bits:
-        return f"Transaksi {unit['index']} ({' '.join(bits)})"
-    return f"Transaksi {unit['index']}"
+        return f"Transaksi {unit.get('index', '')} ({' '.join(bits)})".replace("  ", " ").strip()
+    return f"Transaksi {unit.get('index', '')}".strip()
 
 
-# --- Handler per intent (template tetap, data dari tool/konteks) ---------------
+# --- Handlers per intent yang mengonsumsi Observation nyata dari runner ---
+
 
 def _handle_greeting(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     units = context["units"]
@@ -276,14 +336,15 @@ def _handle_greeting(intent: Intent, context: dict[str, Any], runner: _Runner, u
             None,
         )
     return (
-        _next_action_text(context),
-        _guide_for_action(context),
+        _next_action_text(context, runner.observations.get("recommend_next_action")),
+        _guide_for_action(context, runner.observations.get("recommend_next_action")),
         None,
     )
 
 
-def _next_action_text(context: dict[str, Any]) -> str:
-    action = context["next_action"]
+def _next_action_text(context: dict[str, Any], observation: dict[str, Any] | None = None) -> str:
+    # Causal consumption: utamakan hasil observation yang baru dijalankan tool recommend_next_action
+    action = observation or context["next_action"]
     code = action.get("code")
     target = action.get("target_unit_id")
     unit = next((u for u in context["units"] if u["unit_id"] == target), None)
@@ -303,12 +364,12 @@ def _next_action_text(context: dict[str, Any]) -> str:
         "OPEN_IASC_HANDOFF": "Buka portal resmi IASC dan isi datanya sendiri. Saya sudah menyiapkan ringkasannya.",
         "RECORD_RECEIPT": "Catat nomor laporan resmi bila sudah ada.",
     }
-    return mapping.get(code, action.get("reason") or "Mari periksa kondisi kasus Anda langkah demi langkah.")
+    return mapping.get(str(code or ""), action.get("reason") or "Mari periksa kondisi kasus Anda langkah demi langkah.")
 
 
-def _guide_for_action(context: dict[str, Any]) -> dict[str, str] | None:
+def _guide_for_action(context: dict[str, Any], observation: dict[str, Any] | None = None) -> dict[str, str] | None:
     unit_ids = set(context["unit_ids"])
-    action = context["next_action"]
+    action = observation or context["next_action"]
     code = action.get("code")
     target = action.get("target_unit_id")
     if target and validate_guide_target(f"transaction-{target}", unit_ids):
@@ -328,7 +389,8 @@ def _guide_for_action(context: dict[str, Any]) -> dict[str, str] | None:
 
 
 def _handle_ask_next(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
-    return (_next_action_text(context), _guide_for_action(context), None)
+    obs = runner.observations.get("recommend_next_action")
+    return (_next_action_text(context, obs), _guide_for_action(context, obs), None)
 
 
 def _handle_missing(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
@@ -396,9 +458,10 @@ def _handle_problem(intent: Intent, context: dict[str, Any], runner: _Runner, ui
 
 
 def _handle_confused(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    obs = runner.observations.get("recommend_next_action")
     return (
-        f"Tidak apa-apa, saya bantu. {_next_action_text(context)} Saya tandai yang perlu diperbaiki.",
-        _guide_for_action(context),
+        f"Tidak apa-apa, saya bantu. {_next_action_text(context, obs)} Saya tandai yang perlu diperbaiki.",
+        _guide_for_action(context, obs),
         None,
     )
 
@@ -422,7 +485,8 @@ def _handle_state(intent: Intent, context: dict[str, Any], runner: _Runner, ui: 
 
 
 def _handle_readiness(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
-    overall = context["readiness_overall"]
+    obs = runner.observations.get("assess_handoff_readiness")
+    overall = obs.get("overall_status") if obs else context["readiness_overall"]
     if overall == "READY":
         return (
             "Semuanya siap. Tinggal persetujuan Anda untuk dibuatkan paket.",
@@ -472,7 +536,10 @@ def _handle_workspace(intent: Intent, context: dict[str, Any], runner: _Runner, 
 
 
 def _handle_official(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
-    configured = str(getattr(runner.container.settings, "official_iasc_url", "") or "")
+    obs = runner.observations.get("prepare_official_handoff")
+    configured = (obs.get("official_url") if obs else "") or str(
+        getattr(runner.container.settings, "official_iasc_url", "") or ""
+    )
     url = validate_url(configured) or "https://iasc.ojk.go.id/"
     proposal = _propose(context, "OPEN_OFFICIAL", {"url": url}, {"url": url})
     return (
@@ -491,7 +558,6 @@ def _blocking_fact_ids(context: dict[str, Any]) -> set[str]:
 
 
 def _dest_hint_matches(label: str, text: str) -> bool:
-    """Hint rekening eksplisit dari pengguna: label penuh atau 4 digit ekor."""
     import re as _re
 
     lab = str(label or "").lower()
@@ -596,7 +662,9 @@ def _evidence_of(runner: _Runner, fact_id: str) -> str | None:
     return None
 
 
-def _propose(context: dict[str, Any], action_type: str, summary: dict[str, Any], payload: dict[str, Any]) -> ProposedAction:
+def _propose(
+    context: dict[str, Any], action_type: str, summary: dict[str, Any], payload: dict[str, Any]
+) -> ProposedAction:
     version = context["case"]["version"]
     action_id = action_id_for(context["case"]["case_id"], action_type, payload, version)
     return ProposedAction(
@@ -663,7 +731,6 @@ _HANDLERS = {
 
 
 def _is_replay(db: Any, case_id: str, action_id: str, action_type: str, payload: dict[str, Any]) -> bool:
-    """True bila aksi ini sudah pernah dieksekusi (idempotency key = action_id)."""
     import json as _json
 
     from app.infrastructure.repositories import IdempotencyRepository
@@ -694,7 +761,6 @@ def approve_action(
     payload: dict[str, Any],
     expected_version: int,
 ) -> dict[str, Any]:
-    """Eksekusi aksi YELLOW yang sudah disetujui manusia."""
     from app.api.router import post_unit_mapping
 
     services = services_from(db, request.app.state.container)
@@ -704,9 +770,18 @@ def approve_action(
     if action_id != action_id_for(case_id, action_type, payload, expected_version):
         raise ValidationFailed("konfirmasi tidak cocok — minta ulang dari chat")
     if action_type != "OPEN_OFFICIAL":
-        # replay aman didahulukan: aksi yang sama (action_id) tidak bermutasi ganda
         if _is_replay(db, case_id, action_id, action_type, payload):
-            _audit(db, case_id, "ACTION_APPROVED", case.state.value, "resolve_unit_mapping", 0, "REPLAY", None, action_type)
+            _audit(
+                db,
+                case_id,
+                "ACTION_APPROVED",
+                case.state.value,
+                "resolve_unit_mapping",
+                0,
+                "REPLAY",
+                None,
+                action_type,
+            )
             return {"status": "saved", "message": "Sudah tersimpan sebelumnya. Tidak ada yang berubah."}
     if expected_version != case.version:
         _audit(db, case_id, "ACTION_DENIED", case.state.value, None, 0, "STALE", None, action_type)
@@ -730,8 +805,14 @@ def approve_action(
         url = validate_url(str(payload.get("url") or ""))
         if url is None:
             raise ValidationFailed("tautan tidak diizinkan")
-        _audit(db, case_id, "ACTION_APPROVED", case.state.value, "prepare_official_handoff", 0, "OK", None, action_type)
-        return {"status": "open", "url": url, "message": "Silakan buka sendiri portal resminya. Saya tidak mengirim apa pun."}
+        _audit(
+            db, case_id, "ACTION_APPROVED", case.state.value, "prepare_official_handoff", 0, "OK", None, action_type
+        )
+        return {
+            "status": "open",
+            "url": url,
+            "message": "Silakan buka sendiri portal resminya. Saya tidak mengirim apa pun.",
+        }
 
     raise ValidationFailed("aksi tidak dikenal")
 

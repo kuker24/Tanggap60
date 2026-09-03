@@ -76,8 +76,12 @@ Safe Workspace → panduan handoff manual ke portal resmi (allowlist)
 
 Halaman `/cases/<id>/workspace`, stateless (derivasi dari fakta
 CONFIRMED/CORRECTED + unit COMPLETE/INCOMPLETE). Label eksplisit
-"SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI". Action log visual,
-checklist, CTA portal resmi. Tanpa auto-submit — pengiriman tetap manual.
+"SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI". Action log visual
+"Yang Tanggap60 siapkan", checklist, CTA portal resmi. Tanpa auto-submit — pengiriman tetap manual.
+Bukan isolated computer / sandbox browser — ini adalah formulir persiapan terpandu
+di mana nomor rekening tujuan ditampilkan lengkap khusus di sesi browser korban
+agar siap dicopy ke formulir resmi, sementara konteks Agent, audit log,
+dan telemetry ke model tetap tersamar (masked).
 
 ## Batas yang dijaga
 

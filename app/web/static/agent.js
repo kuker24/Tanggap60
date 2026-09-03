@@ -17,11 +17,13 @@
   const mic = document.getElementById("agent-mic");
   const speakBtn = document.getElementById("agent-speak");
   const toast = document.getElementById("agent-toast");
+  const sendBtn = form.querySelector('button[type="submit"]');
   const HIST_KEY = "t60agent:" + CASE;
   const HIST_TTL = 60 * 60 * 1000;
   let pendingAction = null;
   let speakOn = false;
   let greeted = false;
+  let inFlight = false;
 
   function showToast(text) {
     toast.textContent = text;
@@ -30,21 +32,26 @@
   }
   function setStatus(text) { status.textContent = text; }
 
+  /* Privacy-first: Raw user text (including possible passwords/OTP) is NEVER
+     persisted in sessionStorage. Only AI responses and technical metadata are preserved. */
   function loadHist() {
     try {
       const raw = sessionStorage.getItem(HIST_KEY);
       if (!raw) return [];
       const data = JSON.parse(raw);
       if (!data.ts || Date.now() - data.ts > HIST_TTL) { sessionStorage.removeItem(HIST_KEY); return []; }
-      return data.items || [];
+      return (data.items || []).filter(i => i && i.role === "ai");
     } catch (e) { return []; }
   }
   function saveHist(items) {
-    try { sessionStorage.setItem(HIST_KEY, JSON.stringify({ ts: Date.now(), items: items.slice(-30) })); } catch (e) {}
+    try {
+      const aiOnly = (items || []).filter(i => i && i.role === "ai").slice(-20);
+      sessionStorage.setItem(HIST_KEY, JSON.stringify({ ts: Date.now(), items: aiOnly }));
+    } catch (e) {}
   }
   let hist = loadHist();
 
-  function addMsg(role, text, tools) {
+  function addMsg(role, text, tools, persist = true) {
     const div = document.createElement("div");
     div.className = "agent-msg " + role;
     const p = document.createElement("p");
@@ -69,8 +76,10 @@
     }
     msgs.appendChild(div);
     msgs.scrollTop = msgs.scrollHeight;
-    hist.push({ role, text });
-    saveHist(hist);
+    if (role === "ai" && persist) {
+      hist.push({ role: "ai", text, tools });
+      saveHist(hist);
+    }
     return div;
   }
 
@@ -90,11 +99,20 @@
     return parts[parts.length - 1] || "home";
   }
 
+  function setBusy(busy) {
+    inFlight = busy;
+    if (sendBtn) sendBtn.disabled = busy;
+    input.disabled = busy;
+    if (mic) mic.disabled = busy;
+  }
+
   async function send(text) {
+    if (inFlight) return;
     text = (text || "").trim();
     if (!text && greeted) return;
-    if (text) addMsg("user", text);
+    if (text) addMsg("user", text, null, false);
     input.value = "";
+    setBusy(true);
     setStatus("Membaca kondisi kasus…");
     renderQuick([]);
     try {
@@ -111,14 +129,17 @@
       greeted = true;
       pendingAction = data.proposed_action || null;
       setStatus("Siap membantu");
-      addMsg("ai", data.message, data.tools_used);
+      addMsg("ai", data.message, data.tools_used, true);
       renderQuick(data.quick_actions);
       if (data.proposed_action) renderProposal(data.proposed_action);
       if (data.guidance) guide(data.guidance);
       if (speakOn) speak(data.message);
     } catch (e) {
       setStatus("Siap membantu");
-      addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.");
+      addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.", null, false);
+    } finally {
+      setBusy(false);
+      setTimeout(() => input.focus(), 50);
     }
   }
 
@@ -281,10 +302,12 @@
   function open() {
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
-    const old = hist;
-    hist = [];
-    old.forEach(h => addMsg(h.role, h.text, null));
-    hist = [];
+    // Render stored history only once when container is currently empty
+    if (msgs.children.length === 0 && hist.length > 0) {
+      hist.forEach(h => {
+        if (h && h.role === "ai") addMsg("ai", h.text, h.tools, false);
+      });
+    }
     if (!greeted && msgs.children.length === 0) send("");
     setTimeout(() => input.focus(), 50);
   }

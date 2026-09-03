@@ -151,10 +151,7 @@ def compile_reporting_units(
                     dest_fact = next((x for x in dests if x.fact_id == dest_fid), None)
                     amt_fact = next((x for x in amounts if x.fact_id == amt_fid), None)
                     time_fact = next((x for x in times if x.fact_id == time_fid), None)
-                    # fallback to any if mismatch - but we validate
-                    if dest_fact is None and dests:
-                        # choose first if not specified
-                        dest_fact = dests[0]
+                    # NO GUESSING: do NOT fallback to dests[0] if dest_fid was invalid/missing.
                     fid_list = [f.fact_id for f in [dest_fact, amt_fact, time_fact] if f]
                     evid_ids = [ev.evidence_id] + [eid for eid in shared_evidence_ids if eid != ev.evidence_id][:0]  # shared not auto bound
                     unit_id = stable_unit_id(case_id, ev.evidence_id, fid_list, suffix=str(idx))

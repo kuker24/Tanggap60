@@ -19,8 +19,13 @@ NOT_AVAILABLE = "Belum tersedia — isi sendiri"
 UNCONFIRMED = "Belum tersedia — perlu dikonfirmasi dulu"
 
 
-def prepare_workspace(db: Any, case_id: str) -> dict[str, Any]:
-    """Siapkan field workspace. Murni derivasi; tanpa penyimpanan."""
+def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> dict[str, Any]:
+    """Siapkan field workspace. Murni derivasi; tanpa penyimpanan.
+    
+    mask_destination=False: hanya untuk sesi pelaporan resmi korban di browser
+    miliknya (UI menampilkan nomor rekening lengkap agar bisa dicopy ke form resmi).
+    Agent context, audit log, dan telemetry tetap masked.
+    """
     context = build_agent_context(db, case_id)
     facts = {f.fact_id: f for f in FactRepository(db).list_for_case(case_id)}
     evidence_names = {e.evidence_id: e.original_name_display for e in EvidenceRepository(db).list_for_case(case_id)}
@@ -41,7 +46,7 @@ def prepare_workspace(db: Any, case_id: str) -> dict[str, Any]:
                 dest_bank = fact.normalized_value or fact.raw_value
         when = unit["transferred_at"] or ""
         date, _, time = when.partition(" ")
-        dest = _dest_raw(facts, unit)
+        dest = _dest_raw(facts, unit, mask=mask_destination)
         amount = unit["amount_text"] if unit.get("amount") is not None else UNCONFIRMED
         transactions.append(
             {
@@ -82,10 +87,10 @@ def prepare_workspace(db: Any, case_id: str) -> dict[str, Any]:
     }
     assert set(fields) <= WORKSPACE_FIELDS | {"transactions"}
     log = [
-        "membuka workspace",
-        f"mengisi {len(transactions)} transaksi terkonfirmasi",
+        "membuka workspace persiapan",
+        f"menyiapkan {len(transactions)} transaksi teridentifikasi",
         "menyusun kronologi dari fakta yang ditinjau",
-        "identitas korban dibiarkan kosong untuk diisi pengguna",
+        "identitas korban dibiarkan kosong untuk diisi pengguna sendiri",
     ]
     return {
         "simulation": True,
@@ -97,13 +102,14 @@ def prepare_workspace(db: Any, case_id: str) -> dict[str, Any]:
     }
 
 
-def _dest_raw(facts: dict[str, Any], unit: dict[str, Any]) -> str | None:
+def _dest_raw(facts: dict[str, Any], unit: dict[str, Any], mask: bool = False) -> str | None:
     for fid in unit["fact_ids"]:
         fact = facts.get(fid)
         if fact is None:
             continue
         ftype = fact.type.value if hasattr(fact.type, "value") else str(fact.type)
         if ftype == "ACCOUNT":
-            return mask_account(fact.normalized_value or fact.raw_value)
+            val = fact.normalized_value or fact.raw_value
+            return mask_account(val) if mask else str(val)
     masked = unit.get("destination_masked")
     return str(masked) if masked else None

@@ -34,6 +34,7 @@ agent_api = APIRouter(prefix="/api/v1")
 _AGENT_EVENT_TYPES = frozenset(
     {
         "AGENT_MESSAGE",
+        "AGENT_PLANNER_DECISION",
         "AGENT_TOOL_REQUEST",
         "AGENT_TOOL_RESULT",
         "GUIDANCE_SHOWN",

@@ -345,13 +345,25 @@ def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dic
             return cached
     # verify unit exists (compile current units)
     units, _, _ = _get_units_and_readiness(case_id, request.state.db)
-    if unit_id not in {u.unit_id for u in units}:
+    target_unit = next((u for u in units if u.unit_id == unit_id), None)
+    if target_unit is None:
         raise ValidationFailed("transaksi tidak ditemukan di kasus ini")
     # server-side fact/evidence ownership validation (never trust client)
-    owned_facts = {f.fact_id for f in FactRepository(request.state.db).list_for_case(case_id)}
+    all_facts_list = FactRepository(request.state.db).list_for_case(case_id)
+    facts_by_id = {f.fact_id: f for f in all_facts_list}
+    owned_facts = set(facts_by_id.keys())
     owned_evidence = {e.evidence_id for e in EvidenceRepository(request.state.db).list_for_case(case_id)}
     if evidence_id and evidence_id not in owned_evidence:
         raise ValidationFailed("bukti tidak ditemukan di kasus ini")
+    # Target unit must belong to the target evidence if evidence_id specified, or unit's own evidence
+    allowed_evidence_ids = set(target_unit.evidence_ids)
+    if evidence_id and evidence_id not in allowed_evidence_ids:
+        raise ValidationFailed("bukti tidak cocok dengan transaksi yang dipasangkan")
+
+    # Strict fact-type validation and unit candidate set membership (no guessing, no spoofing)
+    from app.domain.models import FactType
+
+    unit_fact_ids = set(target_unit.fact_ids)
     for row in pairings:
         if not isinstance(row, dict):
             raise ValidationFailed("format pasangan tidak dikenal")
@@ -363,6 +375,21 @@ def post_unit_mapping(case_id: str, unit_id: str, request: Request, payload: dic
         for fid in (dest, amount, when):
             if fid and fid not in owned_facts:
                 raise ValidationFailed("data yang dipasangkan bukan dari kasus ini")
+            if fid and fid not in unit_fact_ids:
+                raise ValidationFailed("data yang dipasangkan bukan bagian dari kandidat transaksi ini")
+
+        dest_fact = facts_by_id[dest]
+        amt_fact = facts_by_id[amount]
+        if dest_fact.type not in {FactType.ACCOUNT, FactType.PJP}:
+            raise ValidationFailed("rekening tujuan harus berupa rekening atau bank penyedia jasa pembayaran")
+        if "VICTIM" in (dest_fact.raw_value or ""):
+            raise ValidationFailed("rekening tujuan tidak boleh rekening korban")
+        if amt_fact.type != FactType.AMOUNT:
+            raise ValidationFailed("nominal harus berupa fakta bertipe jumlah uang")
+        if when:
+            when_fact = facts_by_id[when]
+            if when_fact.type != FactType.DATETIME:
+                raise ValidationFailed("waktu transaksi harus berupa fakta bertipe tanggal/waktu")
     # optimistic concurrency on the shared case version (same convention as
     # fact PATCH and conflict resolve): reject stale tabs overwriting newer writes
     expected = payload.get("expected_version")
