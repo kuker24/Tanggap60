@@ -83,10 +83,12 @@
   <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · dicek{% endif %}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
   <p class="src">{{ evidence_names.get(fact.source_evidence_id, "Cerita Anda") }}</p>
+  {% if fact.review_status == "CANDIDATE" %}
   <div class="fact-actions">
     <button class="btn ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
     <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Betulkan</button>
   </div>
+  {% endif %}
   <div class="correct-box" id="correct-{{ fact.fact_id }}">
     <label for="input-{{ fact.fact_id }}">Nilai yang benar</label>
     <input id="input-{{ fact.fact_id }}" type="text" placeholder="Tulis perbaikan">

@@ -10,7 +10,7 @@ def test_every_victim_page_is_darkroom(client: TestClient) -> None:
     assert home.status_code == 200
     assert 'content="dark"' in home.text
     assert 'content="#000000"' in home.text
-    assert "aurora-center" in home.text
+    assert "aurora-e2e" in home.text
     assert "aurora" in home.text
     case_id = create_case(client)
     for path in (

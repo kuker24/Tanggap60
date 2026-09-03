@@ -37,6 +37,10 @@
     const focus = names[names.length - 1];
     const dropEl = document.getElementById("drop");
     if (dropEl) dropEl.classList.toggle("is-focus", focus === "files");
+    const filesStep = document.querySelector('[data-step="files"]');
+    if (filesStep) filesStep.classList.toggle("submit-ready", names.indexOf("submit") !== -1);
+    const notice = document.querySelector(".notice");
+    if (notice) notice.hidden = focus !== "files";
     if (lede && LEDES[focus]) lede.textContent = LEDES[focus];
   }
   if (document.getElementById("intake-form")) {
