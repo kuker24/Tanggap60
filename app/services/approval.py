@@ -283,9 +283,10 @@ class ApprovalService:
             mappings = UnitMappingRepository(self.session).list_for_case(case_id)
             decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
             units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-            if any(str(getattr(u, "mapping_status", "")) == "AMBIGUOUS" for u in units):
-                # case-level approval blocked when ambiguous exists; unit approval should be used
-                pass  # allow but note? For now don't block case-level if ambiguous - let caller use unit path
+            if any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in units):
+                raise ValidationFailed("pasangan transaksi belum dipilih")
+        except ValidationFailed:
+            raise
         except Exception:
             units = []
         assert_no_blocking_conflicts(self.conflicts.list_for_case(case_id))

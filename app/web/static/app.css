@@ -103,8 +103,10 @@ h3{font:700 16px/1.3 var(--sans);letter-spacing:-.02em;margin:0 0 8px}
 
 label{display:block;font:600 13px/1 var(--sans);color:var(--muted);margin:18px 0 6px}
 label .opt{font-weight:400}
-input[type="text"], textarea{width:100%;padding:12px;border:1px solid var(--hairline);background:#fff;border-radius:10px;font:500 15px/1.5 var(--sans);color:var(--warm)}
-input[type="text"]:focus, textarea:focus{border-color:var(--focus);box-shadow:0 0 0 4px var(--focus-ring);outline:none}
+input[type="text"], textarea, select{width:100%;padding:12px;border:1px solid var(--hairline);background:#fff;border-radius:10px;font:500 15px/1.5 var(--sans);color:var(--warm)}
+input[type="text"]:focus, textarea:focus, select:focus{border-color:var(--focus);box-shadow:0 0 0 4px var(--focus-ring);outline:none}
+.pair-row{padding:12px 0;border-top:1px solid var(--hairline)}
+.pair-row:first-of-type{border-top:0;padding-top:0}
 textarea{min-height:104px;resize:vertical}
 .field .help{font:400 13px/1.45 var(--sans);color:var(--muted);margin-top:6px}
 .notice{background:var(--linen);border:1px solid var(--hairline);padding:12px 14px;border-radius:10px;font:400 14px/1.5 var(--sans);color:#3E3528;margin:0 0 18px}

@@ -126,17 +126,20 @@ def test_missing_transaction_time_is_not_fabricated(client: TestClient, ocr: Scr
     names = set(packed.namelist())
     if payload.get("schema_version") == "2.2":
         assert {"action_plan.pdf", "evidence_pack.pdf", "readiness_report.pdf", "case.json", "handoff.md", "manifest.sha256"}.issubset(names)
-        # bank pack may be per-unit
-        bank_candidates = [n for n in names if "bank" in n.lower()]
-        assert bank_candidates
-        bank_name = bank_candidates[0]
-        bank_text = "".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(packed.read(bank_name))).pages)
+        bank_candidates = [n for n in names if n.endswith("bank_handoff_pack.pdf")]
+        assert not bank_candidates
+        ready_text = "".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(packed.read("readiness_report.pdf"))).pages)
+        plan_text = "".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(packed.read("action_plan.pdf"))).pages)
+        assert "DRAF PENGGUNA" in ready_text
+        assert "NOT_VERIFIED" in ready_text
+        assert "BELUM LENGKAP" in ready_text
+        assert "waktu" in plan_text.lower() or "kurang" in plan_text.lower()
     else:
         assert names == POST_ZIP
         bank_text = "".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(packed.read("bank_handoff_pack.pdf"))).pages)
-    assert "DRAF PENGGUNA" in bank_text
-    assert "NOT_VERIFIED" in bank_text
-    assert "BELUM LENGKAP" in bank_text
+        assert "DRAF PENGGUNA" in bank_text
+        assert "NOT_VERIFIED" in bank_text
+        assert "BELUM LENGKAP" in bank_text
 
 
 def test_cekdulu_not_forced_into_post_packs(client: TestClient) -> None:

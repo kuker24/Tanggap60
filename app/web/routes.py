@@ -8,6 +8,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.api.helpers import artifact_public, case_summary, conflict_public, evidence_public, fact_public
 from app.deps import services_from
+from app.domain.errors import AppError, ValidationFailed
 from app.domain.states import DeclaredCondition, Mode, State
 from app.infrastructure.repositories import (
     ActionRepository,
@@ -18,6 +19,7 @@ from app.infrastructure.repositories import (
     FactRepository,
     ReceiptRepository,
     TransactionRepository,
+    UnitMappingRepository,
 )
 from app.services.ids import new_id
 from app.web.labels import human, soften
@@ -64,6 +66,53 @@ def _gap_texts(report: dict | None, units_report: dict | None) -> list[str]:
             for ck in ch.get("checks") or []:
                 add(ck)
     return out
+
+
+def _case_units(db, case_id: str):
+    from app.services.reporting_units import compile_reporting_units
+
+    facts = FactRepository(db).list_for_case(case_id)
+    evidence = EvidenceRepository(db).list_for_case(case_id)
+    mappings = UnitMappingRepository(db).list_for_case(case_id)
+    decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+    return compile_reporting_units(case_id, facts, evidence, decs if decs else None)
+
+
+def _pairing_cards(db, case_id: str) -> list[dict]:
+    units = _case_units(db, case_id)
+    facts = {f.fact_id: f for f in FactRepository(db).list_for_case(case_id)}
+    cards = []
+    for unit in units:
+        status = str(getattr(unit.mapping_status, "value", unit.mapping_status))
+        if status != "AMBIGUOUS":
+            continue
+        dests, amounts, times = [], [], []
+        for fid in unit.fact_ids:
+            fact = facts.get(fid)
+            if fact is None:
+                continue
+            kind = fact.type.value
+            item = {"id": fact.fact_id, "label": fact.raw_value}
+            if kind in {"ACCOUNT", "PJP"} and "VICTIM" not in (fact.raw_value or ""):
+                dests.append(item)
+            elif kind == "AMOUNT":
+                amounts.append(item)
+            elif kind == "DATETIME":
+                times.append(item)
+        evid = unit.evidence_ids[0] if unit.evidence_ids else ""
+        rows = max(len(dests), len(amounts), 1)
+        rows = min(rows, 4)
+        cards.append(
+            {
+                "unit_id": unit.unit_id,
+                "evidence_id": evid,
+                "dests": dests,
+                "amounts": amounts,
+                "times": times,
+                "rows": list(range(rows)),
+            }
+        )
+    return cards
 
 
 @web.get("/favicon.ico")
@@ -199,8 +248,38 @@ def review(case_id: str, request: Request):
             "evidence_names": {e.evidence_id: e.original_name_display for e in evidence},
             "conflicts": conflicts_pub,
             "has_blocking": bool(blocking),
+            "pairing_units": [] if blocking else _pairing_cards(request.state.db, case_id),
         },
     )
+
+
+@web.post("/cases/{case_id}/pairing/{unit_id}")
+async def submit_pairing(case_id: str, unit_id: str, request: Request):
+    _svc(request)["cases"].get_owned(case_id, _sid(request))
+    form = await request.form()
+    evidence_id = str(form.get("evidence_id") or "")
+    pairings: list[dict[str, str]] = []
+    for index in range(4):
+        dest = str(form.get(f"destination_fact_id_{index}") or "")
+        amount = str(form.get(f"amount_fact_id_{index}") or "")
+        when = str(form.get(f"datetime_fact_id_{index}") or "")
+        if dest and amount:
+            row = {"destination_fact_id": dest, "amount_fact_id": amount}
+            if when:
+                row["datetime_fact_id"] = when
+            pairings.append(row)
+    try:
+        from app.api.router import post_unit_mapping
+
+        post_unit_mapping(
+            case_id,
+            unit_id,
+            request,
+            {"target_evidence_id": evidence_id, "pairings": pairings, "reason": "tinjauan"},
+        )
+    except AppError:
+        pass
+    return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
 
 
 @web.get("/cases/{case_id}/readiness")
@@ -293,9 +372,10 @@ def approval_page(case_id: str, request: Request):
     _, digest = _svc(request)["approval"].current_snapshot(case_id)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
     blocking = [c for c in conflicts if c.severity.value == "BLOCKING" and c.status.value == "OPEN"]
+    ambiguous = any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in _case_units(request.state.db, case_id))
     return TEMPLATES.TemplateResponse(
         "approval.html",
-        {"request": request, "case": case, "snapshot_hash": digest, "blocking": blocking},
+        {"request": request, "case": case, "snapshot_hash": digest, "blocking": blocking, "ambiguous": ambiguous},
     )
 
 
@@ -312,6 +392,10 @@ def submit_approval(
     notice = accepted_notice in {"1", "on", "true", "yes"}
     try:
         _svc(request)["approval"].approve(case_id, _sid(request), snapshot_hash, notice)
+    except ValidationFailed as exc:
+        if "pasangan" in str(exc.message):
+            return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+        return RedirectResponse(f"/cases/{case_id}/approval", status_code=303)
     except AppError:
         return RedirectResponse(f"/cases/{case_id}/approval", status_code=303)
     _kick_orchestrator(request, case_id)

@@ -60,21 +60,19 @@ class ArtifactService:
             raise ApprovalRequired("butuh persetujuan")
         if case.approved_snapshot_hash != snapshot_hash:
             raise ArtifactVerifyFailed("hash persetujuan berbeda")
-        # try case-level snapshot first, then unit-level if target approval is unit-scoped
+        approved_target_id: str | None = None
         try:
             payload, digest = self.approval.current_snapshot(case_id)
             if digest != snapshot_hash:
-                # try unit snapshots
                 from app.infrastructure.repositories import ApprovalRepository
 
                 all_ap = ApprovalRepository(self.session).list_for_case(case_id)
                 matched = next((a for a in all_ap if a.snapshot_hash == snapshot_hash and a.revoked_at is None), None)
                 if matched and matched.target_id:
+                    approved_target_id = matched.target_id
                     payload, digest = self.approval.unit_snapshot(case_id, matched.target_id)
                 if digest != snapshot_hash:
                     raise ArtifactVerifyFailed("snapshot berubah")
-            else:
-                payload = payload  # case-level ok
         except ArtifactVerifyFailed:
             raise
         except Exception as exc:
@@ -138,9 +136,9 @@ class ArtifactService:
         elif use_units:
             # 2.2 path: per-unit packs
             report = self._readiness(case_id)
-            # action plan reflects next best action
-            built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines_v2(case_id, snapshot_hash, next_action_payload, units), generated_at, snapshot_hash))
-            built.append(self._store_pdf(case_id, ArtifactType.EVIDENCE_PACK, self._pack_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
+            emit_units = [u for u in units if u.unit_id == approved_target_id] if approved_target_id else units
+            built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines_v2(case_id, snapshot_hash, next_action_payload, emit_units), generated_at, snapshot_hash))
+            built.append(self._store_pdf(case_id, ArtifactType.EVIDENCE_PACK, self._pack_lines(case_id, snapshot_hash, emit_units), generated_at, snapshot_hash))
             built.append(
                 self._store_pdf(
                     case_id,
@@ -150,19 +148,16 @@ class ArtifactService:
                     snapshot_hash,
                 )
             )
-            # incident police pack
             built.append(
                 self._store_pdf(
                     case_id,
                     ArtifactType.POLICE_HANDOFF_PACK,
-                    self._channel_pack_lines(case_id, snapshot_hash, report, "POLICE"),
+                    self._police_lines(case_id, snapshot_hash, report, emit_units),
                     generated_at,
                     snapshot_hash,
                 )
             )
-            # per-unit packs
-            for unit in units:
-                # unit.json
+            for unit in emit_units:
                 unit_data = self._unit_json_data(unit, units_report)
                 built.append(
                     self._store_bytes(
@@ -174,32 +169,33 @@ class ArtifactService:
                         f"units/{unit.unit_id}/unit.json",
                     )
                 )
-                # bank pack per unit
+                if _mapping(unit) != "COMPLETE":
+                    continue
                 urep = None
                 if units_report:
-                    urep = next((r for r in units_report["units"] if r["unit_id"] == unit.unit_id), None)  # type: ignore[index]
-                bank_ready = urep and any(ch["channel"] == "BANK_PJP" and ch["status"] == "READY" for ch in urep["channels"])  # type: ignore[union-attr]
-                iasc_ready = urep and any(ch["channel"] == "IASC" and ch["status"] == "READY" for ch in urep["channels"])  # type: ignore[union-attr]
-                built.append(
-                    self._store_pdf(
-                        case_id,
-                        ArtifactType.UNIT_BANK_PACK,
-                        self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "BANK", bank_ready),
-                        generated_at,
-                        snapshot_hash,
-                        filename=f"units/{unit.unit_id}/bank_handoff_pack.pdf",
+                    urep = next((r for r in units_report["units"] if r["unit_id"] == unit.unit_id), None)
+                if _channel_ready(urep, "BANK_PJP"):
+                    built.append(
+                        self._store_pdf(
+                            case_id,
+                            ArtifactType.UNIT_BANK_PACK,
+                            self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "BANK", True),
+                            generated_at,
+                            snapshot_hash,
+                            filename=f"units/{unit.unit_id}/bank_handoff_pack.pdf",
+                        )
                     )
-                )
-                built.append(
-                    self._store_pdf(
-                        case_id,
-                        ArtifactType.UNIT_IASC_PACK,
-                        self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "IASC", iasc_ready),
-                        generated_at,
-                        snapshot_hash,
-                        filename=f"units/{unit.unit_id}/iasc_handoff_pack.pdf",
+                if _channel_ready(urep, "IASC"):
+                    built.append(
+                        self._store_pdf(
+                            case_id,
+                            ArtifactType.UNIT_IASC_PACK,
+                            self._unit_pack_lines(case_id, snapshot_hash, unit, urep, "IASC", True),
+                            generated_at,
+                            snapshot_hash,
+                            filename=f"units/{unit.unit_id}/iasc_handoff_pack.pdf",
+                        )
                     )
-                )
         else:
             report = self._readiness(case_id)
             built.append(self._store_pdf(case_id, ArtifactType.ACTION_PLAN, self._plan_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
@@ -216,7 +212,6 @@ class ArtifactService:
             for artifact_type, channel in (
                 (ArtifactType.BANK_HANDOFF_PACK, "BANK_PJP"),
                 (ArtifactType.IASC_HANDOFF_PACK, "IASC"),
-                (ArtifactType.POLICE_HANDOFF_PACK, "POLICE"),
             ):
                 built.append(
                     self._store_pdf(
@@ -227,6 +222,15 @@ class ArtifactService:
                         snapshot_hash,
                     )
                 )
+            built.append(
+                self._store_pdf(
+                    case_id,
+                    ArtifactType.POLICE_HANDOFF_PACK,
+                    self._police_lines(case_id, snapshot_hash, report, []),
+                    generated_at,
+                    snapshot_hash,
+                )
+            )
         case_json = self._case_json(case_id, snapshot_hash, generated_at)
         built.append(self._store_bytes(case_id, ArtifactType.CASE_JSON, json.dumps(case_json, ensure_ascii=False, indent=2).encode(), "application/json", snapshot_hash, "case.json"))
         checklist = self._checklist_text(case_id)
@@ -308,36 +312,25 @@ class ArtifactService:
             lines.append("- Belum ada.")
         return lines
 
-    def _pack_lines(self, case_id: str, snapshot_hash: str) -> list[str]:
-        facts = [f for f in self.facts.list_for_case(case_id) if f.review_status != ReviewStatus.CANDIDATE]
-        conflicts = self.conflicts.list_for_case(case_id)
-        txs = self.transactions.list_for_case(case_id)
+    def _pack_lines(self, case_id: str, snapshot_hash: str, units: list | None = None) -> list[str]:
         lines = [
             "DRAF PENGGUNA — BUKAN DOKUMEN RESMI",
             "STATUS RESMI: NOT_VERIFIED",
             "Draf pengguna. Bukan laporan polisi dan bukan keputusan hukum.",
-            "## Fakta yang ditinjau",
+            "## Kronologi",
         ]
-        if facts:
-            lines.extend(f"- {_fact_line(f)}" for f in facts)
-        else:
-            lines.append("- Belum ada fakta yang dikunci.")
-        lines.append("## Konflik")
-        if conflicts:
-            lines.extend(
-                f"- {human(c.type.value, 'conflict')} ({'masih terbuka' if c.status.value == 'OPEN' else 'selesai'})"
-                for c in conflicts
-            )
-        else:
-            lines.append("- Tidak ada konflik tercatat.")
+        story = _story_lines(units or [], self._locked_facts(case_id))
+        lines.extend(story)
         lines.append("## Transaksi")
-        if txs:
-            lines.extend(
-                f"- Tujuan {tx.destination_account or 'belum ada'} · {_money(tx.amount)}"
-                for tx in txs
-            )
+        complete = [u for u in (units or []) if _mapping(u) == "COMPLETE"]
+        if complete:
+            lines.extend(_tx_bullet(i, u) for i, u in enumerate(complete, start=1))
         else:
-            lines.append("- Belum ada transaksi terpasang.")
+            txs = [t for t in self.transactions.list_for_case(case_id) if t.destination_account and t.destination_account != "AMBIGUOUS"]
+            if txs:
+                lines.extend(f"- Tujuan {tx.destination_account} · {_money(tx.amount)}" for tx in txs)
+            else:
+                lines.append("- Informasi ini belum tersedia.")
         return lines
 
     def _brief_lines(self, case_id: str, snapshot_hash: str) -> list[str]:
@@ -356,21 +349,48 @@ class ArtifactService:
         return lines
 
     def _checklist_text(self, case_id: str) -> str:
+        report = self._readiness(case_id)
+        seen: set[str] = set()
+        rows: list[str] = []
+        for channel in report.get("channels") or []:
+            for check in channel.get("checks") or []:
+                label = str(check.get("label") or "").strip()
+                if not label or label in seen:
+                    continue
+                seen.add(label)
+                status = str(check.get("status") or "")
+                if status == "MET":
+                    rows.append(f"- [x] {label}")
+                elif status == "PREPARE_EXTERNALLY":
+                    rows.append(f"- [ ] {label} (isi di portal resmi)")
+                else:
+                    rows.append(f"- [ ] {label}")
+        if not rows:
+            rows = [
+                "- [ ] Kronologi dan waktu kejadian sudah ditinjau.",
+                "- [ ] Data rekening tujuan tersedia.",
+                "- [ ] Nominal dan waktu transaksi terkonfirmasi.",
+                "- [ ] Bukti transaksi tersedia.",
+                "- [ ] Bukti komunikasi tersedia.",
+                "- [ ] Identitas/KTP disiapkan untuk portal resmi, bukan diunggah ke SatuAman.",
+            ]
+        body = "\n".join(rows)
         return (
             "# Daftar periksa sebelum lapor\n\n"
             "Draf pengguna. Bukan dokumen resmi. Status resmi: NOT_VERIFIED.\n\n"
-            "- [ ] Kronologi dan waktu kejadian sudah ditinjau.\n"
-            "- [ ] Data rekening korban siap diisi di portal resmi.\n"
-            "- [ ] Data rekening tujuan tersedia.\n"
-            "- [ ] Nominal dan waktu transaksi terkonfirmasi.\n"
-            "- [ ] Bukti transaksi tersedia.\n"
-            "- [ ] Bukti komunikasi tersedia.\n"
-            "- [ ] Identitas/KTP disiapkan untuk portal resmi, bukan diunggah ke SatuAman.\n\n"
+            f"{body}\n\n"
             "## Kanal resmi\n"
             f"- IASC: {self.settings.official_iasc_url}\n"
             "- Laporan polisi: Anda yang mengirim.\n"
             "- Bank: nomor resmi dari aplikasi, kartu, atau situs resmi.\n"
         )
+
+    def _locked_facts(self, case_id: str) -> list:
+        return [
+            f
+            for f in self.facts.list_for_case(case_id)
+            if f.review_status in {ReviewStatus.CONFIRMED, ReviewStatus.CORRECTED}
+        ]
 
     def _case_json(self, case_id: str, snapshot_hash: str, generated_at: str) -> dict[str, Any]:
         case = self.cases.get(case_id)
@@ -602,16 +622,23 @@ class ArtifactService:
         block = next(item for item in report["channels"] if item["channel"] == channel)
         incomplete = block["status"] != "READY"
         lines = self._safety_header(case_id, snapshot_hash, str(report["profile_version"]), incomplete)
-        lines.append(f"Paket untuk {block['label']}.")
-        lines.append("## Ringkasan kejadian")
-        facts = [f for f in self.facts.list_for_case(case_id) if f.review_status != ReviewStatus.CANDIDATE]
-        if facts:
-            lines.extend(f"- {_fact_line(f)}" for f in facts)
+        if channel == "IASC":
+            lines.append("Lembar bantu pengisian IASC.")
+            lines.append("## Rekening korban")
+            lines.append("- Bank / nomor / nama: isi langsung di portal resmi.")
+            lines.append("## Rekening terlapor")
+            dests = [f for f in self._locked_facts(case_id) if f.type.value == "ACCOUNT" and "VICTIM" not in (f.raw_value or "")]
+            amounts = [f for f in self._locked_facts(case_id) if f.type.value == "AMOUNT"]
+            times = [f for f in self._locked_facts(case_id) if f.type.value == "DATETIME"]
+            lines.append(f"- Nomor: {dests[0].raw_value if dests else 'Informasi ini belum tersedia.'}")
+            lines.append("## Transaksi")
+            lines.append(f"- Nominal: {amounts[0].raw_value if amounts else 'Informasi ini belum tersedia.'}")
+            lines.append(f"- Waktu: {times[0].raw_value if times else 'Informasi ini belum tersedia.'}")
         else:
-            lines.append("- Belum ada fakta yang dikunci.")
-        if any(c["check_id"].endswith("CHRONOLOGY") and c["status"] == "MET" for c in block["checks"]):
-            lines.append("Kronologi disusun dari waktu, klaim, dan transaksi yang sudah ditinjau.")
-        lines.append("## Daftar bukti")
+            lines.append(f"Lembar lapor {block['label']}.")
+            lines.append("## Ringkasan transaksi")
+            lines.extend(_story_lines([], self._locked_facts(case_id)))
+        lines.append("## Bukti yang disiapkan")
         evidence = self.evidence.list_for_case(case_id)
         if evidence:
             lines.extend(f"- {item.original_name_display}" for item in evidence)
@@ -628,28 +655,72 @@ class ArtifactService:
         lines.append(str(report["disclaimer"]))
         return lines
 
+    def _police_lines(self, case_id: str, snapshot_hash: str, report: dict[str, Any], units: list) -> list[str]:
+        block = next(item for item in report["channels"] if item["channel"] == "POLICE")
+        incomplete = block["status"] != "READY"
+        lines = self._safety_header(case_id, snapshot_hash, str(report["profile_version"]), incomplete)
+        lines.append("Ringkasan untuk laporan kepolisian.")
+        lines.append("## Kronologi")
+        lines.extend(_story_lines(units, self._locked_facts(case_id)))
+        complete = [u for u in units if _mapping(u) == "COMPLETE" and u.amount is not None]
+        lines.append("## Kerugian yang dikonfirmasi")
+        if complete:
+            lines.append(f"- {_money(sum(float(u.amount) for u in complete))}")
+        else:
+            amounts = [f for f in self._locked_facts(case_id) if f.type.value == "AMOUNT"]
+            lines.append(f"- {amounts[0].raw_value}" if amounts else "- Informasi ini belum tersedia.")
+        lines.append("## Daftar transaksi")
+        if complete:
+            lines.extend(_tx_bullet(i, u) for i, u in enumerate(complete, start=1))
+        else:
+            lines.append("- Pasangan transaksi belum dipilih.")
+        lines.append("## Daftar bukti")
+        evidence = self.evidence.list_for_case(case_id)
+        if evidence:
+            lines.extend(f"- {item.original_name_display}" for item in evidence)
+        else:
+            lines.append("- Belum ada berkas.")
+        gaps = [c for c in block["checks"] if c["status"] in {"MISSING", "CONFLICT"}]
+        if gaps:
+            lines.append("## Yang masih kurang")
+            for check in gaps:
+                lines.append(f"- {check['label']}: {soften(check['action'] or check['reason'])}")
+        lines.append("Buka kanal resmi sendiri. Tanggap60 tidak mengirim laporan.")
+        lines.append(str(report["disclaimer"]))
+        return lines
+
     def _plan_lines_v2(self, case_id: str, snapshot_hash: str, next_action: dict[str, Any] | None, units: list) -> list[str]:
         lines = [
             "DRAF PENGGUNA — BUKAN DOKUMEN RESMI",
             "STATUS RESMI: NOT_VERIFIED",
             "SatuAman membantu menyusun langkah. Tidak mengirim laporan.",
+            "## Lakukan sekarang",
         ]
-        if next_action:
-            lines.append("## Lakukan sekarang")
+        complete = [u for u in units if _mapping(u) == "COMPLETE"]
+        pending = [u for u in units if _mapping(u) != "COMPLETE"]
+        if complete:
+            for index, unit in enumerate(complete, start=1):
+                lines.append(
+                    f"- Hubungi bank. Transaksi {_money(unit.amount)} ke {unit.destination_account or 'rekening tujuan'} {unit.transferred_at or ''}.".replace(" .", ".")
+                )
+            lines.append("- Buka portal resmi IASC. Gunakan lembar IASC untuk transaksi yang sudah terpasang.")
+        elif next_action:
             label = soften(next_action.get("label"))
             reason = soften(next_action.get("reason"))
             lines.append(f"- {label}" + (f" — {reason}" if reason else ""))
-        lines.append("## Transaksi")
-        if not units:
-            lines.append("- Belum ada transaksi terpasang.")
-        for index, unit in enumerate(units, start=1):
-            status = getattr(unit, "mapping_status", "UNKNOWN")
-            status_str = status.value if hasattr(status, "value") else str(status)
-            if status_str == "AMBIGUOUS":
-                lines.append(f"- Transaksi {index}: rekening, nominal, atau waktu masih lebih dari satu kemungkinan.")
-            else:
-                dest = unit.destination_account or "belum ada"
-                lines.append(f"- Ke {dest} · {_money(unit.amount)} · {unit.transferred_at or 'waktu belum ada'}")
+        else:
+            lines.append("- Lengkapi data di tinjauan sebelum membawa paket ke kanal resmi.")
+        if pending:
+            lines.append("## Yang masih kurang")
+            for unit in pending:
+                status = _mapping(unit)
+                if status == "AMBIGUOUS":
+                    lines.append("- Beberapa kemungkinan transaksi belum dipasangkan. Jangan gunakan paket bank sebelum dipilih.")
+                else:
+                    lines.append("- Transaksi belum lengkap (rekening, nominal, atau waktu kurang).")
+        elif complete:
+            lines.append("## Transaksi")
+            lines.extend(_tx_bullet(i, u) for i, u in enumerate(complete, start=1))
         return lines
 
     def _readiness_lines_v2(self, case_id: str, snapshot_hash: str, report: dict[str, Any] | None) -> list[str]:
@@ -684,18 +755,28 @@ class ArtifactService:
         except Exception:
             profile_version = "unknown"
         incomplete = not is_ready
-        channel_label = "bank" if channel == "BANK" else "IASC"
         lines = self._safety_header(case_id, snapshot_hash, profile_version, incomplete)
-        lines.append(f"Paket untuk {channel_label}.")
-        lines.append("## Ringkasan transaksi")
-        lines.append(f"- Rekening tujuan: {unit.destination_account or 'Belum dipilih'}")
-        lines.append(f"- Nominal: {_money(unit.amount) if unit.amount is not None else 'Belum dipilih'}")
-        lines.append(f"- Waktu: {unit.transferred_at or 'Belum dipilih'}")
-        status = getattr(unit.mapping_status, "value", str(unit.mapping_status))
-        if status == "AMBIGUOUS":
-            lines.append("- Pasangan rekening, nominal, dan waktu belum dipilih di tinjauan.")
+        if channel == "IASC":
+            lines.append("Lembar bantu pengisian IASC.")
+            lines.append("## Rekening korban")
+            lines.append("- Bank / nomor / nama: isi langsung di portal resmi.")
+            lines.append("## Rekening terlapor")
+            lines.append(f"- Nomor: {unit.destination_account or 'Informasi ini belum tersedia.'}")
+            lines.append("## Transaksi")
+            lines.append(f"- Nominal: {_money(unit.amount) if unit.amount is not None else 'Informasi ini belum tersedia.'}")
+            lines.append(f"- Tanggal / waktu: {unit.transferred_at or 'Informasi ini belum tersedia.'}")
+            lines.append("## Kronologi")
+            lines.extend(_story_lines([unit], self._locked_facts(case_id)))
+        else:
+            lines.append("Lembar lapor bank.")
+            lines.append("## Ringkasan transaksi")
+            lines.append(f"- Rekening tujuan: {unit.destination_account or 'Informasi ini belum tersedia.'}")
+            lines.append(f"- Nominal: {_money(unit.amount) if unit.amount is not None else 'Informasi ini belum tersedia.'}")
+            lines.append(f"- Waktu: {unit.transferred_at or 'Informasi ini belum tersedia.'}")
+            lines.append("## Yang dilakukan sekarang")
+            lines.append("- Hubungi bank lewat nomor resmi di aplikasi, kartu, atau situs. Sampaikan transaksi di atas.")
         names = {item.evidence_id: item.original_name_display for item in self.evidence.list_for_case(case_id)}
-        lines.append("## Bukti")
+        lines.append("## Bukti yang disiapkan")
         shown = False
         for eid in unit.evidence_ids:
             label = names.get(eid)
@@ -703,27 +784,11 @@ class ArtifactService:
                 lines.append(f"- {label}")
                 shown = True
         if not shown:
-            lines.append("- Lihat paket bukti.")
-        lines.append("## Fakta")
-        facts = {f.fact_id: f for f in self.facts.list_for_case(case_id)}
-        any_fact = False
-        for fid in unit.fact_ids:
-            fact = facts.get(fid)
-            if fact:
-                lines.append(f"- {_fact_line(fact)}")
-                any_fact = True
-        if not any_fact:
-            lines.append("- Belum ada fakta terpasang.")
-        if urep:
-            lines.append("## Kesiapan kanal")
-            for ch in urep["channels"]:
-                match_bank = channel == "BANK" and ch["channel"] == "BANK_PJP"
-                match_iasc = channel == "IASC" and ch["channel"] == "IASC"
-                if match_bank or match_iasc or channel.lower() in ch["channel"].lower():
-                    lines.append(f"- {human(ch['channel'], 'channel')}: {ch['status_label']}")
-                    for ck in ch["checks"]:
-                        if ck["status"] in {"MISSING", "CONFLICT", "PREPARE_EXTERNALLY"}:
-                            lines.append(f"- {ck['label']}: {soften(ck['reason'] or ck['action'])}")
+            leftovers = list(self.evidence.list_for_case(case_id)[:6])
+            if leftovers:
+                lines.extend(f"- {item.original_name_display}" for item in leftovers)
+            else:
+                lines.append("- Lihat paket bukti.")
         lines.append("Buka kanal resmi sendiri. Tanggap60 tidak mengirim laporan.")
         return lines
 
@@ -746,6 +811,52 @@ class ArtifactService:
             "mapping_provenance": unit.mapping_provenance,
             "readiness": urep,
         }
+
+
+def _mapping(unit: Any) -> str:
+    raw = getattr(unit, "mapping_status", "")
+    return str(getattr(raw, "value", raw))
+
+
+def _channel_ready(urep: dict[str, Any] | None, channel: str) -> bool:
+    if not urep:
+        return False
+    return any(ch.get("channel") == channel and ch.get("status") == "READY" for ch in urep.get("channels") or [])
+
+
+def _tx_bullet(index: int, unit: Any) -> str:
+    dest = unit.destination_account or "rekening tujuan belum ada"
+    when = unit.transferred_at or "waktu belum ada"
+    return f"- Transaksi {index}: {_money(unit.amount)} ke {dest} · {when}"
+
+
+def _story_lines(units: list, facts: list) -> list[str]:
+    complete = [u for u in units if _mapping(u) == "COMPLETE"]
+    if complete:
+        lines = [_tx_bullet(i, u) for i, u in enumerate(complete, start=1)]
+        claims = [f.raw_value for f in facts if getattr(f.type, "value", f.type) == "CLAIM"]
+        if claims:
+            lines.append(f"- Dari percakapan: {claims[0]}")
+        return lines
+    times = [f.raw_value for f in facts if getattr(f.type, "value", f.type) == "DATETIME"]
+    amounts = [f.raw_value for f in facts if getattr(f.type, "value", f.type) == "AMOUNT"]
+    dests = [
+        f.raw_value
+        for f in facts
+        if getattr(f.type, "value", f.type) == "ACCOUNT" and "VICTIM" not in (f.raw_value or "")
+    ]
+    if times and amounts and dests and len(dests) == 1 and len(amounts) == 1:
+        return [f"- Pada {times[0]} ada transfer {amounts[0]} ke {dests[0]}."]
+    if times or amounts or dests:
+        bits = []
+        if times:
+            bits.append(f"waktu {times[0]}")
+        if amounts:
+            bits.append(f"nominal {amounts[0]}")
+        if dests:
+            bits.append(f"rekening {dests[0]}")
+        return [f"- Data yang sudah dikunci: {', '.join(bits)}. Pasangan lengkap belum dipilih."]
+    return ["- Informasi ini belum tersedia."]
 
 
 def _fact_line(fact: Any) -> str:

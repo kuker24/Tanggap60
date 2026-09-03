@@ -183,8 +183,17 @@ class VerifierService:
                     for ru in reporting_units:
                         uid = str(ru.get("unit_id"))
                         expected_unit_files.add(f"units/{uid}/unit.json")
-                        expected_unit_files.add(f"units/{uid}/bank_handoff_pack.pdf")
-                        expected_unit_files.add(f"units/{uid}/iasc_handoff_pack.pdf")
+                        mapping = str(ru.get("mapping_status") or "")
+                        uready = ru.get("readiness") if isinstance(ru.get("readiness"), dict) else {}
+                        ready_channels = {
+                            str(c.get("channel"))
+                            for c in (uready.get("channels") or [])
+                            if isinstance(c, dict) and c.get("status") == "READY"
+                        }
+                        if mapping == "COMPLETE" and "BANK_PJP" in ready_channels:
+                            expected_unit_files.add(f"units/{uid}/bank_handoff_pack.pdf")
+                        if mapping == "COMPLETE" and "IASC" in ready_channels:
+                            expected_unit_files.add(f"units/{uid}/iasc_handoff_pack.pdf")
                     # base expected files
                     base_expected = {"action_plan.pdf", "evidence_pack.pdf", "readiness_report.pdf", "police_handoff_pack.pdf", "case.json", "handoff.md", "manifest.sha256"}
                     all_expected = base_expected | expected_unit_files

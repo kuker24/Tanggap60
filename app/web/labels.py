@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import re
 
-_UNIT_RE = re.compile(r"\bUnit\s+ru_[0-9a-f]+\s*", re.I)
+_UNIT_RE = re.compile(r"\b(?:Unit\s+)?ru_[0-9a-f]+\b", re.I)
+_ID_RE = re.compile(r"\b(?:ev|fact|conf|tx|act|art|case)-[0-9a-f]+\b", re.I)
 _SPACE_RE = re.compile(r"\s+")
 _JARGON = (
     ("AMBIGUOUS_MAPPING", "pasangan yang belum jelas"),
@@ -112,6 +113,7 @@ def human(value: object, kind: str = "generic") -> str:
 def soften(value: object) -> str:
     text = "" if value is None else str(value)
     text = _UNIT_RE.sub("", text)
+    text = _ID_RE.sub("", text)
     for src, dst in _JARGON:
         text = text.replace(src, dst)
     text = _SPACE_RE.sub(" ", text).strip(" —–-")

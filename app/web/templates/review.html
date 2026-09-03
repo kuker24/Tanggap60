@@ -30,6 +30,45 @@
   {% endfor %}
 {% endif %}
 
+{% if pairing_units %}
+  {% for unit in pairing_units %}
+  <article class="card block">
+    <h3>Belum bisa membuat paket laporan</h3>
+    <p class="muted small">Kami menemukan beberapa kemungkinan transaksi dan tidak akan menebak pasangannya. Pilih yang benar.</p>
+    <form class="stack" method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
+      <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
+      {% for row in unit.rows %}
+      <div class="pair-row">
+        <p class="muted small">Pasangan {{ row + 1 }}</p>
+        <label for="dest-{{ unit.unit_id }}-{{ row }}">Rekening tujuan</label>
+        <select id="dest-{{ unit.unit_id }}-{{ row }}" name="destination_fact_id_{{ row }}">
+          <option value="">—</option>
+          {% for item in unit.dests %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+        <label for="amt-{{ unit.unit_id }}-{{ row }}">Nominal</label>
+        <select id="amt-{{ unit.unit_id }}-{{ row }}" name="amount_fact_id_{{ row }}">
+          <option value="">—</option>
+          {% for item in unit.amounts %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+        <label for="time-{{ unit.unit_id }}-{{ row }}">Waktu</label>
+        <select id="time-{{ unit.unit_id }}-{{ row }}" name="datetime_fact_id_{{ row }}">
+          <option value="">—</option>
+          {% for item in unit.times %}
+          <option value="{{ item.id }}">{{ item.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endfor %}
+      <div class="row"><button class="btn ember" type="submit">Simpan pasangan</button></div>
+    </form>
+  </article>
+  {% endfor %}
+{% endif %}
+
 {% if not has_blocking %}
 <div class="fact-grid">
 {% for fact in facts %}
@@ -107,7 +146,7 @@ async function confirmAll(){
     }
     version += 1;
   }
-  location.href = `/cases/${CASE}/result`;
+  location.reload();
   return false;
 }
 async function resolveConflict(ev, id){
