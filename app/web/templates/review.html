@@ -1,93 +1,96 @@
 {% extends "base.html" %}
-{% block title %}Tinjau fakta — Tanggap60{% endblock %}
+{% block title %}Tinjau fakta — SatuAman{% endblock %}
 {% block stepper %}
 <nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Bukti</span>
   <span class="step done"><i>✓</i> Periksa</span>
   <span class="step active"><i>3</i> Tinjau</span>
   <span class="step"><i>4</i> Paket</span>
 </nav>
 {% endblock %}
 {% block content %}
-<h1>Periksa fakta sebelum paket dibuat</h1>
-<p class="lede">Setiap nilai punya sumber. Jika salah, betulkan — Tanggap60 akan hitung ulang kesiapan kanal.</p>
+<h1>Periksa fakta ini</h1>
+<p class="lede">Jika salah, betulkan. Jika ada dua nilai, pilih yang benar.</p>
 
-{% for conflict in conflicts if conflict.severity == "BLOCKING" and conflict.status == "OPEN" %}
-<article class="card block">
-  <div class="card-head">
-    <h3>Ada data yang bertentangan — perlu keputusan Anda</h3>
-    <span class="badge err">BLOCKING</span>
-  </div>
-  <p class="muted">Tanggap60 tidak akan memilih sendiri. Tentukan nilai yang benar sebelum paket final dibuat.</p>
-  <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')" style="margin-top:12px">
-    {% for fid in conflict.fact_ids %}
-    {% set fact = facts_by_id.get(fid) %}
-    <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}" style="justify-content:space-between">
-      <span><b>Gunakan {{ fact.raw_value if fact else fid[-6:] }}</b><br><span class="muted">Sumber: {{ evidence_names.get(fact.source_evidence_id, fact.source_locator) if fact else "bukti" }} · {{ fact.type if fact else "" }}</span></span>
-      <span class="badge neutral">pilih</span>
-    </button>
-    {% endfor %}
-  </form>
-</article>
-{% endfor %}
+{% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
+{% if blocking_conflicts %}
+  {% for conflict in blocking_conflicts %}
+  <article class="card block">
+    <h3>Ada data yang bertentangan</h3>
+    <p class="muted small">Pilih nilai yang benar sebelum paket dibuat.</p>
+    <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
+      {% for fid in conflict.fact_ids %}
+      {% set fact = facts_by_id.get(fid) %}
+      <button class="btn ghost" name="resolution_fact_id" value="{{ fid }}" style="justify-content:space-between;text-align:left">
+        <span style="text-align:left"><b>Gunakan {{ fact.raw_value if fact else "nilai ini" }}</b><br><span class="muted small">{{ evidence_names.get(fact.source_evidence_id, "bukti") if fact else "bukti" }}</span></span>
+      </button>
+      {% endfor %}
+    </form>
+  </article>
+  {% endfor %}
+{% endif %}
 
-<div class="fact-grid" style="margin-top:14px">
+<div class="fact-grid">
 {% for fact in facts %}
-<article class="fact">
-  <div class="card-head" style="margin-bottom:6px">
-    <span class="badge {% if fact.review_status == 'CONFIRMED' %}ok{% elif fact.review_status == 'REJECTED' %}err{% endif %}">{{ fact.review_status }}</span>
-    <span class="kicker">{{ fact.type }}</span>
-  </div>
-  <p style="margin:0"><strong style="font-size:17px;letter-spacing:-.02em">{{ fact.raw_value }}</strong></p>
-  <p class="src">Sumber: {{ evidence_names.get(fact.source_evidence_id, fact.source_locator) }} · halaman {{ fact.source_page or 1 }} · {{ fact.source_locator }} · confidence {{ fact.confidence or "—" }}</p>
+<article class="fact" data-fact="{{ fact.fact_id }}">
+  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · dicek{% endif %}</p>
+  <p><strong class="value">{{ fact.raw_value }}</strong></p>
+  <p class="src">{{ evidence_names.get(fact.source_evidence_id, "Cerita Anda") }}</p>
   <div class="fact-actions">
-    <button class="btn small" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')" aria-label="Tandai benar">Benar</button>
+    <button class="btn small ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
+    <button class="btn ghost small" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Ubah</button>
     <button class="btn ghost small" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan ini</button>
-    <button class="btn ghost small" data-action="unavailable" onclick="return patchFact(event, '{{ fact.fact_id }}')">Belum tersedia</button>
   </div>
+  <div class="correct-box" id="correct-{{ fact.fact_id }}">
+    <label for="input-{{ fact.fact_id }}">Nilai yang benar</label>
+    <input id="input-{{ fact.fact_id }}" type="text" placeholder="Tulis perbaikan">
+    <div class="row">
+      <button class="btn small ember" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
+      <button class="btn ghost small" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal</button>
+    </div>
+  </div>
+</article>
+{% else %}
+<article class="empty">
+  <h3>Belum ada fakta</h3>
+  <p>Tambah bukti yang lebih jelas, atau lanjut — kelengkapan akan menandai yang kurang.</p>
+  <a class="btn ghost small" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
 </article>
 {% endfor %}
 </div>
 
-<div class="row" style="margin-top:18px">
-  <a class="btn ghost" href="/cases/{{ case.case_id }}/readiness">Cek kesiapan kanal</a>
-  <a class="btn" href="/cases/{{ case.case_id }}/result">Lanjut ke rencana →</a>
+<div class="row">
+  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
 </div>
 
 <script>
 const VERSION = {{ case.version }};
 const CASE = "{{ case.case_id }}";
-async function patchFact(ev, id) {
+function toast(m){ const t=document.getElementById("toast"); t.textContent=m; t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),2200); }
+async function patchFact(ev, id){
   ev.preventDefault();
   const btn = ev.currentTarget || ev.submitter;
   const action = btn.getAttribute("data-action");
-  await fetch(`/api/v1/cases/${CASE}/facts/${id}`, {
-    method: "PATCH",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({action, expected_version: VERSION})
-  });
-  location.reload();
+  if(action==="correct"){ openCorrect(id); return false; }
+  const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, expected_version: VERSION}) });
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); } else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan"); }
   return false;
 }
-async function resolveConflict(ev, id) {
+function openCorrect(id){ document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
+function closeCorrect(id){ document.getElementById("correct-"+id).classList.remove("open"); return false; }
+async function submitCorrect(id){
+  const v=document.getElementById("input-"+id).value.trim();
+  if(!v){ toast("Isi nilai perbaikan"); return false; }
+  const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
+  return false;
+}
+async function resolveConflict(ev, id){
   ev.preventDefault();
-  await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({resolution_fact_id: ev.submitter.value, expected_version: VERSION})
-  });
-  location.reload();
+  const fid = ev.submitter.value;
+  const res = await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({resolution_fact_id: fid, expected_version: VERSION})});
+  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal"); }
   return false;
 }
 </script>
-{% endblock %}
-{% block rail %}
-<h2>{{ case.state.value }}</h2>
-<p class="muted">Versi kasus {{ case.version }} · Perubahan fakta membatalkan approval lama.</p>
-<div class="divider"></div>
-<p class="muted">Tips: mulai dari konflik BLOCKING (merah) di atas, lalu cek fakta dengan badge abu-abu.</p>
-<div class="kv">
-  <div><span class="muted">Fakta</span><b>{{ facts|length }}</b></div>
-  <div><span class="muted">Konflik terbuka</span><b>{{ conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list|length }}</b></div>
-</div>
 {% endblock %}

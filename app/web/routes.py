@@ -22,9 +22,11 @@ from app.infrastructure.repositories import (
     TransactionRepository,
 )
 from app.infrastructure.resources import available_ram_mb, process_rss_mb
+from app.web.labels import human
 
 web = APIRouter()
 TEMPLATES = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+TEMPLATES.env.filters["human"] = human
 
 
 def _sid(request: Request) -> str:

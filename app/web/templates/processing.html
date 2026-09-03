@@ -1,57 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Memproses — Tanggap60{% endblock %}
+{% block title %}Memeriksa — SatuAman{% endblock %}
 {% block stepper %}
 <nav class="stepper" aria-label="Langkah">
-  <span class="step done"><i>✓</i> Masukkan</span>
+  <span class="step done"><i>✓</i> Bukti</span>
   <span class="step active"><i>2</i> Periksa</span>
   <span class="step"><i>3</i> Tinjau</span>
   <span class="step"><i>4</i> Paket</span>
 </nav>
 {% endblock %}
 {% block content %}
-<h1>Memeriksa dan menyusun fakta</h1>
-<p class="lede">Bukan persentase palsu. Ini <b>tool yang benar-benar berjalan</b> dengan durasi nyata. LLM tidak memutuskan hukum.</p>
+<h1>Memeriksa bukti Anda</h1>
+<p class="lede" id="state-live" aria-live="polite">{% if case.state.value == "FAILED_SAFE" %}Tidak bisa dilanjutkan otomatis.{% elif case.state.value == "REVIEW_REQUIRED" %}Siap ditinjau.{% else %}Sedang berjalan. Halaman ini lanjut sendiri.{% endif %}</p>
+{% if case.state.value == "FAILED_SAFE" %}
+<div class="row"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual</a></div>
+{% elif case.state.value == "REVIEW_REQUIRED" %}
+<script>location.replace("/cases/{{ case.case_id }}/review");</script>
+{% endif %}
 
-<p id="state-live" class="live" aria-live="polite">{{ case.state.value }}</p>
-
-<ul class="timeline">
-  {% for event in events %}
+{% set s = case.state.value %}
+<ul class="timeline" aria-label="Langkah pemeriksaan">
   <li>
-    <span class="tl-dot {% if event.result_code == 'OK' %}ok{% elif event.result_code %}err{% endif %}">{% if event.result_code == 'OK' %}✓{% else %}•{% endif %}</span>
-    <span class="tl-main">
-      <b>{{ event.tool_name or event.event_type }}</b>
-      <span>· {{ event.planner or "deterministic" }} · {{ event.duration_ms or 0 }} ms {% if event.result_code %}· {{ event.result_code }}{% endif %}</span>
-    </span>
+    <span class="tl-dot {% if s in ['EXTRACTING','REVIEW_REQUIRED','READY_FOR_ACTION','FAILED_SAFE'] %}ok{% else %}run{% endif %}">{% if s in ['EXTRACTING','REVIEW_REQUIRED','READY_FOR_ACTION','FAILED_SAFE'] %}✓{% else %}·{% endif %}</span>
+    <span class="tl-main"><b>Memeriksa berkas</b></span>
   </li>
-  {% else %}
-  <li><span class="tl-dot run">◷</span><span class="tl-main"><b>Memeriksa keamanan file</b><span>· magic MIME · SHA-256</span></span></li>
-  <li><span class="tl-dot">•</span><span class="tl-main"><b>Membaca bukti</b><span>· OCR & ekstraksi</span></span></li>
-  <li><span class="tl-dot">•</span><span class="tl-main"><b>Menyusun fakta dan sumber</b><span>· halaman & bbox</span></span></li>
-  <li><span class="tl-dot">•</span><span class="tl-main"><b>Mencari data yang bertentangan</b><span>· conflict detection</span></span></li>
-  {% endfor %}
+  <li>
+    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% elif s == 'EXTRACTING' %}run{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
+    <span class="tl-main"><b>Membaca bukti</b></span>
+  </li>
+  <li>
+    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
+    <span class="tl-main"><b>Menyusun fakta</b></span>
+  </li>
+  <li>
+    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
+    <span class="tl-main"><b>Mencari yang bertentangan</b></span>
+  </li>
+  <li>
+    <span class="tl-dot {% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}ok{% endif %}">{% if s in ['REVIEW_REQUIRED','READY_FOR_ACTION'] %}✓{% else %}·{% endif %}</span>
+    <span class="tl-main"><b>Siap ditinjau</b></span>
+  </li>
 </ul>
-
-<div class="row" style="margin-top:16px">
-  <a class="btn" href="/cases/{{ case.case_id }}/review">Buka tinjauan bila siap →</a>
-  <span class="muted">Auto-lanjut saat REVIEW_REQUIRED. Jika FAILED_SAFE: coba ulang atau isi manual.</span>
-</div>
-
-<p class="muted" style="margin-top:12px">RSS {{ rss }} MB · RAM tersedia {{ ram }} MB · Guard ≥1024 MB RAM / 2048 MB disk</p>
 
 <script>
   document.body.setAttribute("data-case", "{{ case.case_id }}");
   document.body.setAttribute("data-page", "processing");
 </script>
-{% endblock %}
-{% block rail %}
-<h2>Alat <span class="badge neutral">9 tool</span></h2>
-<p class="muted">Hermes memilih urutan. Angka kesiapan dihitung ulang deterministik, bukan opini LLM.</p>
-<div class="rail-list">
-  <div class="rail-item"><span>inspect_evidence</span><b class="muted">keamanan</b></div>
-  <div class="rail-item"><span>extract_candidate_facts</span><b class="muted">OCR</b></div>
-  <div class="rail-item"><span>validate_case_facts</span><b class="muted">validasi</b></div>
-  <div class="rail-item"><span>assess_handoff_readiness</span><b class="muted">preflight</b></div>
-  <div class="rail-item"><span>compile_artifacts</span><b class="muted">PDF/ZIP</b></div>
-</div>
-<p class="muted" style="margin-top:10px">Sumber: <code>app/hermes/tools/*.py</code> + <code>readiness_profiles.json mvp2</code></p>
 {% endblock %}
