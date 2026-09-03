@@ -52,7 +52,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             accept = request.headers.get("accept", "")
             if "text/html" in accept and not str(request.url.path).startswith("/api/"):
                 response = HTMLResponse(
-                    "<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='color-scheme' content='dark'><title>Terjadi gangguan</title></head><body style=\"font-family:Archivo,system-ui,sans-serif;background:#100904;color:#ffedd7;max-width:40rem;margin:3rem auto;padding:0 1.25rem;line-height:1.5\"><h1 style=\"font-weight:500;text-transform:uppercase\">Sedang ada gangguan</h1><p>Coba muat ulang halaman ini. Data Anda belum terkirim ke bank atau polisi.</p><p><a href='/' style=\"color:#ffedd7\">Kembali ke beranda</a></p></body></html>",
+                    "<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='color-scheme' content='dark'><title>Terjadi gangguan</title></head><body style=\"font-family:Inter,system-ui,sans-serif;background:#000;color:#fff;max-width:40rem;margin:3rem auto;padding:0 1.25rem;line-height:1.5\"><h1 style=\"font-weight:600\">Sedang ada gangguan</h1><p>Coba muat ulang halaman ini. Data Anda belum terkirim ke bank atau polisi.</p><p><a href='/' style=\"color:#0088ff\">Kembali ke beranda</a></p></body></html>",
                     status_code=500,
                 )
             else:

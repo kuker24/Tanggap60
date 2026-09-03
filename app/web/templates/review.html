@@ -9,8 +9,15 @@
 </nav>
 {% endblock %}
 {% block content %}
+{% set ns = namespace(first=none, count=0) %}
+{% for fact in facts %}
+  {% if fact.review_status == "CANDIDATE" %}
+    {% set ns.count = ns.count + 1 %}
+    {% if ns.first is none %}{% set ns.first = fact.fact_id %}{% endif %}
+  {% endif %}
+{% endfor %}
 <h1>Periksa fakta ini</h1>
-<p class="lede">{% if has_blocking %}Pilih nilai yang benar.{% else %}Jika salah, betulkan.{% endif %}</p>
+<p class="lede" id="coach-lede">{% if has_blocking %}Pilih nilai yang benar.{% elif ns.count %}Fakta 1 dari {{ ns.count }}. Apakah ini benar?{% else %}Jika salah, betulkan.{% endif %}</p>
 
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
 {% if blocking_conflicts %}
@@ -70,9 +77,9 @@
 {% endif %}
 
 {% if not has_blocking %}
-<div class="fact-grid">
+<div class="fact-grid" id="fact-grid">
 {% for fact in facts %}
-<article class="fact" data-fact="{{ fact.fact_id }}">
+<article class="fact{% if ns.first == fact.fact_id %} is-on{% endif %}" data-fact="{{ fact.fact_id }}">
   <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · dicek{% endif %}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
   <p class="src">{{ evidence_names.get(fact.source_evidence_id, "Cerita Anda") }}</p>

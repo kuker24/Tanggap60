@@ -8,17 +8,17 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.pdfgen import canvas
 
-WARM = HexColor("#100904")
-CREAM = HexColor("#ffedd7")
-EMBER = HexColor("#dc5000")
-MUTED = HexColor("#6c5f51")
-LINEN = HexColor("#ffedd7")
-HAIR = HexColor("#40372e")
-BARK = HexColor("#382416")
-RED = HexColor("#dc5000")
-RED_SOFT = HexColor("#f3e2c8")
-AMBER = HexColor("#382416")
-AMBER_SOFT = HexColor("#f6ead4")
+WARM = HexColor("#0f0f10")
+CREAM = HexColor("#ffffff")
+EMBER = HexColor("#0088ff")
+MUTED = HexColor("#888b91")
+LINEN = HexColor("#ffffff")
+HAIR = HexColor("#333333")
+BARK = HexColor("#1c1d1f")
+RED = HexColor("#e6714f")
+RED_SOFT = HexColor("#f4d4cc")
+AMBER = HexColor("#1c1d1f")
+AMBER_SOFT = HexColor("#e8e8ea")
 
 BANNER_DRAF = "DRAF PENGGUNA — BUKAN DOKUMEN RESMI"
 BANNER_STATUS = "STATUS RESMI: NOT_VERIFIED"
