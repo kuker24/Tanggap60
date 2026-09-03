@@ -288,21 +288,19 @@
     throw new Error(j.message || ("Gagal (kode " + res.status + "). Coba lagi."));
   }
 
-  // Harden every plain POST form against double submit.
+  // Harden every plain POST form against double submit. Disable is deferred
+  // one tick so the submitter's own name/value still ships with the payload.
   document.addEventListener("submit", (e) => {
     const f = e.target;
     if (!(f instanceof HTMLFormElement) || f.dataset.noHarden !== undefined) return;
     if (f.method.toLowerCase() !== "post" || f.enctype === "multipart/form-data") return;
-    const btn = f.querySelector('[type="submit"]');
-    if (btn && !btn.disabled) {
+    const btn = f.querySelector('[type="submit"]:not([disabled])');
+    if (!btn) return;
+    const label = btn.textContent.trim();
+    setTimeout(() => {
       btn.disabled = true;
-      if (btn.textContent.trim()) btn.dataset.label = btn.textContent;
-      btn.textContent = "Memproses…";
-      setTimeout(() => {
-        btn.disabled = false;
-        if (btn.dataset.label) btn.textContent = btn.dataset.label;
-      }, 9000);
-    }
+      if (label) btn.textContent = "Memproses…";
+    }, 0);
   });
   // Technical trace: lazy-load only when the user opens the disclosure.
   const trace = document.getElementById("trace");

@@ -22,7 +22,7 @@
 <section class="card" aria-labelledby="grp-{{ group.key }}">
   <h3 id="grp-{{ group.key }}">{{ group.title }}</h3>
   <ul class="file-list">
-    {% for a in group.items %}
+    {% for a in group.files %}
     <li class="file-chip">
       <span><b>{{ a.type | human("artifact") }}</b><br><span class="meta">{{ (a.size_bytes / 1024) | round(1) }} KB · terverifikasi</span></span>
       <a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>

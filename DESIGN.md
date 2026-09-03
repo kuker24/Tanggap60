@@ -3,31 +3,33 @@
 <!-- impeccable:design-schema 1 -->
 
 ## World
-Dua permukaan. **Landing:** Motionsites AI Image Generator UI — kanvas putih, tiga kartu radial kuning–pink–ungu. **Kasus:** aurora wizard seperti layar Periksa — indigo bukan void Superwhisper, bukan walnut ORYZO.
+Satu dunia terang-tenang dari beranda sampai paket: **WASPADA TENANG**. Warm paper, tinta gelap, amber untuk satu aksi komitmen. Panel gelap hanya untuk jejak teknis (collapsed by default). Landing putih Motionsites (tiga kartu radial) tetap sebagai pembuka.
 
 ## Palette
-- Landing: canvas `#ffffff`, teks `#0f172a`, muted `#64748b`, kartu `#F4F8F9`, aksen `#F5C344` / `#F28482` / `#B567C2`
-- Kasus: canvas `#0c1224`, surface `#030719` / `#001b33`, teks `#ffffff`, muted `#888b91`
-- Kasus CTA putih isi, teks hitam. Sinyal `#0088ff` ikon, tautan, cincin. OK `#27c93f`, danger `#e6714f`
+- Kanvas `#faf7f1`, teks `#1c1917`, muted `#6f675c`, garis `#e6ddcb`, kartu `#ffffff`
+- Primer amber `#92400e` (hover `#78350f`), teks tombol putih
+- Sinyal/fokus/link biru `#1d4ed8`; OK `#15803d`; danger `#b91c1c`
+- Varian lembut untuk latar status: amber `#f7e8d3`, hijau `#e2f2e7`, merah `#fbe4e1`, biru `#e3ecfd`
+- Panel teknis: `#1c1917` + teks `#f5efe2`, mono untuk data
 
 ## Type
-- Inter 400/500/600. Landing H1 2.75rem tracking −0.02em. Kasus H1 32px tracking −1.2px.
-- Label 12px muted. Sentuh 44px.
+- Inter 400/500/600 + system fallback. H1 task 26–32px tracking −1.2px, balance wrap.
+- Input mobile 16px (anti zoom Safari). Target sentuh ≥44px.
 
 ## Materials
-- Landing kartu 20px, bayangan `0 10px 30px -10px`. Kasus kartu 24px, tombol 9px, tanpa bayangan.
-- Aurora penuh di semua layar kasus. PDF kop midnight+putih, tanpa aurora.
+- Kartu 20px + bayangan tipis `0 1px 2px`; tombol 9px; tanpa dekorasi berat.
+- Sticky bottom CTA di alur konfirmasi/persetujuan + safe-area.
+- Gerak: satu momen (cincin tunggu 0.85s); `prefers-reduced-motion` mematikan gerak.
 
 ## Layout
-- Landing max 1100px pada seksi fitur; hero/FAQ max 40rem. Dua form `POST /start`.
-- Kasus isi max 40rem. Stepper tengah: Bukti → Periksa → Tinjau → Paket. Satu aksi primer putih penuh. Skip tautan teks.
-- Coach: intake unggah→cerita→tautan→kirim. Tinjau satu fakta.
+- Task flow max 40rem; dashboard max 60rem; landing max 40/68rem.
+- Stepper Bukti → Periksa → Konfirmasi → Bertindak; kompak “N / 4 · Nama” di HP; `aria-current="step"`.
+- Satu keputusan per kartu; radio cards untuk pilihan; ringkasan transaksi relasional (Rp → rekening → waktu).
+- Bukti teknis di disclosure gelap / ZIP, bukan primary UI.
 
 ## Voice
-- Indonesia sederhana. CTA menamai aksi. Tanpa copy generator gambar.
-
-## Motion
-- Kartu landing statis (sesuai bank). Kasus: cincin wait GPU 0.85s linear; stepper 180ms ease-out; `:active scale(0.97)`. `prefers-reduced-motion` mematikan gerak.
+- Indonesia sederhana. “Transaksi” bukan reporting unit; “rekening penerima” tanpa tuduhan; “kami tidak akan menebak”.
+- Error menjawab: apa yang gagal, dampaknya, apa yang bisa dilakukan + Retry.
 
 ## Surface — Persuade + Operate
-Landing meyakinkan lalu memulai. Kasus menyelesaikan tugas. Bukti teknis di ZIP, bukan di UI.
+Landing meyakinkan lalu memulai (satu cerita 3 langkah + FAQ + TTL). Kasus menyelesaikan tugas: bukti → susun → konfirmasi → lakukan sekarang → paket → bawa ke situs resmi.

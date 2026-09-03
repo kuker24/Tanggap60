@@ -8,6 +8,13 @@ _SPACE_RE = re.compile(r"\s+")
 _JARGON = (
     ("AMBIGUOUS_MAPPING", "transaksi yang belum terpasang"),
     ("SHA-256", "kode cek keaslian"),
+    ("Reporting Unit", "Transaksi"),
+    ("reporting unit", "transaksi"),
+    ("milik pelaku", "penerima"),
+    ("READY", "siap"),
+    ("jalur finansial", "bank"),
+    ("Unit ", "Transaksi "),
+    ("unit ", "transaksi "),
     ("Bank/PJP", "Bank"),
     ("bank/PJP", "bank"),
     (" atau PJP", ""),

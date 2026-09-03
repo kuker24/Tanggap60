@@ -126,7 +126,9 @@ _ID_MONTHS = {
 }
 
 
-def _format_rupiah(value: object) -> str:
+def _format_rupiah(value: float | int | str | None) -> str:
+    if value is None or value == "":
+        return ""
     try:
         return "Rp" + f"{float(value):,.0f}".replace(",", ".")
     except (TypeError, ValueError):
@@ -321,11 +323,13 @@ def processing(case_id: str, request: Request):
     # Read-only render: the pipeline is triggered by POST /intake or
     # POST /api/v1/cases/{id}/runs, so refresh/back never mutates state.
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    has_evidence = bool(EvidenceRepository(request.state.db).list_for_case(case_id))
     return TEMPLATES.TemplateResponse(
         "processing.html",
         {
             "request": request,
             "case": case,
+            "has_evidence": has_evidence,
         },
     )
 
@@ -486,6 +490,7 @@ def readiness_page(case_id: str, request: Request):
     summaries = _tx_summaries(request.state.db, case_id, evidence_names)
     tx_cards = []
     has_blocking = False
+    needs_evidence = False
     ready_count = 0
     if units and units_report:
         reps = {r.get("unit_id"): r for r in units_report.get("units") or []}
@@ -493,7 +498,8 @@ def readiness_page(case_id: str, request: Request):
         for tx in summaries:
             rep = reps.get(tx["unit_id"], {})
             ch_status = by_unit.get(tx["unit_id"], {})
-            missing_blocking: list[str] = []
+            missing_review: list[str] = []
+            missing_evidence: list[str] = []
             missing_info: list[str] = []
             for ch in rep.get("channels", []) or []:
                 for ck in ch.get("checks", []) or []:
@@ -502,14 +508,21 @@ def readiness_page(case_id: str, request: Request):
                     text = soften(ck.get("action") or ck.get("label") or "")
                     if not text:
                         continue
+                    check_id = str(ck.get("check_id") or "")
+                    is_evidence = "EVIDENCE" in check_id or "COMMUNICATION" in check_id
                     if ck.get("blocking"):
-                        has_blocking = True
-                        if text not in missing_blocking:
-                            missing_blocking.append(text)
+                        if is_evidence:
+                            needs_evidence = True
+                            if text not in missing_evidence:
+                                missing_evidence.append(text)
+                        else:
+                            has_blocking = True
+                            if text not in missing_review:
+                                missing_review.append(text)
                     elif text not in missing_info:
                         missing_info.append(text)
             financial = [ch_status.get("BANK_PJP"), ch_status.get("IASC")]
-            ready = bool(financial) and all(s == "READY" for s in financial) and not missing_blocking
+            ready = bool(financial) and all(s == "READY" for s in financial) and not missing_review
             if ready:
                 ready_count += 1
             tx_cards.append(
@@ -520,13 +533,18 @@ def readiness_page(case_id: str, request: Request):
                         {"label": "Bank", "status": ch_status.get("BANK_PJP", "")},
                         {"label": "IASC", "status": ch_status.get("IASC", "")},
                     ],
-                    "missing_blocking": missing_blocking,
+                    "missing_review": missing_review,
+                    "missing_evidence": missing_evidence,
                     "missing_info": missing_info,
                 }
             )
         for ck in (units_report.get("incident_police", {}) or {}).get("checks", []) or []:
             if ck.get("status") in {"MISSING", "CONFLICT"} and ck.get("blocking"):
-                has_blocking = True
+                check_id = str(ck.get("check_id") or "")
+                if "EVIDENCE" in check_id or "COMMUNICATION" in check_id or "PROVENANCE" in check_id:
+                    needs_evidence = True
+                else:
+                    has_blocking = True
     return TEMPLATES.TemplateResponse(
         "readiness.html",
         {
@@ -536,6 +554,7 @@ def readiness_page(case_id: str, request: Request):
             "gaps": gaps,
             "tx_cards": tx_cards,
             "has_blocking": has_blocking,
+            "needs_evidence": needs_evidence,
             "ready_count": ready_count,
         },
     )
@@ -665,7 +684,7 @@ def artifacts_page(case_id: str, request: Request):
         for a in members:
             used.add(a["artifact_id"])
         if members:
-            groups.append({"key": key, "title": title, "items": members})
+            groups.append({"key": key, "title": title, "files": members})
     rest = [a for a in pub if a["artifact_id"] not in used]
     pack = next((a for a in pub if a["type"] == "CASE_ZIP" and a["downloadable"]), None)
     return TEMPLATES.TemplateResponse(

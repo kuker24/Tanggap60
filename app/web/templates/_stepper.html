@@ -2,7 +2,7 @@
 {% macro stepper(active, label) %}
 {% set names = [(1, "Bukti"), (2, "Periksa"), (3, "Konfirmasi"), (4, "Bertindak")] %}
 <nav class="stepper" aria-label="{{ label }}">
-  <span role="list">
+  <span role="list" class="step-list">
     {% for n, name in names %}
     {% if n < active %}
     <span role="listitem" class="step done"><i aria-hidden="true">✓</i> {{ name }}</span>

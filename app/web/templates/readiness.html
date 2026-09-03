@@ -36,16 +36,27 @@
     {{ ch.label }}: {% if ch.status == "READY" %}Siap{% elif ch.status == "BLOCKED" %}Belum bisa{% elif ch.status %}Perlu dilengkapi{% else %}—{% endif %}{% if not loop.last %} · {% endif %}
     {% endfor %}
   </p>
-  {% if tx.missing_blocking %}
+  {% if tx.missing_review %}
   <ul class="tx-missing">
-    {% for m in tx.missing_blocking %}
+    {% for m in tx.missing_review %}
     <li>{{ m }}</li>
     {% endfor %}
   </ul>
   <div class="actions">
     <a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi transaksi</a>
   </div>
-  {% elif tx.missing_info %}
+  {% endif %}
+  {% if tx.missing_evidence %}
+  <ul class="tx-missing">
+    {% for m in tx.missing_evidence %}
+    <li>{{ m }}</li>
+    {% endfor %}
+  </ul>
+  <div class="actions">
+    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
+  </div>
+  {% endif %}
+  {% if tx.missing_info %}
   <ul class="tx-missing">
     {% for m in tx.missing_info %}
     <li>{{ m }} (tidak menghentikan — bisa dilengkapi di situs resmi)</li>
@@ -78,6 +89,10 @@
   {% if has_blocking %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi transaksi</a>
   <p class="muted small">Belum bisa membuat paket sebelum data yang ditandai selesai — supaya isinya tidak salah.</p>
+  {% elif needs_evidence %}
+  <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
+  <p class="muted small">Paket tetap bisa dibuat tanpa bukti tambahan, tapi bisa kurang kuat di bank atau IASC.</p>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/approval">Lanjut ke paket ›</a>
   {% elif ready_count %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paket untuk {{ ready_count }} transaksi</a>
   {% else %}

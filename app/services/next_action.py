@@ -110,23 +110,23 @@ def recommend_next_action(
             if r.get("BANK_PJP") == "READY":
                 return NextBestAction(
                     code=NextActionCode.CONTACT_BANK_PJP,
-                    label="Hubungi bank/PJP untuk unit siap",
-                    reason=f"Unit {target.unit_id} sudah READY untuk jalur finansial — segera hubungi bank/PJP via kanal resmi, jangan menunggu unit lain.",
+                    label="Hubungi bank untuk transaksi yang sudah siap",
+                    reason="Ada transaksi yang banknya sudah siap — hubungi bank lewat situs resmi sekarang, jangan menunggu transaksi lain.",
                     target_unit_id=target.unit_id,
                     priority=2,
                 )
             if r.get("IASC") == "READY":
                 return NextBestAction(
                     code=NextActionCode.PREPARE_IASC_UNIT,
-                    label="Siapkan laporan IASC untuk unit siap",
-                    reason=f"Unit {target.unit_id} READY untuk IASC — buka portal resmi IASC dan isi data, jangan menunggu unit lain.",
+                    label="Siapkan laporan IASC yang sudah siap",
+                    reason="Ada transaksi yang siap dilaporkan ke IASC — buka portal resmi IASC dan isi datanya, jangan menunggu transaksi lain.",
                     target_unit_id=target.unit_id,
                     priority=2,
                 )
             return NextBestAction(
                 code=NextActionCode.PREPARE_IASC_UNIT,
-                label="Tindak lanjuti unit siap",
-                reason=f"Unit {target.unit_id} sudah siap — jangan menunggu unit lain.",
+                label="Tindak lanjuti transaksi yang siap",
+                reason="Ada transaksi yang sudah siap — jangan menunggu transaksi lain.",
                 target_unit_id=target.unit_id,
                 priority=2,
             )
@@ -138,8 +138,8 @@ def recommend_next_action(
         c, unit_id = sorted(scoped_blocking, key=lambda x: x[1])[0]
         return NextBestAction(
             code=NextActionCode.RESOLVE_CONFLICT,
-            label="Selesaikan konflik untuk unit terdampak",
-            reason=f"Unit {unit_id} terblokir konflik — selesaikan konflik untuk unit tersebut.",
+            label="Selesaikan data yang bentrok",
+            reason="Ada data yang saling bertentangan — pilih yang benar supaya paketnya akurat.",
             priority=3,
             target_unit_id=unit_id,
             related_fact_ids=c.fact_ids,
@@ -153,7 +153,7 @@ def recommend_next_action(
         return NextBestAction(
             code=NextActionCode.RESOLVE_UNIT_MAPPING,
             label="Tentukan pasangan transaksi",
-            reason=f"Unit {target.unit_id} memiliki AMBIGUOUS_MAPPING — pilih pasangan nominal, rekening, dan waktu yang benar.",
+            reason="Ada transaksi yang belum terpasang — pilih pasangan jumlah uang, rekening, dan waktu yang benar. Kami tidak akan menebak.",
             target_unit_id=target.unit_id,
             priority=4,
             related_fact_ids=target.fact_ids,
@@ -169,7 +169,7 @@ def recommend_next_action(
             return NextBestAction(
                 code=NextActionCode.CONFIRM_TRANSACTION_AMOUNT,
                 label="Konfirmasi nominal transfer",
-                reason=f"Unit {unit.unit_id} belum memiliki nominal yang ditinjau.",
+                reason="Ada transaksi yang jumlah uangnya belum jelas.",
                 target_unit_id=unit.unit_id,
                 priority=5,
                 related_fact_ids=unit.fact_ids,
@@ -178,7 +178,7 @@ def recommend_next_action(
             return NextBestAction(
                 code=NextActionCode.CONFIRM_TRANSACTION_TIME,
                 label="Konfirmasi waktu transaksi",
-                reason=f"Unit {unit.unit_id} belum memiliki waktu transaksi yang ditinjau.",
+                reason="Ada transaksi yang waktunya belum jelas.",
                 target_unit_id=unit.unit_id,
                 priority=5,
                 related_fact_ids=unit.fact_ids,
@@ -187,15 +187,15 @@ def recommend_next_action(
             return NextBestAction(
                 code=NextActionCode.CONFIRM_DESTINATION,
                 label="Konfirmasi rekening tujuan",
-                reason=f"Unit {unit.unit_id} belum memiliki rekening tujuan yang ditinjau.",
+                reason="Ada transaksi yang rekening tujuannya belum jelas.",
                 target_unit_id=unit.unit_id,
                 priority=5,
                 related_fact_ids=unit.fact_ids,
             )
         return NextBestAction(
             code=NextActionCode.ADD_TRANSFER_EVIDENCE,
-            label="Tambahkan bukti transfer",
-            reason=f"Unit {unit.unit_id} belum lengkap — unggah bukti transaksi yang jelas.",
+            label="Tambah bukti transfer",
+            reason="Ada transaksi yang belum lengkap — tambah bukti transfer yang jelas.",
             target_unit_id=unit.unit_id,
             priority=5,
         )
@@ -204,8 +204,8 @@ def recommend_next_action(
     if units and not incident_police_ready:
         return NextBestAction(
             code=NextActionCode.PREPARE_POLICE_INCIDENT,
-            label="Siapkan paket incident untuk kepolisian",
-            reason="Setelah jalur finansial, siapkan kronologi lengkap untuk kanal kepolisian — pilih kanal resmi yang tersedia.",
+            label="Siapkan ringkasan untuk polisi",
+            reason="Setelah urusan bank, siapkan kronologi lengkap untuk situs resmi kepolisian.",
             priority=6,
         )
 
@@ -213,8 +213,8 @@ def recommend_next_action(
     if not units:
         return NextBestAction(
             code=NextActionCode.ADD_TRANSFER_EVIDENCE,
-            label="Unggah bukti transfer",
-            reason="Belum ada unit transaksi — unggah bukti transfer yang memuat nominal, rekening, dan waktu.",
+            label="Tambah bukti transfer",
+            reason="Belum ada transaksi — kirim bukti transfer yang memuat jumlah uang, rekening, dan waktu.",
             priority=7,
         )
 
@@ -224,8 +224,8 @@ def recommend_next_action(
         target = sorted(complete_units, key=lambda u: u.unit_id)[0]
         return NextBestAction(
             code=NextActionCode.APPROVE_READY_UNIT,
-            label="Setujui unit yang sudah siap",
-            reason=f"Unit {target.unit_id} menunggu persetujuan untuk menghasilkan paket terverifikasi.",
+            label="Setujui transaksi yang sudah siap",
+            reason="Ada transaksi menunggu persetujuan untuk dibuatkan paket terverifikasi.",
             target_unit_id=target.unit_id,
             priority=8,
         )

@@ -134,6 +134,64 @@ def test_web_pairing_stale_redirects(client: TestClient, ocr: ScriptedOcr) -> No
     assert "pairing-basi" in res.headers["location"]
 
 
+def test_web_artifacts_page_renders_after_approval(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _ambiguous_case(client, ocr)
+    unit = _ambiguous_unit(client, case_id)
+    version = client.get(f"/api/v1/cases/{case_id}").json()["version"]
+    payload = _valid_payload(client, case_id, unit)
+    payload["expected_version"] = version
+    mapped = client.post(f"/api/v1/cases/{case_id}/reporting-units/{unit['unit_id']}/mapping", json=payload)
+    assert mapped.status_code == 200
+    draft = client.post(f"/api/v1/cases/{case_id}/draft")
+    assert draft.status_code == 200
+    ok = client.post(
+        f"/api/v1/cases/{case_id}/approval",
+        headers={"Idempotency-Key": "p0-web-art"},
+        json={"snapshot_hash": draft.json()["snapshot_hash"], "accepted_notice": True},
+    )
+    assert ok.status_code == 200
+    page = client.get(f"/cases/{case_id}/artifacts")
+    assert page.status_code == 200
+    assert "Paket Anda siap dibawa" in page.text
+    assert "Buka situs IASC" in page.text
+
+
+def test_dashboard_evidence_path_and_informed_bypass(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _ambiguous_case(client, ocr)
+    unit = _ambiguous_unit(client, case_id)
+    grouped = _facts(client, case_id)
+    dest_a = next(f for f in grouped["ACCOUNT"] if "DEST-A" in f["raw_value"])
+    dest_b = next(f for f in grouped["ACCOUNT"] if "DEST-B" in f["raw_value"])
+    amt_a = next(f for f in grouped["AMOUNT"] if "2.000" in f["raw_value"])
+    amt_b = next(f for f in grouped["AMOUNT"] if "750" in f["raw_value"])
+    time_a = next(f for f in grouped["DATETIME"] if "09:13" in f["raw_value"])
+    time_b = next(f for f in grouped["DATETIME"] if "09:47" in f["raw_value"])
+    version = client.get(f"/api/v1/cases/{case_id}").json()["version"]
+    mapped = client.post(
+        f"/api/v1/cases/{case_id}/reporting-units/{unit['unit_id']}/mapping",
+        json={
+            "target_evidence_id": unit["evidence_ids"][0],
+            "expected_version": version,
+            "pairings": [
+                {"destination_fact_id": dest_a["fact_id"], "amount_fact_id": amt_a["fact_id"], "datetime_fact_id": time_a["fact_id"]},
+                {"destination_fact_id": dest_b["fact_id"], "amount_fact_id": amt_b["fact_id"], "datetime_fact_id": time_b["fact_id"]},
+            ],
+        },
+    )
+    assert mapped.status_code == 200
+    page = client.get(f"/cases/{case_id}/readiness")
+    assert page.status_code == 200
+    assert "Yang perlu Anda lakukan" in page.text
+    assert "Tambah bukti" in page.text
+    assert "Lanjut ke paket" in page.text
+    import re
+
+    visible = re.sub(r"<[^>]+>", " ", page.text)
+    assert "READY" not in visible
+    assert "ru_" not in visible
+    assert "AMBIGUOUS" not in visible
+
+
 def test_web_approval_double_submit_single_approval(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = create_case(client)
     upload_text_png(client, ocr, case_id, "clean.png", CLEAN)

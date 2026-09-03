@@ -66,10 +66,10 @@ input,textarea,select{caret-color:var(--ink)}
 .step.active i{border-color:var(--paper);color:var(--paper);background:transparent}
 .step.done{color:var(--ok)}
 .step.done i{border-color:var(--ok);color:var(--ok)}
-.step-compact{display:none;font:600 13px/1.3 var(--sans);color:var(--ink);white-space:nowrap}
+.stepper .step-compact{display:none;font:600 13px/1.3 var(--sans);color:var(--ink);white-space:nowrap}
 @media (max-width:560px){
-  .stepper>span{display:none}
-  .step-compact{display:block}
+  .stepper>span.step-list{display:none}
+  .stepper>span.step-compact{display:block}
 }
 
 .shell{max-width:var(--max);margin:0 auto;padding:40px 20px 64px;flex:1;width:100%;animation:enter .28s var(--ease-out) both}
@@ -244,9 +244,9 @@ body.is-void .actions,.stage-void .actions{width:100%;max-width:22rem}
 .tx{border:1px solid var(--line);border-radius:var(--radius-card);background:var(--surface);padding:20px;margin-top:16px}
 .tx-top{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:10px}
 .tx-top h3{margin:0;font-size:16px}
-.tx-amount{font:600 26px/1.15 var(--sans);letter-spacing:-.03em;margin:0}
-.tx-route{font:500 16px/1.4 var(--sans);margin:2px 0 0}
-.tx-when{font:400 13px/1.4 var(--sans);color:var(--muted);margin:6px 0 0}
+.tx-amount{font:600 26px/1.15 var(--sans);letter-spacing:-.03em;margin:0;overflow-wrap:anywhere}
+.tx-route{font:500 16px/1.4 var(--sans);margin:2px 0 0;overflow-wrap:anywhere}
+.tx-when{font:400 13px/1.4 var(--sans);color:var(--muted);margin:6px 0 0;overflow-wrap:anywhere}
 .tx-missing{margin:12px 0 0;padding-left:18px;font:400 14px/1.55 var(--sans);color:var(--muted)}
 .tx .actions{margin-top:16px}
 
@@ -283,7 +283,7 @@ body.is-void .actions,.stage-void .actions{width:100%;max-width:22rem}
 .tech summary::-webkit-details-marker{display:none}
 .tech summary::before{content:"+";font-weight:600;color:var(--amber-soft)}
 .tech[open] summary::before{content:"–"}
-.tech-body{padding:0 20px 20px;font:400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;word-break:break-word}
+.tech-body{padding:0 20px 20px;font:400 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;word-break:break-word;overflow-x:auto}
 .tech-body table{width:100%;border-collapse:collapse}
 .tech-body td,.tech-body th{padding:6px 8px;border-bottom:1px solid rgba(245,239,226,.14);text-align:left;font-size:12px}
 .tech-lite summary{cursor:pointer;font:500 13px/1.4 var(--sans);color:var(--muted);padding:12px 0;min-height:44px}
