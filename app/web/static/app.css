@@ -144,6 +144,8 @@ legend{padding:0;margin-bottom:4px}
 
 .timeline{list-style:none;padding:0;margin:0;display:grid;gap:8px}
 .timeline li{padding:14px;border:1px solid var(--line);border-radius:var(--radius-ghost);background:var(--surface);display:flex;gap:12px;align-items:center}
+.timeline li:has(.tl-dot.run){border-color:var(--signal);background:var(--signal-soft)}
+.timeline li:has(.tl-dot.run) ~ li:has(.tl-dot.run){border-color:var(--line);background:var(--surface)}
 .tl-dot{width:28px;height:28px;border-radius:999px;display:grid;place-items:center;flex:0 0 28px;border:1px solid var(--line);background:var(--surface);color:var(--muted);font:500 12px/1 var(--sans)}
 .tl-dot.ok{border-color:var(--ok);color:var(--ok)}
 .tl-dot.run{border-color:var(--signal);color:var(--signal)}
@@ -221,6 +223,25 @@ body.is-void .actions,.stage-void .actions{width:100%;max-width:22rem}
   flex-shrink:0;
   border-radius:50%;
   border:2px solid var(--line);
+}
+/* Processing page: ring aligns with left-aligned copy, not floating center */
+body[data-page="processing"] .wait-ring{
+  width:56px;
+  height:56px;
+  margin:0 0 24px;
+  align-self:flex-start;
+}
+.back-link{margin:20px 0 0}
+@keyframes proc-in{
+  from{opacity:0;transform:translateY(8px)}
+  to{opacity:1;transform:none}
+}
+@media (prefers-reduced-motion:no-preference){
+  body[data-page="processing"] .timeline li{opacity:0;animation:proc-in .3s var(--ease-out) forwards}
+  body[data-page="processing"] .timeline li:nth-child(1){animation-delay:.04s}
+  body[data-page="processing"] .timeline li:nth-child(2){animation-delay:.08s}
+  body[data-page="processing"] .timeline li:nth-child(3){animation-delay:.12s}
+  body[data-page="processing"] .timeline li:nth-child(4){animation-delay:.16s}
 }
 .wait-ring::after{
   content:"";

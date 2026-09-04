@@ -43,7 +43,8 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     processing = client.get(f"/cases/{case_id}/processing")
     assert "wait-ring" in processing.text
     assert "timeline" in processing.text
-    assert "Lihat proses teknis" in processing.text
+    assert "Lihat rincian proses" in processing.text
+    assert "Mengelompokkan bukti per transaksi." in processing.text
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
     css = client.get("/static/app.css")

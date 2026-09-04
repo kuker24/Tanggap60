@@ -13,20 +13,21 @@
 <div class="wait-ring" aria-hidden="true"></div>
 {% endif %}
 <h1>Kami sedang menyusun kasus Anda</h1>
-<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Biasanya selesai kurang dari satu menit pada demo ini. Tunggu di halaman ini — pindah sendiri kalau sudah selesai.{% endif %}</p>
+<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Biasanya selesai kurang dari satu menit. Tunggu di halaman ini — pindah sendiri kalau sudah selesai.{% endif %}</p>
 <ol class="timeline" aria-label="Tahapan penyusunan" data-guide-id="processing-status" tabindex="0">
   <li><span class="tl-dot {% if has_evidence %}ok{% else %}run{% endif %}" aria-hidden="true">{% if has_evidence %}✓{% else %}…{% endif %}</span><span class="tl-main"><b>Bukti diterima</b><br><span class="muted small">Foto, cerita, atau link Anda sudah masuk.</span></span></li>
-  <li><span class="tl-dot {% if st in ['NEW', 'INGESTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Membaca isi bukti</b><br><span class="muted small">Mengenali tulisan, jumlah uang, dan rekening.</span></span></li>
-  <li><span class="tl-dot {% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Menyusun transaksi</b><br><span class="muted small">Mengelompokkan bukti jadi transaksi per transaksi.</span></span></li>
-  <li><span class="tl-dot {% if st == 'REVIEW_REQUIRED' %}ok{% endif %}" aria-hidden="true">{% if st == 'REVIEW_REQUIRED' %}✓{% else %}4{% endif %}</span><span class="tl-main"><b>Menyiapkan yang perlu Anda konfirmasi</b><br><span class="muted small">Kalau ada yang meragukan, Anda yang memutuskan — bukan mesin.</span></span></li>
+  <li><span class="tl-dot {% if st in ['NEW', 'INGESTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Membaca isi bukti</b><br><span class="muted small">Mengenali nominal, tanggal, dan rekening.</span></span></li>
+  <li><span class="tl-dot {% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Menyusun transaksi</b><br><span class="muted small">Mengelompokkan bukti per transaksi.</span></span></li>
+  <li><span class="tl-dot {% if st == 'REVIEW_REQUIRED' %}ok{% endif %}" aria-hidden="true">{% if st == 'REVIEW_REQUIRED' %}✓{% else %}4{% endif %}</span><span class="tl-main"><b>Menyiapkan konfirmasi Anda</b><br><span class="muted small">Kalau ada yang meragukan, Anda yang memutuskan — bukan mesin.</span></span></li>
 </ol>
 {% if st == "REVIEW_REQUIRED" %}
 <script>location.replace("/cases/{{ case.case_id }}/review");</script>
 {% endif %}
-<details class="tech" id="trace">
-  <summary>Lihat proses teknis</summary>
+<details class="tech-lite" id="trace">
+  <summary>Lihat rincian proses</summary>
   <div class="tech-body" id="trace-body" data-case="{{ case.case_id }}">Memuat…</div>
 </details>
+<p class="muted small back-link"><a class="link" href="/">← Kembali ke beranda</a></p>
 {% endif %}
 <noscript>
   <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/review">Buka halaman konfirmasi</a> setelah 1–2 menit.</p>
