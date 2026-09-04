@@ -117,3 +117,37 @@ def test_pairing_then_pack_omits_ids(client: TestClient, ocr: ScriptedOcr) -> No
     plan_text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(packed.read("action_plan.pdf"))).pages)
     assert "Hubungi bank" in plan_text
     assert "ru_" not in plan_text
+
+
+CLEAN = "Transfer Berhasil Rp500.000 Ke: DEMO-DEST-C 23 September 2026 10:05 WIB Dari: DEMO-VICTIM-MASKED"
+
+
+def test_mixed_units_guide_but_block_partial_pack(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = create_case(client)
+    upload_text_png(client, ocr, case_id, "clean.png", CLEAN)
+    upload_text_png(client, ocr, case_id, "ambiguous.png", AMBIGUOUS)
+    client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "mix-run"})
+    confirm_critical(client, case_id)
+    units = client.get(f"/api/v1/cases/{case_id}/reporting-units").json()["reporting_units"]
+    assert any(u["mapping_status"] == "AMBIGUOUS" for u in units)
+    nxt = client.get(f"/api/v1/cases/{case_id}/next-action")
+    assert nxt.status_code == 200
+    assert nxt.json().get("code")
+    ready = next((u for u in units if u["mapping_status"] == "COMPLETE"), units[0])
+    denied_unit = client.post(
+        f"/api/v1/cases/{case_id}/reporting-units/{ready['unit_id']}/approval",
+        headers={"Idempotency-Key": "unit-appr"},
+        json={"snapshot_hash": "x", "accepted_notice": True},
+    )
+    assert denied_unit.status_code == 404
+    draft = client.post(f"/api/v1/cases/{case_id}/draft")
+    if draft.status_code == 200:
+        blocked = client.post(
+            f"/api/v1/cases/{case_id}/approval",
+            headers={"Idempotency-Key": "mix-appr"},
+            json={"snapshot_hash": draft.json()["snapshot_hash"], "accepted_notice": True},
+        )
+        assert blocked.status_code == 400
+    page = client.get(f"/cases/{case_id}/readiness")
+    assert "Buat paket untuk" not in page.text
+    assert "Pasangkan" in page.text or "pasang" in page.text.lower()

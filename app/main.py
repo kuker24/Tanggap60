@@ -117,6 +117,9 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        path = str(request.url.path)
+        if path.startswith("/api/") or path.startswith("/cases/") or path == "/demo/metrics":
+            response.headers["Cache-Control"] = "no-store"
         return response
 
     @app.get("/health/live")
@@ -145,7 +148,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
 
     @app.get("/demo/metrics", response_model=None)
     def metrics(request: Request):
-        if app.state.container.settings.app_env == "production":
+        if app.state.container.settings.app_env not in {"development", "test"}:
             return JSONResponse(status_code=404, content={"detail": "Not Found"})
         session = request.state.db
         from app.infrastructure.repositories import CaseRepository

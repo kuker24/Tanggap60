@@ -8,7 +8,7 @@ from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
 from app.config import Settings
-from app.domain.errors import InvalidFileType, InvalidStateTransition, UploadLimitExceeded
+from app.domain.errors import InvalidFileType, InvalidStateTransition, NotFound, UploadLimitExceeded
 from app.domain.models import EvidenceKind, EvidenceRecord, EvidenceStatus
 from app.domain.policies import sha256_bytes
 from app.domain.states import State
@@ -24,7 +24,6 @@ MAX_TEXT_BYTES = 100_000
 MAX_URL_BYTES = 4096
 FROZEN_EVIDENCE_STATES = frozenset(
     {
-        State.WAITING_APPROVAL,
         State.GENERATING,
         State.VERIFYING,
         State.HANDOFF_READY,
@@ -138,8 +137,7 @@ class IntakeService:
             retention_until=case.expires_at,
         )
         self.evidence.add(record)
-        if case.state == State.NEW:
-            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        self._reopen_for_new_evidence(case)
         return record
 
     def add_text(self, case_id: str, session_id: str, text: str) -> EvidenceRecord:
@@ -164,8 +162,7 @@ class IntakeService:
             retention_until=case.expires_at,
         )
         self.evidence.add(record)
-        if case.state == State.NEW:
-            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        self._reopen_for_new_evidence(case)
         return record
 
     def add_url(self, case_id: str, session_id: str, url: str) -> EvidenceRecord:
@@ -190,6 +187,21 @@ class IntakeService:
             retention_until=case.expires_at,
         )
         self.evidence.add(record)
-        if case.state == State.NEW:
-            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+        self._reopen_for_new_evidence(case)
         return record
+
+    def _reopen_for_new_evidence(self, case) -> None:
+        if case.state != State.INGESTING:
+            self.cases.set_state(case, State.INGESTING, event_type="EVIDENCE_ACCEPTED")
+
+    def delete_unprocessed(self, case_id: str, session_id: str, evidence_id: str) -> None:
+        case = self.cases.get_owned(case_id, session_id)
+        if case.state in FROZEN_EVIDENCE_STATES:
+            raise InvalidStateTransition("tidak bisa hapus bukti")
+        item = self.evidence.get(evidence_id)
+        if item.case_id != case_id:
+            raise NotFound("evidence not found")
+        if item.status != EvidenceStatus.ACCEPTED:
+            raise InvalidStateTransition("bukti yang sudah diproses tidak bisa dihapus")
+        self.storage.delete_key(case_id, item.storage_key)
+        self.evidence.delete(evidence_id)

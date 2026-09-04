@@ -1,14 +1,9 @@
 [Unit]
-Description=Hermes dashboard Cloudflare quick tunnel
-After=network-online.target hermes-dashboard.service
-Wants=network-online.target
+Description=Disabled Hermes dashboard tunnel. Use SSH -L 9119:127.0.0.1:9119
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:9119
-Restart=on-failure
-RestartSec=5
-NoNewPrivileges=yes
+Type=oneshot
+ExecStart=/bin/false
 
 [Install]
 WantedBy=multi-user.target

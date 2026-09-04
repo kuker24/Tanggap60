@@ -34,7 +34,7 @@ Conflict dibedakan:
 - `UNIT_SCOPED` — hanya memblokir unit yang terkait (fact_ids subset unit).
 - `INCIDENT_GLOBAL` — memblokir semua unit.
 
-Contoh: Unit A READY, Unit B AMBIGUOUS → Unit A tetap dapat ditindaklanjuti.
+Contoh: Unit A READY, Unit B AMBIGUOUS → next-action tetap menunjuk Unit A (bimbingan per unit). Paket/approval tetap case-level: semua ambiguitas harus diselesaikan dulu.
 
 ## Readiness V2 Per Unit
 ```
@@ -46,9 +46,8 @@ INCIDENT
 Status: `READY`, `NEEDS_ACTION`, `BLOCKED`, plus `AMBIGUOUS` sebagai blocker eksplisit. Ditampilkan sebagai `5/5 pemeriksaan internal selesai + 1 diisi di portal resmi`.
 
 ## Approval Granularity
-- `REPORTING_UNIT_HANDOFF` dengan `target_id = unit_id`, snapshot mengikat `unit identity, reviewed facts, provenance, mapping decisions, relevant conflicts, readiness_profile_version`.
-- `INCIDENT_HANDOFF` untuk police/incident pack.
-- Perubahan fakta yang relevan → revoke unit tersebut; perubahan unit lain yang tidak terkait → tidak membatalkan approval unit yang masih valid.
+- Rilis ini memakai `INCIDENT_HANDOFF` case-level. Next-action per unit tetap ada; endpoint approval per unit tidak dipublikasikan.
+- Perubahan fakta yang relevan → revoke approval kasus.
 
 ## Artifact Contract V2
 Schema `2.2` (additive, 2.0/2.1 tetap valid).
@@ -79,7 +78,7 @@ Codes: `RESOLVE_CONFLICT`, `RESOLVE_UNIT_MAPPING`, `CONFIRM_TRANSACTION_*`, `CON
 Prioritas:
 1. Blocking conflict → RESOLVE_CONFLICT
 2. Ambiguous → RESOLVE_UNIT_MAPPING
-3. Ready financial unit → CONTACT_BANK/PREPARE_IASC (tanpa menunggu unit lain)
+3. Ready financial unit → CONTACT_BANK/PREPARE_IASC sebagai bimbingan; packaging menunggu seluruh kasus non-ambiguous
 4. Missing critical fact → CONFIRM_*
 5. Police incident
 

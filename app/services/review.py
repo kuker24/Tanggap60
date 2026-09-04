@@ -116,6 +116,8 @@ class ReviewService:
 
             raise StaleCaseVersion("versi kasus usang")
         conflict = self.conflicts.get(conflict_id)
+        if conflict.case_id != case_id:
+            raise NotFound("conflict not found")
         if resolution_fact_id not in conflict.fact_ids:
             raise ValidationFailed("fakta resolusi tidak terkait")
         for fact_id in conflict.fact_ids:

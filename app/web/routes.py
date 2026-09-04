@@ -295,15 +295,10 @@ async def intake_submit(case_id: str, request: Request):
 
 @web.post("/cases/{case_id}/evidence/{evidence_id}/delete")
 def delete_evidence_web(case_id: str, evidence_id: str, request: Request):
-    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    if case.state not in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING}:
+    try:
+        _svc(request)["intake"].delete_unprocessed(case_id, _sid(request), evidence_id)
+    except AppError:
         return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
-    repo = EvidenceRepository(request.state.db)
-    item = repo.get(evidence_id)
-    if item.case_id != case_id:
-        return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
-    request.app.state.container.storage.delete_key(case_id, item.storage_key)
-    repo.delete(evidence_id)
     return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
 
 
@@ -315,7 +310,9 @@ def reset_case(case_id: str, request: Request):
         "purge_case",
         {"confirmation": "PURGE", "user_initiated": True, "session_id": _sid(request)},
     )
-    return RedirectResponse("/", status_code=303)
+    response = RedirectResponse("/", status_code=303)
+    response.headers["Clear-Site-Data"] = '"storage"'
+    return response
 
 
 @web.get("/cases/{case_id}/processing")
@@ -492,6 +489,9 @@ def readiness_page(case_id: str, request: Request):
     has_blocking = False
     needs_evidence = False
     ready_count = 0
+    has_ambiguous = any(
+        str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in units
+    )
     if units and units_report:
         reps = {r.get("unit_id"): r for r in units_report.get("units") or []}
         by_unit = units_report.get("readiness_by_unit") or {}
@@ -556,6 +556,7 @@ def readiness_page(case_id: str, request: Request):
             "has_blocking": has_blocking,
             "needs_evidence": needs_evidence,
             "ready_count": ready_count,
+            "has_ambiguous": has_ambiguous,
         },
     )
 
@@ -641,6 +642,10 @@ def submit_approval(
     notice = accepted_notice in {"1", "on", "true", "yes"}
     if not idempotency_key:
         return RedirectResponse(f"/cases/{case_id}/approval?notice=coba-lagi", status_code=303)
+    try:
+        _svc(request)["cases"].get_owned(case_id, _sid(request))
+    except AppError:
+        return RedirectResponse("/", status_code=303)
     idem_payload = json.dumps({"snapshot_hash": snapshot_hash, "accepted_notice": notice}, sort_keys=True)
     try:
         if _idempotency(request, case_id, idempotency_key, idem_payload):

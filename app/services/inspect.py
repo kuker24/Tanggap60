@@ -74,6 +74,8 @@ class InspectService:
         results: list[dict[str, object]] = []
         ocr_total_ms = 0
         for item in items:
+            if item.status != EvidenceStatus.ACCEPTED:
+                continue
             data = self.storage.read_bytes(case_id, item.storage_key)
             pages: list[PageText] = []
             warning = None
@@ -229,7 +231,7 @@ class InspectService:
                     )
                     self.facts.add(fact)
                     created += 1
-        if created == 0:
+        if created == 0 and not self.facts.list_for_case(case_id):
             case = self.case_repo.get(case_id)
             case.route_reason = "MANUAL_REVIEW_REQUIRED"
             self.cases.touch(case)

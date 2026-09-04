@@ -4,7 +4,7 @@
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
 {% block content %}
 <h1>Sudah mendapat nomor laporan atau tiket?</h1>
-<p class="lede">Nomor yang dikasih bank, IASC, atau polisi setelah Anda melapor. Disimpan di sini biar tidak hilang — hanya tersimpan lokal, status resmi tetap lihat di situs mereka.</p>
+  <p class="lede">Nomor yang dikasih bank, IASC, atau polisi setelah Anda melapor. Yang tercatat di kasus ini hanya nomor yang disamarkan. Status resmi tetap lihat di situs mereka.</p>
 
 {% if receipt %}
 <div class="card">
@@ -60,7 +60,16 @@ async function purgeNow(ev) {
   ev.preventDefault();
   if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
   const res = await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
-  if(res.ok){ location.href = "/"; return false; }
+  if(res.ok){
+    try {
+      const id = "{{ case.case_id }}";
+      sessionStorage.removeItem("t60agent:" + id);
+      sessionStorage.removeItem("t60plan:" + id);
+      sessionStorage.removeItem("t60wait:" + id);
+    } catch (e) {}
+    location.href = "/";
+    return false;
+  }
   const j = await res.json().catch(()=>({}));
   window._alert("purge-alert", "error", "Belum terhapus", (j.message || "Gagal menghapus") + ". Coba lagi.");
   return false;

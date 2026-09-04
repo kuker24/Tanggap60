@@ -18,7 +18,7 @@ SatuAman Tanggap60 — AI Rescue Agent / Native Co-pilot: AI pendamping insiden 
 VPS 4 vCPU / 4 GB / 20 GB, 1 web + 1 heavy worker, Nginx, SQLite WAL, Hermes Agent CLI sebagai orkestrator tool (allowlist per state). Fallback deterministik jika model tidak tersedia. Klaim durasi demo diukur lokal, bukan jaminan.
 
 ## Capabilities and Constraints
-Must: case anonim, upload JPG/PNG/PDF 8×25MB plus teks/URL dengan kuota yang sama, SHA-256 + provenance, OCR + fact extraction, routing PRE/POST/OUT_OF_SCOPE, conflict detection, fact review, readiness 2026-09-02.mvp2, action plan, artifact ZIP terverifikasi (paket kanal sesuai kesiapan), verification, handoff manual, receipt, purge, events. Constraints: no auto-submit, no raw OCR/PII di trace, approval hash-bound, profile fail-safe, guard RAM 1024 / disk 2048.
+Must: case anonim, upload JPG/PNG/PDF maksimal 8 berkas / 25 MB total plus teks/URL dengan kuota yang sama, SHA-256 + provenance, OCR + fact extraction, routing PRE/POST/OUT_OF_SCOPE, conflict detection, fact review, readiness 2026-09-02.mvp2, action plan, artifact ZIP terverifikasi (paket kanal sesuai kesiapan), verification, handoff manual, receipt, purge, events. Constraints: no auto-submit, no raw OCR/PII di trace, approval hash-bound, profile fail-safe, guard RAM 1024 / disk 2048.
 
 ## Brand Commitments
 Nama SatuAman Tanggap60. Bahasa Indonesia sederhana. Disclaimer tetap: keputusan resmi di lembaga berwenang. Dunia visual: satu dunia terang-tenang (warm paper) dari beranda sampai paket; panel gelap hanya untuk jejak teknis yang collapsed. Alur langkah: Bukti → Periksa → Konfirmasi → Bertindak.

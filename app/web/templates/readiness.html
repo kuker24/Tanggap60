@@ -89,6 +89,9 @@
   {% if has_blocking %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi transaksi</a>
   <p class="muted small">Belum bisa membuat paket sebelum data yang ditandai selesai — supaya isinya tidak salah.</p>
+  {% elif has_ambiguous %}
+  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Pasangkan transaksi dulu</a>
+  <p class="muted small">Paket dibuat untuk seluruh kasus setelah semua transaksi terpasang.</p>
   {% elif needs_evidence %}
   <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
   <p class="muted small">Paket tetap bisa dibuat tanpa bukti tambahan, tapi bisa kurang kuat di bank atau IASC.</p>

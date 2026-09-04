@@ -66,20 +66,18 @@ install -d /etc/systemd/system/tanggap60-web.service.d /etc/systemd/system/tangg
 printf '[Service]\nSupplementaryGroups=hermes\n' >/etc/systemd/system/tanggap60-web.service.d/hermes.conf
 printf '[Service]\nSupplementaryGroups=hermes\n' >/etc/systemd/system/tanggap60-worker.service.d/hermes.conf
 cp "${APP_DIR}/deploy/hermes-dashboard.service" /etc/systemd/system/
-cp "${APP_DIR}/deploy/hermes-tunnel.service" /etc/systemd/system/
 cp "${APP_DIR}/deploy/tanggap60-hermes-acl.service" /etc/systemd/system/
 cp "${APP_DIR}/deploy/tanggap60-hermes-acl.timer" /etc/systemd/system/
 chmod +x "${APP_DIR}/scripts/fix_hermes_acl.sh"
 "${APP_DIR}/scripts/fix_hermes_acl.sh"
 systemctl daemon-reload
 systemctl enable --now tanggap60-hermes-acl.service
-systemctl enable hermes-dashboard hermes-tunnel
+systemctl enable hermes-dashboard
+systemctl stop hermes-tunnel 2>/dev/null || true
+systemctl disable hermes-tunnel 2>/dev/null || true
+systemctl mask hermes-tunnel
 systemctl restart hermes-dashboard
 sleep 3
-if systemctl is-active --quiet hermes-tunnel; then
-  echo "HERMES_TUNNEL_ALREADY_ACTIVE"
-else
-  systemctl start hermes-tunnel || echo "HERMES_TUNNEL_SKIP"
-fi
 systemctl restart tanggap60-web tanggap60-worker
 echo "HERMES_DASHBOARD_OK"
+echo "Hermes dashboard is loopback-only. Use SSH -L 9119:127.0.0.1:9119"
