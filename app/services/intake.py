@@ -47,11 +47,16 @@ def pdf_page_count(data: bytes) -> int:
 
 
 def check_image_pixels(data: bytes, max_pixels: int) -> None:
-    with Image.open(BytesIO(data)) as image:
-        image.load()
-        pixels = image.width * image.height
-        if pixels > max_pixels:
-            raise InvalidFileType("gambar melebihi batas piksel")
+    try:
+        with Image.open(BytesIO(data)) as image:
+            image.load()
+            pixels = image.width * image.height
+            if pixels > max_pixels:
+                raise InvalidFileType("gambar melebihi batas piksel")
+    except InvalidFileType:
+        raise
+    except (OSError, ValueError, Image.DecompressionBombError):
+        raise InvalidFileType("gambar tidak bisa dibaca") from None
 
 
 class IntakeService:

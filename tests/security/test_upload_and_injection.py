@@ -13,6 +13,17 @@ def _case(client: TestClient) -> str:
     return client.post("/api/v1/cases", json={"mode": "DEMO", "declared_condition": "AFTER_LOSS"}).json()["case_id"]
 
 
+def test_truncated_png_is_invalid_file_type(client: TestClient) -> None:
+    case_id = _case(client)
+    payload = b"\x89PNG\r\n\x1a\n" + b"\x00" * 80
+    res = client.post(
+        f"/api/v1/cases/{case_id}/evidence",
+        files=[("files", ("blank.png", payload, "image/png"))],
+    )
+    assert res.status_code in {400, 422}
+    assert res.json()["code"] == "INVALID_FILE_TYPE"
+
+
 def test_t07_jpeg_executable(client: TestClient) -> None:
     case_id = _case(client)
     payload = b"MZ" + b"\x00" * 20
