@@ -5,19 +5,44 @@
 {% block title %}Ketipu online? Susun buktinya di sini — SatuAman{% endblock %}
 {% block content %}
 <section class="land-hero">
-  <h1>Bukti berantakan. Kami bantu tentukan apa yang harus dilakukan sekarang.</h1>
-  <p class="lede">Kirim bukti yang ada — foto, chat, atau link. SatuAman menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
-  <form class="choices" method="post" action="/start" aria-label="Pilih kondisi">
-    <input type="hidden" name="mode" value="DEMO">
-    <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-      <b>Saya sudah kirim uang</b>
-      <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
-    </button>
-    <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-      <b>Saya baru curiga, belum kirim uang</b>
-      <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
-    </button>
-  </form>
+  <div class="land-hero-inner">
+    <div class="land-hero-copy">
+      <p class="land-eyebrow"><span aria-hidden="true">✦</span> AI Rescue Agent</p>
+      <h1>Bukti berantakan. Kami bantu tentukan apa yang harus dilakukan sekarang.</h1>
+      <p class="lede">Kirim bukti yang ada — foto, chat, atau link. SatuAman menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
+      <form class="choices land-choices" method="post" action="/start" aria-label="Pilih kondisi">
+        <input type="hidden" name="mode" value="DEMO">
+        <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
+          <b>Saya sudah kirim uang</b>
+          <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
+        </button>
+        <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
+          <b>Saya baru curiga, belum kirim uang</b>
+          <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
+        </button>
+      </form>
+      <ul class="land-trust" aria-label="Janji utama">
+        <li>Tidak mengirim laporan.</li>
+        <li>Kami tidak akan menebak.</li>
+        <li>Data demo otomatis dihapus setelah 60 menit.</li>
+      </ul>
+    </div>
+    <div class="land-hero-visual" aria-hidden="true">
+      <div class="land-mock">
+        <p class="land-mock-title">Transaksi ditemukan · 2</p>
+        <div class="land-mock-row is-ok">
+          <span class="land-mock-amt">Rp2.750.000</span>
+          <span class="land-mock-tag">Jelas</span>
+        </div>
+        <div class="land-mock-row is-wait">
+          <span class="land-mock-amt">Rp2.500.000</span>
+          <span class="land-mock-tag">Perlu konfirmasi</span>
+        </div>
+        <p class="land-mock-callout">Kami tidak akan menebak.</p>
+        <svg class="land-mock-cursor" width="26" height="26" viewBox="0 0 24 24"><path d="M4 2L20 11L11 13L9 22L4 2Z" fill="#0f172a" stroke="#fff" stroke-width="1"/></svg>
+      </div>
+    </div>
+  </div>
 </section>
 
 <section class="c1-wrap" aria-labelledby="c1-title">
@@ -27,6 +52,7 @@
     <p class="c1-subtitle">Yang Anda kirim tetap milik Anda.<br>Keputusan resmi tetap di bank, IASC, atau polisi.</p>
     <div class="c1-grid">
       <article class="c1-card c1-card-1">
+        <span class="c1-num" aria-hidden="true">1</span>
         <div class="c1-prompt">
           Transfer <span class="c1-blur-text">Rp2.750.000 ke BCA</span> tadi pagi, lalu <span class="c1-blur-text">penjual hilang</span>. Foto chat dan struk saja cukup.
         </div>
@@ -35,12 +61,14 @@
         <h3>1. Kirim bukti</h3>
       </article>
       <article class="c1-card c1-card-2">
+        <span class="c1-num" aria-hidden="true">2</span>
         <div class="c1-api-visual">
           <img class="c1-network-img" src="/static/landing/network.svg?v={{ asset_v }}" width="480" height="180" alt="">
         </div>
         <h3>2. Kami baca isinya</h3>
       </article>
       <article class="c1-card c1-card-3">
+        <span class="c1-num" aria-hidden="true">3</span>
         <div class="c1-mesh" aria-hidden="true"></div>
         <img class="c1-folder" src="/static/landing/library.svg?v={{ asset_v }}" width="170" height="124" alt="">
         <span class="c1-search" aria-hidden="true">
@@ -54,50 +82,56 @@
 </section>
 
 <section class="land-proof" aria-labelledby="proof-title">
-  <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
-  <ul class="land-proof-list">
-    <li><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</li>
-    <li><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya — tidak menebak.</li>
-    <li><b>Paket bisa dicek keasliannya.</b> Ada kode cek di dalamnya supaya isinya terbukti tidak berubah. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</li>
-  </ul>
+  <div class="land-section-inner">
+    <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
+    <ul class="land-proof-list">
+      <li class="is-no"><span class="land-mark" aria-hidden="true">×</span><span><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</span></li>
+      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya — tidak menebak.</span></li>
+      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek keasliannya.</b> Ada kode cek di dalamnya supaya isinya terbukti tidak berubah. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
+    </ul>
+  </div>
 </section>
 
 <section class="land-faq" aria-labelledby="faq-title">
-  <h2 id="faq-title">Pertanyaan yang sering muncul</h2>
-  <details>
-    <summary>Apakah laporan saya langsung terkirim ke bank atau polisi?</summary>
-    <p>Tidak. SatuAman hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
-  </details>
-  <details>
-    <summary>Apakah uang saya pasti kembali?</summary>
-    <p>Tidak ada yang bisa memastikan itu. Yang bisa kami bantu: bukti Anda rapi sehingga mudah diproses bank atau polisi.</p>
-  </details>
-  <details>
-    <summary>Apa isi paketnya?</summary>
-    <p>Arsip ZIP berisi foto dan cerita Anda, ringkasan datanya, dan kode cek keaslian supaya isinya terbukti tidak berubah. Cara bukanya sama seperti file ZIP biasa.</p>
-  </details>
-  <details>
-    <summary>Apa itu IASC?</summary>
-    <p>IASC adalah kanal resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id — bukan di sini.</p>
-  </details>
-  <details>
-    <summary>Berapa lama data saya disimpan?</summary>
-    <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari halaman paket setelah selesai melapor.</p>
-  </details>
+  <div class="land-section-inner narrow">
+    <h2 id="faq-title">Pertanyaan yang sering muncul</h2>
+    <details>
+      <summary>Apakah laporan saya langsung terkirim ke bank atau polisi?</summary>
+      <p>Tidak. SatuAman hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
+    </details>
+    <details>
+      <summary>Apakah uang saya pasti kembali?</summary>
+      <p>Tidak ada yang bisa memastikan itu. Yang bisa kami bantu: bukti Anda rapi sehingga mudah diproses bank atau polisi.</p>
+    </details>
+    <details>
+      <summary>Apa isi paketnya?</summary>
+      <p>Arsip ZIP berisi foto dan cerita Anda, ringkasan datanya, dan kode cek keaslian supaya isinya terbukti tidak berubah. Cara bukanya sama seperti file ZIP biasa.</p>
+    </details>
+    <details>
+      <summary>Apa itu IASC?</summary>
+      <p>IASC adalah kanal resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id — bukan di sini.</p>
+    </details>
+    <details>
+      <summary>Berapa lama data saya disimpan?</summary>
+      <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari halaman paket setelah selesai melapor.</p>
+    </details>
+  </div>
 </section>
 
 <section class="land-cta" aria-labelledby="cta-title">
-  <h2 id="cta-title">Mulai dari kondisi Anda</h2>
-  <form class="choices" method="post" action="/start" aria-label="Mulai kasus">
-    <input type="hidden" name="mode" value="DEMO">
-    <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-      <b>Saya sudah kirim uang</b>
-      <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
-    </button>
-    <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-      <b>Saya baru curiga, belum kirim uang</b>
-      <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
-    </button>
-  </form>
+  <div class="land-section-inner">
+    <h2 id="cta-title">Mulai dari kondisi Anda</h2>
+    <form class="choices land-choices" method="post" action="/start" aria-label="Mulai kasus">
+      <input type="hidden" name="mode" value="DEMO">
+      <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
+        <b>Saya sudah kirim uang</b>
+        <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
+      </button>
+      <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
+        <b>Saya baru curiga, belum kirim uang</b>
+        <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
+      </button>
+    </form>
+  </div>
 </section>
 {% endblock %}
