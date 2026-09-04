@@ -25,6 +25,8 @@ from app.agent.broker import (
     YELLOW_ACTIONS,
     ProposedAction,
     action_id_for,
+    build_plan,
+    canonical_page_for,
     red_message,
     validate_guide_target,
     validate_url,
@@ -206,7 +208,7 @@ def handle_message(
         message = red_message(intent.red_category)
         context = build_agent_context(db, case_id)
         _audit(db, case_id, "SENSITIVE_STOP", context["case"]["state"], None, 0, "DENIED", intent.red_category, text)
-        return _response(context, message, None, None, [], started, 0, "DETERMINISTIC_SAFE", False)
+        return _response(context, message, None, None, None, [], started, 0, "DETERMINISTIC_SAFE", False)
 
     context = build_agent_context(db, case_id)
     state = context["case"]["state"]
@@ -232,10 +234,32 @@ def handle_message(
         )
     if guidance is not None:
         _audit(db, case_id, "GUIDANCE_SHOWN", state, None, 0, "OK", None, guidance["target"])
+    plan = _plan_for(guidance, context, ui_state)
+    if plan:
+        _audit(
+            db,
+            case_id,
+            "GUIDANCE_PLAN",
+            state,
+            None,
+            0,
+            "OK",
+            None,
+            f"{len(plan)} steps -> {guidance['target'] if guidance else ''}",
+        )
 
     hermes_configured = bool(getattr(container.hermes, "hermes_cli_configured", False))
     return _response(
-        context, message, guidance, proposal, runner.used, started, runner.tool_ms, planner_mode, hermes_configured
+        context,
+        message,
+        guidance,
+        plan,
+        proposal,
+        runner.used,
+        started,
+        runner.tool_ms,
+        planner_mode,
+        hermes_configured,
     )
 
 
@@ -243,6 +267,7 @@ def _response(
     context: dict[str, Any],
     message: str,
     guidance: dict[str, str] | None,
+    plan: list[dict[str, Any]] | None,
     proposal: ProposedAction | None,
     tools_used: list[dict[str, Any]],
     started: float,
@@ -263,6 +288,7 @@ def _response(
         "message": message,
         "quick_actions": context["quick_actions"],
         "guidance": guidance,
+        "guidance_plan": plan,
         "proposed_action": None,
         "tools_used": tools_used,
         "agent_response_ms": total_ms,
@@ -294,6 +320,91 @@ def _guide(target: str | None, label: str, unit_ids: set[str]) -> dict[str, str]
     if valid is None:
         return None
     return {"target": valid, "label": label}
+
+
+def _plan_for(
+    guidance: dict[str, str] | None,
+    context: dict[str, Any],
+    ui_state: dict[str, Any] | None,
+) -> list[dict[str, Any]] | None:
+    """Derivasi guidance_plan deterministik untuk 3 flow hero (Live Rescue fase 1).
+
+    - review-facts + konflik BLOCKING terbuka → plan konflik nominal.
+    - transaction-<uid> + unit AMBIGUOUS → plan pairing transaksi.
+    - next-best-action → plan tindakan utama.
+    Kembalikan None bila flow tidak cocok (frontend memakai one-shot legacy).
+    Semua teks ditulis di kode (bukan output model); target & route tervalidasi.
+    """
+    if guidance is None:
+        return None
+    target = guidance.get("target", "")
+    unit_ids = set(context.get("unit_ids", []))
+    current = str((ui_state or {}).get("current_page") or "")
+    page = canonical_page_for(target)
+
+    nav: list[dict[str, Any]] = []
+    if page and page != current:
+        nav.append({"type": "NAVIGATE_INTERNAL", "route": page})
+
+    # conflicts_open hanya berisi konflik terbuka (tanpa field status).
+    blocking = [c for c in context.get("conflicts_open", []) if c.get("severity") == "BLOCKING"]
+    if target == "review-facts" and blocking:
+        return build_plan(
+            [
+                {"type": "STATUS", "message": "Saya membuka data yang bertentangan."},
+                *nav,
+                {"type": "SCROLL_TO", "target": "review-facts"},
+                {"type": "SPOTLIGHT", "target": "review-facts"},
+                {
+                    "type": "CALLOUT",
+                    "target": "review-facts",
+                    "title": "Pilih yang benar",
+                    "message": "Saya menemukan data yang berbeda. Saya tidak akan menebak — pilih yang sesuai bukti.",
+                },
+                {"type": "WAIT_FOR_USER"},
+            ],
+            unit_ids,
+        )
+    if target != "transaction-list" and target.startswith("transaction-"):
+        uid = target[len("transaction-") :].split("-")[0]
+        unit = next((u for u in context.get("units", []) if u.get("unit_id") == uid), None)
+        if unit is not None and unit.get("mapping_status") == "AMBIGUOUS" and uid in unit_ids:
+            return build_plan(
+                [
+                    {"type": "STATUS", "message": "Saya membuka transaksi yang perlu dipasangkan."},
+                    *nav,
+                    {"type": "SCROLL_TO", "target": f"transaction-{uid}"},
+                    {"type": "SPOTLIGHT", "target": f"transaction-{uid}"},
+                    {"type": "MOVE_POINTER", "target": f"transaction-{uid}-amount"},
+                    {
+                        "type": "CALLOUT",
+                        "target": f"transaction-{uid}-amount",
+                        "title": "Pastikan nominal",
+                        "message": "Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
+                    },
+                    {"type": "WAIT_FOR_USER"},
+                ],
+                unit_ids,
+            )
+    if target == "next-best-action":
+        return build_plan(
+            [
+                {"type": "STATUS", "message": "Saya menunjukkan tindakan paling penting."},
+                *nav,
+                {"type": "SCROLL_TO", "target": "next-best-action"},
+                {"type": "SPOTLIGHT", "target": "next-best-action"},
+                {"type": "MOVE_POINTER", "target": "next-best-action"},
+                {
+                    "type": "CALLOUT",
+                    "target": "next-best-action",
+                    "title": "Lakukan ini dulu",
+                    "message": "Ini langkah paling penting sekarang. Ikuti bagian yang disorot.",
+                },
+                {"type": "WAIT_FOR_USER"},
+            ],
+            unit_ids,
+        )
+    return None
 
 
 def _unit_label(unit: dict[str, Any]) -> str:

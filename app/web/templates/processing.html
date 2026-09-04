@@ -14,7 +14,7 @@
 {% endif %}
 <h1>Kami sedang menyusun kasus Anda</h1>
 <p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Biasanya selesai kurang dari satu menit pada demo ini. Tunggu di halaman ini — pindah sendiri kalau sudah selesai.{% endif %}</p>
-<ol class="timeline" aria-label="Tahapan penyusunan">
+<ol class="timeline" aria-label="Tahapan penyusunan" data-guide-id="processing-status" tabindex="0">
   <li><span class="tl-dot {% if has_evidence %}ok{% else %}run{% endif %}" aria-hidden="true">{% if has_evidence %}✓{% else %}…{% endif %}</span><span class="tl-main"><b>Bukti diterima</b><br><span class="muted small">Foto, cerita, atau link Anda sudah masuk.</span></span></li>
   <li><span class="tl-dot {% if st in ['NEW', 'INGESTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Membaca isi bukti</b><br><span class="muted small">Mengenali tulisan, jumlah uang, dan rekening.</span></span></li>
   <li><span class="tl-dot {% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if st in ['NEW', 'INGESTING', 'EXTRACTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Menyusun transaksi</b><br><span class="muted small">Mengelompokkan bukti jadi transaksi per transaksi.</span></span></li>

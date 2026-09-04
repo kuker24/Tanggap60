@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 from app.agent.broker import (
+    GUIDE_STEP_TYPES,
+    INTERNAL_ROUTES,
     action_id_for,
+    build_plan,
+    canonical_page_for,
     validate_guide_target,
+    validate_plan_step,
     validate_url,
 )
 from app.agent.formatting import (
@@ -90,3 +95,76 @@ def test_action_id_deterministic() -> None:
     assert first == action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3)
     assert first != action_id_for("case-a", "SET_UNIT_MAPPING", payload, 4)
     assert first != action_id_for("case-b", "SET_UNIT_MAPPING", payload, 3)
+
+
+def test_plan_step_schema_valid() -> None:
+    units = {"ru_abc123def456"}
+    assert validate_plan_step({"type": "STATUS", "message": "Halo"}, units) == {
+        "type": "STATUS",
+        "message": "Halo",
+    }
+    assert validate_plan_step({"type": "NAVIGATE_INTERNAL", "route": "review"}, units) == {
+        "type": "NAVIGATE_INTERNAL",
+        "route": "review",
+    }
+    assert validate_plan_step({"type": "WAIT_FOR_USER"}, units) == {"type": "WAIT_FOR_USER"}
+    step = validate_plan_step(
+        {
+            "type": "CALLOUT",
+            "target": "transaction-ru_abc123def456-amount",
+            "title": "Pastikan",
+            "message": "Jangan menebak.",
+        },
+        units,
+    )
+    assert step is not None and step["target"] == "transaction-ru_abc123def456-amount"
+    assert "GUIDE_UI" not in GUIDE_STEP_TYPES  # aksi broker bukan tipe langkah visual
+
+
+def test_plan_step_invalid_rejected() -> None:
+    units = {"ru_abc123def456"}
+    # tipe tak dikenal
+    assert validate_plan_step({"type": "RUN_JAVASCRIPT", "code": "alert(1)"}, units) is None
+    assert validate_plan_step({"type": "AUTO_SUBMIT"}, units) is None
+    assert validate_plan_step("STATUS", units) is None
+    assert validate_plan_step({}, units) is None
+    # target tak dikenal / unit asing
+    assert validate_plan_step({"type": "SPOTLIGHT", "target": "body > div"}, units) is None
+    assert validate_plan_step({"type": "SCROLL_TO", "target": "transaction-ru_tidakada00"}, units) is None
+    assert validate_plan_step({"type": "SPOTLIGHT"}, units) is None
+    # route tak dikenal / path arbitrer / URL eksternal
+    assert validate_plan_step({"type": "NAVIGATE_INTERNAL", "route": "admin"}, units) is None
+    assert validate_plan_step({"type": "NAVIGATE_INTERNAL", "route": "/etc/passwd"}, units) is None
+    assert validate_plan_step({"type": "NAVIGATE_INTERNAL", "route": "https://evil.example.com/"}, units) is None
+    assert validate_plan_step({"type": "NAVIGATE_INTERNAL"}, units) is None
+    # CALLOUT tanpa pesan ditolak; STATUS tanpa pesan ditolak
+    assert validate_plan_step({"type": "CALLOUT", "target": "review-facts", "title": "x"}, units) is None
+    assert validate_plan_step({"type": "STATUS"}, units) is None
+
+
+def test_build_plan_fail_closed_and_capped() -> None:
+    units = {"ru_abc123def456"}
+    plan = build_plan(
+        [
+            {"type": "STATUS", "message": "OK"},
+            {"type": "EVIL"},
+            {"type": "SPOTLIGHT", "target": "nope"},
+            {"type": "WAIT_FOR_USER"},
+        ],
+        units,
+    )
+    assert [s["type"] for s in plan] == ["STATUS", "WAIT_FOR_USER"]
+    assert build_plan("bukan-list", units) == []
+    long_plan = build_plan([{"type": "WAIT_FOR_USER"}] * 20, units)
+    assert len(long_plan) == 8
+    assert "review" in INTERNAL_ROUTES and "workspace" in INTERNAL_ROUTES
+
+
+def test_canonical_page_for() -> None:
+    assert canonical_page_for("upload-evidence") == "intake"
+    assert canonical_page_for("review-facts") == "review"
+    assert canonical_page_for("next-best-action") == "readiness"
+    assert canonical_page_for("approve-package") == "approval"
+    assert canonical_page_for("transaction-ru_abc123def456-amount") == "review"
+    assert canonical_page_for("transaction-list") == "readiness"
+    assert canonical_page_for("entah-apa") is None

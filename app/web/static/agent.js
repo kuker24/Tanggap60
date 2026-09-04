@@ -114,6 +114,7 @@
     input.value = "";
     setBusy(true);
     setStatus("Membaca kondisi kasus…");
+    setHud("Membaca kondisi kasus…", "working");
     renderQuick([]);
     try {
       const res = await fetch(`/api/v1/cases/${CASE}/agent/messages`, {
@@ -132,10 +133,19 @@
       addMsg("ai", data.message, data.tools_used, true);
       renderQuick(data.quick_actions);
       if (data.proposed_action) renderProposal(data.proposed_action);
-      if (data.guidance) guide(data.guidance);
+      if (data.guidance_plan && data.guidance_plan.length) {
+        setHud("Menyiapkan panduan…", "working");
+        if (!RT.run(data.guidance_plan)) setHud(null);
+      } else if (data.guidance) {
+        setHud(null);
+        guide(data.guidance);
+      } else {
+        setHud(null);
+      }
       if (speakOn) speak(data.message);
     } catch (e) {
       setStatus("Siap membantu");
+      setHud(null);
       addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.", null, false);
     } finally {
       setBusy(false);
@@ -209,7 +219,427 @@
     }
   }
 
-  /* --- Guided pointer: scroll + ring + tooltip, reduced-motion aware --- */
+  /* --- Live Rescue Mode: GuidanceRuntime (visual execution layer) ---
+     Server mengirim guidance_plan (langkah tervalidasi). Runtime mengeksekusi
+     satu demi satu: STATUS → NAVIGATE → SCROLL → SPOTLIGHT → POINTER →
+     CALLOUT → WAIT. Tanpa JS/selector/URL arbitrer dari server. */
+  const PLAN_KEY = "t60plan:" + CASE;
+  const WAIT_KEY = "t60wait:" + CASE;
+  const AUTO_KEY = "t60autopilot";
+  const PLAN_TTL = 10 * 60 * 1000;
+  const ROUTES = { intake: 1, processing: 1, review: 1, readiness: 1, result: 1, approval: 1, artifacts: 1, receipt: 1, workspace: 1 };
+  const TARGET_STEP = { SCROLL_TO: 1, SPOTLIGHT: 1, MOVE_POINTER: 1, CALLOUT: 1, OPEN_DISCLOSURE: 1, FOCUS: 1 };
+  const reduceMotion = () => window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  let hudEl = null, hudText = null, hudTimer = 0;
+  function ensureHud() {
+    if (hudEl) return;
+    hudEl = document.createElement("div");
+    hudEl.id = "agent-hud";
+    hudEl.hidden = true;
+    const spark = document.createElement("span");
+    spark.className = "hud-spark";
+    spark.setAttribute("aria-hidden", "true");
+    spark.textContent = "✦";
+    hudText = document.createElement("span");
+    hudText.className = "hud-text";
+    hudEl.appendChild(spark);
+    hudEl.appendChild(hudText);
+    document.body.appendChild(hudEl);
+  }
+  function setHud(text, mode) {
+    ensureHud();
+    if (hudTimer) { clearTimeout(hudTimer); hudTimer = 0; }
+    if (!text) { hudEl.hidden = true; return; }
+    hudText.textContent = text;
+    hudEl.dataset.mode = mode || "working";
+    hudEl.hidden = false;
+  }
+  function hudDone(text) {
+    setHud(text, "done");
+    hudTimer = setTimeout(() => { if (hudEl) hudEl.hidden = true; }, 4000);
+  }
+  let liveEl = null;
+  function announce(text) {
+    if (!liveEl) {
+      liveEl = document.createElement("div");
+      liveEl.id = "agent-guide-live";
+      liveEl.className = "sr";
+      liveEl.setAttribute("role", "status");
+      liveEl.setAttribute("aria-live", "polite");
+      document.body.appendChild(liveEl);
+    }
+    liveEl.textContent = "";
+    setTimeout(() => { liveEl.textContent = text; }, 30);
+  }
+
+  let layerEl = null;
+  function ensureLayer() {
+    if (layerEl) return layerEl;
+    layerEl = document.createElement("div");
+    layerEl.id = "agent-guide-layer";
+    layerEl.setAttribute("aria-hidden", "true");
+    document.body.appendChild(layerEl);
+    return layerEl;
+  }
+  let cursorEl = null, cursorX = 0, cursorY = 0, cursorInit = false;
+  function ensureCursor() {
+    ensureLayer();
+    if (cursorEl) return cursorEl;
+    cursorEl = document.createElement("div");
+    cursorEl.id = "agent-cursor";
+    cursorEl.hidden = true;
+    const dot = document.createElement("span");
+    dot.className = "cur-dot";
+    dot.textContent = "✦";
+    const tag = document.createElement("span");
+    tag.className = "cur-tag";
+    tag.textContent = "Tanggap60";
+    cursorEl.appendChild(dot);
+    cursorEl.appendChild(tag);
+    layerEl.appendChild(cursorEl);
+    return cursorEl;
+  }
+  function movePointerTo(el, done) {
+    const cur = ensureCursor();
+    const r = el.getBoundingClientRect();
+    const tx = Math.max(8, Math.min(window.innerWidth - 8, r.left + 20));
+    const ty = Math.max(8, Math.min(window.innerHeight - 8, r.top + Math.min(r.height, 44) / 2));
+    if (!cursorInit) { cursorX = tx; cursorY = Math.max(0, ty - 160); cursorInit = true; }
+    cur.hidden = false;
+    const dx = tx - cursorX, dy = ty - cursorY;
+    const dist = Math.hypot(dx, dy);
+    const dur = reduceMotion() ? 0 : Math.max(300, Math.min(700, 300 + dist * 0.4));
+    cursorX = tx; cursorY = ty;
+    announce("Tanggap60 menunjuk bagian yang perlu diperhatikan.");
+    if (!dur) {
+      cur.style.transform = "translate(" + tx + "px," + ty + "px)";
+      setTimeout(done, 60);
+      return;
+    }
+    const anim = cur.animate(
+      [{ transform: cur.style.transform || "translate(" + (tx - dx) + "px," + (ty - dy) + "px)" },
+       { transform: "translate(" + tx + "px," + ty + "px)" }],
+      { duration: dur, easing: "cubic-bezier(.3,.7,.3,1)" }
+    );
+    const finish = () => { cur.style.transform = "translate(" + tx + "px," + ty + "px)"; done(); };
+    anim.onfinish = finish;
+    setTimeout(finish, dur + 120);
+  }
+  function hideCursor() { if (cursorEl) cursorEl.hidden = true; }
+
+  let spotRects = [], spotTarget = null, spotRaf = 0;
+  function paintSpotlight() {
+    spotRaf = 0;
+    if (!spotTarget || !spotRects.length) return;
+    const r = spotTarget.getBoundingClientRect();
+    const pad = 8, vw = window.innerWidth, vh = window.innerHeight;
+    const x0 = Math.max(0, r.left - pad), y0 = Math.max(0, r.top - pad);
+    const x1 = Math.min(vw, r.right + pad), y1 = Math.min(vh, r.bottom + pad);
+    const pos = [
+      [0, 0, vw, y0], [0, y1, vw, vh - y1], [0, y0, x0, y1 - y0], [x1, y0, vw - x1, y1 - y0],
+    ];
+    spotRects.forEach((d, i) => {
+      d.style.left = pos[i][0] + "px"; d.style.top = pos[i][1] + "px";
+      d.style.width = Math.max(0, pos[i][2]) + "px"; d.style.height = Math.max(0, pos[i][3]) + "px";
+    });
+  }
+  function showSpotlight(el) {
+    ensureLayer();
+    hideSpotlight();
+    spotTarget = el;
+    for (let i = 0; i < 4; i++) {
+      const d = document.createElement("div");
+      d.className = "spot-rect";
+      layerEl.appendChild(d);
+      spotRects.push(d);
+    }
+    paintSpotlight();
+  }
+  function hideSpotlight() {
+    spotRects.forEach(d => d.remove());
+    spotRects = []; spotTarget = null;
+  }
+  function scheduleRepaint() {
+    if (spotRaf || (!spotTarget && !calloutEl)) return;
+    spotRaf = requestAnimationFrame(() => { paintSpotlight(); placeCalloutAgain(); });
+  }
+  window.addEventListener("scroll", scheduleRepaint, { passive: true, capture: true });
+  window.addEventListener("resize", scheduleRepaint);
+
+  let calloutEl = null, calloutTarget = null;
+  function placeCalloutAgain() {
+    if (!calloutEl || !calloutTarget) return;
+    positionCallout(calloutEl, calloutTarget);
+  }
+  function positionCallout(card, el) {
+    const r = el.getBoundingClientRect();
+    const cw = Math.min(260, window.innerWidth - 16), ch = card.offsetHeight || 140;
+    let left = Math.max(8, Math.min(window.innerWidth - cw - 8, r.left + window.scrollX - window.scrollX));
+    left = Math.max(8, Math.min(window.innerWidth - cw - 8, r.left));
+    let top = r.bottom + 10;
+    if (top + ch > window.innerHeight - 8) top = r.top - ch - 10;
+    if (top < 8) top = Math.min(window.innerHeight - ch - 8, r.bottom + 10);
+    if (top < 8) top = 8;
+    card.style.left = left + "px";
+    card.style.top = top + "px";
+  }
+  function showCallout(el, title, message) {
+    ensureLayer();
+    hideCallout();
+    calloutTarget = el;
+    calloutEl = document.createElement("div");
+    calloutEl.id = "agent-callout";
+    calloutEl.setAttribute("role", "dialog");
+    calloutEl.setAttribute("aria-label", title || "Panduan Tanggap60");
+    const head = document.createElement("div");
+    head.className = "co-head";
+    head.textContent = "✦ Tanggap60";
+    const h = document.createElement("strong");
+    h.className = "co-title";
+    h.textContent = title || "Perhatikan bagian ini";
+    const p = document.createElement("p");
+    p.className = "co-msg";
+    p.textContent = message;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "co-ok";
+    btn.textContent = "Mengerti";
+    btn.addEventListener("click", () => { hideCallout(); hideSpotlight(); hideCursor(); });
+    calloutEl.appendChild(head);
+    calloutEl.appendChild(h);
+    calloutEl.appendChild(p);
+    calloutEl.appendChild(btn);
+    layerEl.appendChild(calloutEl);
+    positionCallout(calloutEl, el);
+    announce((title ? title + ". " : "") + message);
+  }
+  function hideCallout() {
+    if (calloutEl) { calloutEl.remove(); calloutEl = null; calloutTarget = null; }
+  }
+  function clearVisuals() {
+    hideCallout(); hideSpotlight(); hideCursor();
+    if (spotRaf) { cancelAnimationFrame(spotRaf); spotRaf = 0; }
+  }
+
+  function minimizePanel() {
+    if (!panel.hidden) {
+      panel.hidden = true;
+      fab.setAttribute("aria-expanded", "false");
+      showToast("Lihat yang ditunjukkan — ketuk Tanya AI untuk kembali.");
+    }
+  }
+  function saveContinuation(steps) {
+    try {
+      // Hanya metadata aman: nama target/route + pesan server. Tanpa teks user/PII.
+      sessionStorage.setItem(PLAN_KEY, JSON.stringify({ ts: Date.now(), steps }));
+    } catch (e) {}
+  }
+  function loadContinuation() {
+    try {
+      const raw = sessionStorage.getItem(PLAN_KEY);
+      if (!raw) return null;
+      const data = JSON.parse(raw);
+      if (!data || !Array.isArray(data.steps) || !data.steps.length) return null;
+      if (Date.now() - data.ts > PLAN_TTL) { sessionStorage.removeItem(PLAN_KEY); return null; }
+      return data.steps;
+    } catch (e) { return null; }
+  }
+  function clearContinuation() { try { sessionStorage.removeItem(PLAN_KEY); } catch (e) {} }
+  function markWaiting() { try { sessionStorage.setItem(WAIT_KEY, JSON.stringify({ ts: Date.now() })); } catch (e) {} }
+  function takeWaiting() {
+    try {
+      const raw = sessionStorage.getItem(WAIT_KEY);
+      sessionStorage.removeItem(WAIT_KEY);
+      if (!raw) return false;
+      return Date.now() - JSON.parse(raw).ts < PLAN_TTL;
+    } catch (e) { return false; }
+  }
+  function clearWaiting() { try { sessionStorage.removeItem(WAIT_KEY); } catch (e) {} }
+
+  const RT = {
+    plan: [], idx: 0, busy: false, paused: false, stepTimer: 0,
+    run(plan, fromIdx) {
+      this.cancel(true);
+      const steps = (plan || []).filter(validStep);
+      if (!steps.length) return false;
+      this.plan = steps;
+      this.idx = fromIdx || 0;
+      this.busy = true;
+      this.paused = false;
+      minimizePanel();
+      this.next();
+      return true;
+    },
+    next() {
+      if (!this.busy || this.paused) return;
+      if (this.idx >= this.plan.length) { this.finish(); return; }
+      const s = this.plan[this.idx++];
+      try { this.exec(s); } catch (e) { this.next(); }
+    },
+    later(fn, ms) {
+      if (this.stepTimer) clearTimeout(this.stepTimer);
+      this.stepTimer = setTimeout(() => { this.stepTimer = 0; this.next(); }, ms);
+    },
+    exec(s) {
+      switch (s.type) {
+        case "STATUS":
+          setHud(s.message, "working");
+          announce(s.message);
+          this.later(null, reduceMotion() ? 150 : 900);
+          break;
+        case "NAVIGATE_INTERNAL": {
+          saveContinuation(this.plan.slice(this.idx));
+          setHud("Membuka halaman " + s.route + "…", "working");
+          location.href = "/cases/" + CASE + "/" + s.route;
+          break;
+        }
+        case "SCROLL_TO": {
+          const el = findGuideTarget(s.target);
+          if (!el) { this.next(); break; }
+          el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+          this.later(null, reduceMotion() ? 150 : 650);
+          break;
+        }
+        case "SPOTLIGHT": {
+          const el = findGuideTarget(s.target);
+          if (!el) { this.next(); break; }
+          el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+          setTimeout(() => { if (this.busy) showSpotlight(el); }, reduceMotion() ? 50 : 500);
+          this.later(null, reduceMotion() ? 200 : 700);
+          break;
+        }
+        case "MOVE_POINTER": {
+          const el = findGuideTarget(s.target);
+          if (!el) { this.next(); break; }
+          el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+          setTimeout(() => {
+            if (!this.busy) return;
+            movePointerTo(el, () => this.next());
+          }, reduceMotion() ? 50 : 500);
+          break;
+        }
+        case "CALLOUT": {
+          const el = findGuideTarget(s.target);
+          if (!el) { this.next(); break; }
+          showCallout(el, s.title, s.message);
+          this.later(null, reduceMotion() ? 200 : 600);
+          break;
+        }
+        case "OPEN_DISCLOSURE": {
+          const el = findGuideTarget(s.target);
+          if (el) {
+            const det = el.closest ? (el.closest("details") || el.querySelector("details")) : null;
+            if (det) det.open = true;
+          }
+          this.next();
+          break;
+        }
+        case "FOCUS": {
+          const el = findGuideTarget(s.target);
+          if (el && el.focus) {
+            try {
+              if (!el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+              el.focus({ preventScroll: true });
+            } catch (e) {}
+          }
+          this.next();
+          break;
+        }
+        case "WAIT_FOR_USER":
+          this.paused = true;
+          setHud("Menunggu konfirmasi Anda", "waiting");
+          announce("Menunggu konfirmasi Anda. " + (this.plan.length ? "" : ""));
+          markWaiting();
+          break;
+        case "CLEAR_GUIDANCE":
+        default:
+          this.next();
+          break;
+      }
+    },
+    pause() { this.paused = true; },
+    resume() { if (this.busy && this.paused) { this.paused = false; this.next(); } },
+    cancel(silent) {
+      if (this.stepTimer) { clearTimeout(this.stepTimer); this.stepTimer = 0; }
+      this.busy = false; this.paused = false; this.plan = []; this.idx = 0;
+      clearVisuals();
+      clearContinuation(); clearWaiting();
+      if (!silent) { setHud(null); announce("Panduan ditutup."); }
+    },
+    finish() {
+      this.busy = false; this.paused = false;
+      clearContinuation(); clearWaiting();
+      clearVisuals();
+      hudDone("✓ Panduan selesai");
+      announce("Panduan selesai.");
+    },
+  };
+  // Validasi bentuk saja (bukan resolvabilitas DOM): langkah lintas-halaman
+  // harus lolos filter di halaman asal dan di-resolve saat eksekusi.
+  // Server sudah memvalidasi target/route; exec melewati langkah yang
+  // targetnya tidak ada (fail-open aman karena visual hanya kosmetik).
+  const TARGET_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
+  function validStep(s) {
+    if (!s || typeof s !== "object") return false;
+    const t = s.type;
+    if (t === "NAVIGATE_INTERNAL") return !!ROUTES[String(s.route || "")];
+    if (t === "STATUS") return typeof s.message === "string" && !!s.message;
+    if (t === "WAIT_FOR_USER" || t === "CLEAR_GUIDANCE") return true;
+    if (t === "CALLOUT") {
+      return TARGET_RE.test(String(s.target || "")) && typeof s.message === "string" && !!s.message;
+    }
+    if (TARGET_STEP[t]) return TARGET_RE.test(String(s.target || ""));
+    return false;
+  }
+  document.addEventListener("keydown", (ev) => {
+    if (ev.key === "Escape" && RT.busy) RT.cancel(false);
+  });
+
+  async function silentFollowUp(text) {
+    if (inFlight) return;
+    inFlight = true;
+    setHud("Membaca kondisi kasus…", "working");
+    try {
+      const res = await fetch(`/api/v1/cases/${CASE}/agent/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text, ui_state: { current_page: currentPage(), pending_action: pendingAction } }),
+      });
+      if (!res.ok) throw new Error("http-" + res.status);
+      const data = await res.json();
+      greeted = true;
+      pendingAction = data.proposed_action || null;
+      setStatus("Siap membantu");
+      addMsg("ai", data.message, data.tools_used, true);
+      renderQuick(data.quick_actions);
+      if (data.proposed_action) renderProposal(data.proposed_action);
+      if (data.guidance_plan && data.guidance_plan.length) {
+        if (!RT.run(data.guidance_plan)) setHud(null);
+      } else if (data.guidance) {
+        guide(data.guidance);
+        setHud(null);
+      } else {
+        setHud(null);
+      }
+    } catch (e) {
+      setHud(null);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  /* Lanjutan otomatis: sambung plan lintas halaman / lanjut setelah aksi user. */
+  (function autoResume() {
+    const cont = loadContinuation();
+    if (cont) { clearContinuation(); setTimeout(() => RT.run(cont, 0), 600); return; }
+    if (takeWaiting()) { setTimeout(() => silentFollowUp("Lanjut."), 600); return; }
+    try {
+      if (localStorage.getItem(AUTO_KEY) === "1") setTimeout(() => silentFollowUp("Bantu saya sampai selesai."), 900);
+    } catch (e) {}
+  })();
+
+  /* --- Guided pointer legacy (one-shot): dipakai bila tanpa guidance_plan --- */
   let tipEl = null, ringEl = null, ringTimer = 0;
   function clearGuide() {
     if (tipEl) { tipEl.remove(); tipEl = null; }
@@ -297,6 +727,19 @@
     speakBtn.textContent = speakOn ? "🔊" : "🔈";
     if (!speakOn && "speechSynthesis" in window) { try { window.speechSynthesis.cancel(); } catch (e) {} }
   });
+
+  /* --- Panduan langsung toggle (default OFF) --- */
+  (function autopilot() {
+    const box = document.getElementById("agent-autopilot");
+    if (!box) return;
+    try { box.checked = localStorage.getItem(AUTO_KEY) === "1"; } catch (e) {}
+    box.addEventListener("change", () => {
+      try { localStorage.setItem(AUTO_KEY, box.checked ? "1" : "0"); } catch (e) {}
+      showToast(box.checked ? "Panduan langsung aktif. Saya tunjukkan langkahnya." : "Panduan langsung mati.");
+      if (box.checked) silentFollowUp("Bantu saya sampai selesai.");
+      else RT.cancel(false);
+    });
+  })();
 
   /* --- Panel wiring --- */
   function open() {

@@ -51,6 +51,7 @@ _AGENT_EVENT_TYPES = frozenset(
         "AGENT_TOOL_REQUEST",
         "AGENT_TOOL_RESULT",
         "GUIDANCE_SHOWN",
+        "GUIDANCE_PLAN",
         "ACTION_PROPOSED",
         "ACTION_APPROVED",
         "ACTION_DENIED",

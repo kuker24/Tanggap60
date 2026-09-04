@@ -415,3 +415,66 @@ def test_workspace_full_account_in_owner_session_masked_in_context(client: TestC
     # Label akun tanpa digit tetap tampil aman, rekening digit ter-mask
     assert ctx_unit["destination_masked"] == "DEMO-DEST-B"
 
+
+def _conflict_case(client: TestClient, ocr: ScriptedOcr) -> str:
+    """Kasus dengan konflik BLOCKING terbuka (dua nominal berbeda)."""
+    from tests.hero_support import CHAT, TRANSFER
+
+    case_id = create_case(client)
+    upload_text_png(client, ocr, case_id, "chat.png", CHAT)
+    upload_text_png(client, ocr, case_id, "transfer.png", TRANSFER)
+    client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "plan-conflict-run"})
+    conflicts = client.get(f"/api/v1/cases/{case_id}/conflicts").json()["conflicts"]
+    assert [c for c in conflicts if c["severity"] == "BLOCKING" and c["status"] == "OPEN"]
+    return case_id
+
+
+def _plan_types(plan: list[dict] | None) -> list[str]:
+    assert plan, "guidance_plan kosong"
+    return [s["type"] for s in plan]
+
+
+def test_plan_conflict_flow_navigates_and_waits(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _conflict_case(client, ocr)
+    body = _ask(client, case_id, "Mana transaksi yang bermasalah?", {"current_page": "readiness"})
+    assert body["guidance"] is not None and body["guidance"]["target"] == "review-facts"
+    types = _plan_types(body["guidance_plan"])
+    assert types == ["STATUS", "NAVIGATE_INTERNAL", "SCROLL_TO", "SPOTLIGHT", "CALLOUT", "WAIT_FOR_USER"]
+    nav = body["guidance_plan"][1]
+    assert nav["route"] == "review"
+    assert "http" not in nav["route"] and "/" not in nav["route"]
+    callout = body["guidance_plan"][4]
+    assert callout["target"] == "review-facts" and "menebak" in callout["message"]
+    trail = client.get(f"/api/v1/cases/{case_id}/agent/trail").json()["trail"]
+    assert "GUIDANCE_PLAN" in {e["event_type"] for e in trail}
+
+
+def test_plan_pairing_flow_points_amount(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _agent_case(client, ocr)
+    body = _ask(client, case_id, "Mana transaksi yang bermasalah?", {"current_page": "review"})
+    guidance = body["guidance"]
+    assert guidance is not None and guidance["target"].startswith("transaction-ru_")
+    uid = guidance["target"][len("transaction-") :].split("-")[0]
+    types = _plan_types(body["guidance_plan"])
+    # sudah di review → tanpa NAVIGATE_INTERNAL
+    assert types == ["STATUS", "SCROLL_TO", "SPOTLIGHT", "MOVE_POINTER", "CALLOUT", "WAIT_FOR_USER"]
+    move = body["guidance_plan"][3]
+    assert move["target"] == f"transaction-{uid}-amount"
+    callout = body["guidance_plan"][4]
+    assert callout["target"] == f"transaction-{uid}-amount"
+
+
+def test_plan_next_action_and_legacy_fallback(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = _agent_case(client, ocr)
+    body = _ask(client, case_id, "Saya harus apa?", {"current_page": "intake"})
+    if body["guidance"] is not None and body["guidance"]["target"] == "next-best-action":
+        types = _plan_types(body["guidance_plan"])
+        assert types[0] == "STATUS" and types[-1] == "WAIT_FOR_USER"
+        assert "NAVIGATE_INTERNAL" in types  # intake != readiness
+    # kasus NEW tanpa bukti: legacy one-shot, tanpa plan (bukan flow hero)
+    fresh = create_case(client)
+    new_body = _ask(client, fresh, "Halo")
+    assert new_body["guidance"] is not None
+    assert new_body["guidance"]["target"] == "upload-evidence"
+    assert new_body["guidance_plan"] is None
+
