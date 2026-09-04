@@ -21,7 +21,7 @@ export DEBIAN_FRONTEND=noninteractive NEEDRESTART_MODE=l
 apt-get install -y --no-install-recommends git ca-certificates
 git clone https://github.com/kuker24/Tanggap60.git /opt/tanggap60/app
 cd /opt/tanggap60/app
-sudo ./scripts/bootstrap_vps.sh
+sudo RELEASE_SHA=<40-hex-commit> ./scripts/bootstrap_vps.sh
 ./scripts/verify_vps.sh
 ```
 

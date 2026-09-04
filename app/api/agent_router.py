@@ -40,13 +40,22 @@ agent_api = APIRouter(prefix="/api/v1")
 # Case-scoped in-process concurrency guard agar requests agent per case tidak tumpang tindih
 _CASE_LOCKS: dict[str, threading.Lock] = {}
 _GLOBAL_LOCK = threading.Lock()
+_CASE_LOCKS_MAX = 256
 
 
 def _get_case_lock(case_id: str) -> threading.Lock:
     with _GLOBAL_LOCK:
-        if case_id not in _CASE_LOCKS:
-            _CASE_LOCKS[case_id] = threading.Lock()
-        return _CASE_LOCKS[case_id]
+        lock = _CASE_LOCKS.get(case_id)
+        if lock is None:
+            if len(_CASE_LOCKS) >= _CASE_LOCKS_MAX:
+                for cid, held in list(_CASE_LOCKS.items()):
+                    if cid != case_id and not held.locked():
+                        del _CASE_LOCKS[cid]
+                        if len(_CASE_LOCKS) < _CASE_LOCKS_MAX:
+                            break
+            lock = threading.Lock()
+            _CASE_LOCKS[case_id] = lock
+        return lock
 
 
 _AGENT_EVENT_TYPES = frozenset(

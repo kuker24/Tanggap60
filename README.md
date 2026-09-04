@@ -6,7 +6,7 @@ Mengubah bukti digital berantakan menjadi **unit kasus yang dapat ditelusuri**, 
 
 Benang merah: `ONE INCIDENT → EVIDENCE → VERIFIED FACTS → REPORTING UNITS → GAPS → NEXT BEST ACTION → UNIT READINESS → HUMAN APPROVAL → VERIFIED HANDOFF PACK`.
 
-**Rescue Agent (chat + pointer + ruang persiapan):** pendamping state-aware — membaca kondisi kasus, menjalankan tool Tanggap60 via Hermes, menyorot UI yang perlu diklik, meminta persetujuan untuk perubahan, menyiapkan workspace simulasi, berhenti sebelum OTP/kredensial/submit final. Lihat `AGENT_ARCHITECTURE.md`.
+**Native Co-pilot:** suara/teks → aksi native di halaman (buka transaksi, prefill draf, minta persetujuan). GREEN dieksekusi, YELLOW prefill, RED ditolak. TTS default mati. Lihat `AGENT_ARCHITECTURE.md`.
 
 Jangan andalkan laptop sebagai lingkungan uji. Jalankan di VPS (systemd + Nginx + venv).
 
@@ -14,7 +14,7 @@ Jangan andalkan laptop sebagai lingkungan uji. Jalankan di VPS (systemd + Nginx 
 
 Hermes adapter + FastAPI + Jinja + SQLite WAL + Pillow/Tesseract + ReportLab. Satu web worker, satu heavy worker.
 
-Alur pascainsiden: unggah bukti → ekstraksi → tinjau fakta/konflik → preflight kanal → approval → paket terverifikasi → handoff manual → receipt. Artefak ZIP: Action Plan, Evidence Pack, readiness report, tiga paket kanal, `case.json`, checklist, manifest SHA-256. Lihat `docs/PREFLIGHT.md`.
+Alur pascainsiden: unggah bukti → ekstraksi → tinjau fakta/konflik → preflight kanal → approval → paket terverifikasi → handoff manual → receipt. Artefak ZIP terverifikasi (paket kanal Bank/IASC hanya jika channel READY). Lihat `docs/PREFLIGHT.md`.
 
 ## Perintah
 
@@ -34,9 +34,11 @@ Lihat `docs/DEPLOY.md`. VPS lomba:
 ```bash
 git clone https://github.com/kuker24/Tanggap60.git /opt/tanggap60/app
 cd /opt/tanggap60/app
-sudo ./scripts/bootstrap_vps.sh
+sudo RELEASE_SHA=<40-hex-commit> ./scripts/bootstrap_vps.sh
 ./scripts/verify_vps.sh
 ```
+
+Jangan clone tanpa pin SHA. Default `main` hanya valid setelah tag `competition-final`.
 
 Tanpa IP publik: `sudo ENABLE_TUNNEL=1 ./scripts/bootstrap_vps.sh`.
 

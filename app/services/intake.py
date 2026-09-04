@@ -20,6 +20,19 @@ from app.services.ids import new_id
 
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 Image.MAX_IMAGE_PIXELS = 20_000_000
+MAX_TEXT_BYTES = 100_000
+MAX_URL_BYTES = 4096
+FROZEN_EVIDENCE_STATES = frozenset(
+    {
+        State.WAITING_APPROVAL,
+        State.GENERATING,
+        State.VERIFYING,
+        State.HANDOFF_READY,
+        State.RECEIPT_RECORDED,
+        State.COMPLETE,
+        State.PURGED,
+    }
+)
 
 JPEG_MAGIC = b"\xff\xd8\xff"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -76,6 +89,17 @@ class IntakeService:
         self.cases = cases
         self.evidence = EvidenceRepository(session)
 
+    def _assert_evidence_mutable_and_capacity(self, case, extra_bytes: int) -> None:
+        if case.state in FROZEN_EVIDENCE_STATES:
+            raise InvalidStateTransition("tidak bisa mengubah bukti setelah persetujuan")
+        guard_resources(self.settings, str(self.storage.root))
+        existing = self.evidence.list_for_case(case.case_id)
+        if len(existing) >= self.settings.max_upload_files:
+            raise UploadLimitExceeded("maksimal 8 berkas")
+        total = sum(item.size_bytes for item in existing) + extra_bytes
+        if extra_bytes > self.settings.max_upload_bytes or total > self.settings.max_upload_bytes:
+            raise UploadLimitExceeded("ukuran unggahan melebihi 25 MB")
+
     def upload_bytes(
         self,
         case_id: str,
@@ -86,16 +110,7 @@ class IntakeService:
         kind_hint: EvidenceKind | None = None,
     ) -> EvidenceRecord:
         case = self.cases.get_owned(case_id, session_id)
-        if case.state not in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.FAILED_SAFE}:
-            if case.state.value in {"WAITING_APPROVAL", "GENERATING", "VERIFYING", "HANDOFF_READY"}:
-                raise InvalidStateTransition("tidak bisa mengubah bukti setelah persetujuan")
-        guard_resources(self.settings, str(self.storage.root))
-        existing = self.evidence.list_for_case(case_id)
-        if len(existing) >= self.settings.max_upload_files:
-            raise UploadLimitExceeded("maksimal 8 berkas")
-        total = sum(item.size_bytes for item in existing) + len(data)
-        if total > self.settings.max_upload_bytes or len(data) > self.settings.max_upload_bytes:
-            raise UploadLimitExceeded("ukuran unggahan melebihi 25 MB")
+        self._assert_evidence_mutable_and_capacity(case, len(data))
         mime = sniff_mime(data[:16] if len(data) >= 16 else data)
         kind = ALLOWED_MIME[mime]
         if kind_hint == EvidenceKind.RECEIPT:
@@ -129,9 +144,10 @@ class IntakeService:
 
     def add_text(self, case_id: str, session_id: str, text: str) -> EvidenceRecord:
         payload = text.encode("utf-8")
-        if len(payload) > 100_000:
+        if len(payload) > MAX_TEXT_BYTES:
             raise UploadLimitExceeded("teks terlalu panjang")
         case = self.cases.get_owned(case_id, session_id)
+        self._assert_evidence_mutable_and_capacity(case, len(payload))
         storage_key = self.storage.new_key()
         self.storage.write_atomic(case_id, storage_key, payload)
         record = EvidenceRecord(
@@ -154,7 +170,10 @@ class IntakeService:
 
     def add_url(self, case_id: str, session_id: str, url: str) -> EvidenceRecord:
         payload = url.strip().encode("utf-8")
+        if len(payload) > MAX_URL_BYTES:
+            raise UploadLimitExceeded("URL terlalu panjang")
         case = self.cases.get_owned(case_id, session_id)
+        self._assert_evidence_mutable_and_capacity(case, len(payload))
         storage_key = self.storage.new_key()
         self.storage.write_atomic(case_id, storage_key, payload)
         record = EvidenceRecord(

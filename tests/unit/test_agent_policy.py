@@ -91,10 +91,18 @@ def test_url_allowlist() -> None:
 
 def test_action_id_deterministic() -> None:
     payload = {"unit_id": "ru_x", "pairings": []}
-    first = action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3)
-    assert first == action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3)
-    assert first != action_id_for("case-a", "SET_UNIT_MAPPING", payload, 4)
-    assert first != action_id_for("case-b", "SET_UNIT_MAPPING", payload, 3)
+    secret = "test-secret-key-16"
+    first = action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3, secret_key=secret)
+    assert first.startswith("ag_")
+    assert len(first) == 3 + 32
+    assert first == action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3, secret_key=secret)
+    assert first != action_id_for("case-a", "SET_UNIT_MAPPING", payload, 4, secret_key=secret)
+    assert first != action_id_for("case-b", "SET_UNIT_MAPPING", payload, 3, secret_key=secret)
+    try:
+        action_id_for("case-a", "SET_UNIT_MAPPING", payload, 3)
+        raise AssertionError("secret_key wajib")
+    except ValueError:
+        pass
 
 
 def test_plan_step_schema_valid() -> None:

@@ -9,6 +9,7 @@ REPO_URL="${REPO_URL:-https://github.com/kuker24/Tanggap60.git}"
 APP_DIR="${APP_DIR:-/opt/tanggap60/app}"
 ENABLE_TUNNEL="${ENABLE_TUNNEL:-0}"
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
+RELEASE_SHA="${RELEASE_SHA:-}"
 
 if [[ "$(id -u)" -ne 0 ]]; then
   echo "run as root" >&2
@@ -25,11 +26,20 @@ fi
 
 mkdir -p /opt/tanggap60 /var/lib/tanggap60/cases /var/lib/tanggap60/db /var/log/tanggap60 /etc/tanggap60
 
+if [[ ! "${RELEASE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "RELEASE_SHA wajib (40 hex), contoh: RELEASE_SHA=<git-sha> $0" >&2
+  exit 1
+fi
+
 if [[ ! -f "${APP_DIR}/pyproject.toml" ]]; then
   git clone "${REPO_URL}" "${APP_DIR}"
-elif [[ -d "${APP_DIR}/.git" ]]; then
-  git -C "${APP_DIR}" pull --ff-only
 fi
+if [[ ! -d "${APP_DIR}/.git" ]]; then
+  echo "bukan git repo: ${APP_DIR}" >&2
+  exit 1
+fi
+git -C "${APP_DIR}" fetch --tags origin
+git -C "${APP_DIR}" checkout --detach "${RELEASE_SHA}"
 
 id tanggap60 >/dev/null 2>&1 || useradd --system --home /opt/tanggap60 --shell /usr/sbin/nologin tanggap60
 

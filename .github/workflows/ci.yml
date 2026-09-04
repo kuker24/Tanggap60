@@ -15,5 +15,10 @@ jobs:
       - run: python -m pip install -e ".[dev,ocr]"
       - run: python scripts/make_demo_fixtures.py
       - run: pytest -q
-      - run: ruff check app tests scripts/smoke_*.py scripts/benchmark_vps.py
+      - run: ruff check app tests scripts
       - run: mypy app
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: node --check app/web/static/agent.js
+      - run: node --check app/web/static/app.js

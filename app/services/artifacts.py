@@ -213,6 +213,9 @@ class ArtifactService:
                 (ArtifactType.BANK_HANDOFF_PACK, "BANK_PJP"),
                 (ArtifactType.IASC_HANDOFF_PACK, "IASC"),
             ):
+                block = next((item for item in report.get("channels") or [] if item.get("channel") == channel), None)
+                if not block or block.get("status") != "READY":
+                    continue
                 built.append(
                     self._store_pdf(
                         case_id,

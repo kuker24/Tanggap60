@@ -51,12 +51,12 @@ Safe Workspace → panduan handoff manual ke portal resmi (allowlist)
 
 - **GREEN** (otomatis): baca state/readiness/konflik/tindakan; scroll,
   highlight, pindah halaman internal; pratinjau workspace; tool read-only.
-- **YELLOW** (butuh konfirmasi eksplisit): `SET_UNIT_MAPPING`,
-  `OPEN_OFFICIAL`. Proposal = `action_id` deterministik
-  `sha256(case|type|payload|version)` — stateless, anti-tamper (diubah
-  sedikit → 400), idempoten (approve ganda = replay aman), tolak basi
-  (versi berubah → 409 + pesan refresh). Eksekusi reuse
-  `post_unit_mapping` — tidak ada duplikat logika mutasi.
+- **YELLOW** (butuh konfirmasi eksplisit): `SET_DRAFT` / `SET_UNIT_MAPPING`,
+  `OPEN_OFFICIAL`. Proposal = `action_id` HMAC-SHA256
+  `HMAC(secret, case|type|payload|version)` 32 hex — tanpa secret
+  server menolak. Stateless, anti-tamper (diubah sedikit → 400),
+  idempoten, tolak basi (versi berubah → 409). Prefill DOM ≠ commit
+  server sampai pengguna/voice `iya`.
 - **RED** (selalu tolak + jelaskan): password/PIN/login, OTP, CAPTCHA,
   transaksi bank, auto-submit, vonis hukum, scrape situs lain, bypass,
   unggah KTP otomatis. Event `SENSITIVE_STOP`.
@@ -99,10 +99,12 @@ dan telemetry ke model tetap tersamar (masked).
 
 ## Voice (bonus, cuttable)
 
-`agent.js`: push-to-talk Web Speech API → mengisi input (pengguna
-menekan kirim sendiri); tombol baca-jawaban via speechSynthesis (default
-mati). Satu API agent yang sama. Tanpa dependensi server/APi berbayar.
-Sengaja tipis agar tidak mengorbankan hero flow.
+`agent.js`: push-to-talk Web Speech API → transkrip final auto-send ke
+`POST .../agent/messages` (dijaga `inFlight`). TTS `speechSynthesis`
+default mati, nyala hanya dari toggle. NativeActionBus mengeksekusi
+langkah GREEN di DOM; YELLOW prefill + badge; RED tidak dijalankan.
+Tanpa dependensi server/API berbayar. Chat teks tetap jalan jika
+SpeechRecognition tidak ada.
 
 ## Endpoint
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import shutil
 from pathlib import Path
 from uuid import uuid4
 
@@ -17,7 +18,7 @@ from app.infrastructure.db import CaseRow
 from app.infrastructure.jobs import JobQueue
 from app.infrastructure.logging import configure_logging
 from app.infrastructure.resources import available_ram_mb, cpu_percent, free_disk_mb, process_rss_mb
-from app.session import COOKIE, error_body, get_session_id, set_session_cookie
+from app.session import error_body, get_session_id, set_session_cookie
 from app.web.routes import TEMPLATES, _friendly_file_error, web
 
 LOGGER = configure_logging("tanggap60-web")
@@ -116,8 +117,6 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        if COOKIE not in request.cookies:
-            pass
         return response
 
     @app.get("/health/live")
@@ -137,10 +136,17 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
                 status_code=503, content={"status": "not_ready", "error": str(type(exc).__name__)}
             )
         session.close()
-        return JSONResponse({"status": "ready"})
+        ocr_ok = shutil.which("tesseract") is not None
+        env = app.state.container.settings.app_env
+        components = {"db": True, "storage": True, "ocr": ocr_ok}
+        if env in {"competition", "production"} and not ocr_ok:
+            return JSONResponse(status_code=503, content={"status": "not_ready", "components": components})
+        return JSONResponse({"status": "ready", "components": components})
 
-    @app.get("/demo/metrics")
-    def metrics(request: Request) -> dict[str, object]:
+    @app.get("/demo/metrics", response_model=None)
+    def metrics(request: Request):
+        if app.state.container.settings.app_env == "production":
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
         session = request.state.db
         from app.infrastructure.repositories import CaseRepository
 

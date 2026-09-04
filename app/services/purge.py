@@ -75,8 +75,5 @@ class PurgeService:
         self.receipts.delete_for_case(case_id)
         self.jobs.delete_for_case(case_id)
         self.idem.delete_for_case(case_id)
-        try:
-            self.unit_maps.delete_for_case(case_id)
-        except Exception:
-            pass
+        self.unit_maps.delete_for_case(case_id)
         self.events.delete_content_for_case(case_id)

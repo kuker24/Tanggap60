@@ -10,7 +10,6 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tests.fixture_render import CHAT, TRANSFER, invoice_pdf, png_bytes  # noqa: E402
 
-
 TRANSFER_A = "Transfer Berhasil Rp2.000.000 Ke: DEMO-DEST-A 23 September 2026 09:13 WIB Dari: DEMO-VICTIM-MASKED"
 TRANSFER_B = "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B"
 TRANSFER_B_COMPLETE = "Transfer Berhasil Rp750.000 Ke: DEMO-DEST-B 23 September 2026 09:47 WIB Dari: DEMO-VICTIM-MASKED"

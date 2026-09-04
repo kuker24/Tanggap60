@@ -224,11 +224,22 @@ class VerifierService:
                                 ok = False
                                 checks["unexpected"] = "fail"
                 elif "action_plan.pdf" in manifest_map:
-                    for required in POST_ZIP_NAMES:
+                    expected = set(POST_ZIP_NAMES)
+                    readiness = (payload or {}).get("readiness") or {}
+                    by_ch = {
+                        str(c.get("channel")): str(c.get("status"))
+                        for c in (readiness.get("channels") or [])
+                        if isinstance(c, dict)
+                    }
+                    if by_ch.get("BANK_PJP") != "READY":
+                        expected.discard("bank_handoff_pack.pdf")
+                    if by_ch.get("IASC") != "READY":
+                        expected.discard("iasc_handoff_pack.pdf")
+                    for required in expected:
                         if required not in names:
                             ok = False
                             checks[f"missing:{required}"] = "fail"
-                    unexpected = names - POST_ZIP_NAMES
+                    unexpected = names - expected
                     if unexpected:
                         ok = False
                         checks["unexpected"] = "fail"

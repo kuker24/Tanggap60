@@ -267,9 +267,11 @@ def action_id_for(
 
     canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     message = f"{case_id}|{action_type}|{canonical}|{expected_version}".encode()
-    key = (secret_key or "tanggap60-action-broker-key").encode()
+    if not secret_key:
+        raise ValueError("secret_key wajib untuk action_id")
+    key = secret_key.encode()
     digest = hmac.new(key, message, hashlib.sha256).hexdigest()
-    return f"ag_{digest[:16]}"
+    return f"ag_{digest[:32]}"
 
 
 def validate_guide_target(target: str, unit_ids: set[str]) -> str | None:

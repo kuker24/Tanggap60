@@ -50,8 +50,12 @@ class RedactingFilter(logging.Filter):
     )
 
     def filter(self, record: logging.LogRecord) -> bool:
-        if isinstance(record.msg, str):
-            record.msg = self._sensitive.sub("[redacted]", record.msg)
+        try:
+            rendered = record.getMessage()
+        except Exception:
+            rendered = str(record.msg)
+        record.msg = self._sensitive.sub("[redacted]", rendered)
+        record.args = None
         return True
 
 

@@ -9,3 +9,9 @@ def test_redact_amount() -> None:
     record = logging.LogRecord("x", logging.INFO, "", 1, "transfer Rp2.750.000 secret", None, None)
     RedactingFilter().filter(record)
     assert "2.750" not in str(record.msg)
+
+
+def test_redact_percent_args() -> None:
+    record = logging.LogRecord("x", logging.INFO, "", 1, "transfer %s", ("Rp2.750.000",), None)
+    RedactingFilter().filter(record)
+    assert "2.750" not in record.getMessage()
