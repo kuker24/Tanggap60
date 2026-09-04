@@ -42,8 +42,11 @@ def sniff_mime(header: bytes) -> str:
 
 
 def pdf_page_count(data: bytes) -> int:
-    reader = PdfReader(BytesIO(data))
-    return len(reader.pages)
+    try:
+        reader = PdfReader(BytesIO(data))
+        return len(reader.pages)
+    except Exception:
+        raise InvalidFileType("PDF tidak bisa dibaca") from None
 
 
 def check_image_pixels(data: bytes, max_pixels: int) -> None:

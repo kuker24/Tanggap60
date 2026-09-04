@@ -47,6 +47,7 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "Mengelompokkan bukti per transaksi." in processing.text
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
+    assert "Belum ada data" in review.text
     css = client.get("/static/app.css")
     assert css.status_code == 200
     assert "#faf7f1" in css.text

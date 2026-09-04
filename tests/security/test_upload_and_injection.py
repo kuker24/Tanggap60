@@ -35,6 +35,17 @@ def test_t07_jpeg_executable(client: TestClient) -> None:
     assert res.json()["code"] == "INVALID_FILE_TYPE"
 
 
+def test_truncated_pdf_is_invalid_file_type(client: TestClient) -> None:
+    case_id = _case(client)
+    payload = b"%PDF-1.4\n" + b"\x00" * 40
+    res = client.post(
+        f"/api/v1/cases/{case_id}/evidence",
+        files=[("files", ("blank.pdf", payload, "application/pdf"))],
+    )
+    assert res.status_code in {400, 422}
+    assert res.json()["code"] == "INVALID_FILE_TYPE"
+
+
 def test_t08_pdf_too_many_pages(client: TestClient) -> None:
     case_id = _case(client)
     writer = PdfWriter()

@@ -11,7 +11,7 @@
   {% endif %}
 {% endfor %}
 <h1>Pastikan datanya benar</h1>
-<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Data 1 dari {{ ns.count }}. Ini benar?{% else %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% endif %}</p>
+<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Data 1 dari {{ ns.count }}. Ini benar?{% elif facts %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
 
 {% if notice == "pairing-ok" %}
 <p class="notice ok" role="status">Pasangan tersimpan. Lanjut ke data berikutnya.</p>
