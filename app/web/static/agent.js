@@ -322,7 +322,13 @@
        { transform: "translate(" + tx + "px," + ty + "px)" }],
       { duration: dur, easing: "cubic-bezier(.3,.7,.3,1)" }
     );
-    const finish = () => { cur.style.transform = "translate(" + tx + "px," + ty + "px)"; done(); };
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      cur.style.transform = "translate(" + tx + "px," + ty + "px)";
+      done();
+    };
     anim.onfinish = finish;
     setTimeout(finish, dur + 120);
   }
