@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Setujui paket — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
+{% block title %}Setujui paket — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <h1>Paket yang akan dibuat</h1>
 
@@ -19,7 +19,13 @@
 <article class="card block">
   <h3>Belum bisa dibuat</h3>
   <p class="muted small">Ada transaksi yang belum terpasang. Pasangkan dulu supaya isinya tidak salah.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pasangkan sekarang</a></div>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi data</a></div>
+</article>
+{% elif not scope_units %}
+<article class="card">
+  <h3>Belum ada transaksi untuk diperiksa</h3>
+  <p class="muted small">Kirim bukti dulu. Paket tidak bisa dibuat dari kasus kosong.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a></div>
 </article>
 {% else %}
 <p class="lede">Periksa sekali lagi. Tanggap60 tidak mengirim laporan — Anda yang bawa paketnya ke situs resmi.</p>
@@ -46,13 +52,13 @@
     <span>Saya sudah memeriksa transaksi di atas dan memahami bahwa Tanggap60 tidak mengirim laporan.</span>
   </label>
   <div class="sticky-cta">
-    <button class="btn ember" id="go" type="submit">Buat paket untuk {{ scope_units|length }} transaksi</button>
+    <button class="btn ember" id="go" type="submit">Buat dokumen</button>
   </div>
 </form>
 <p class="muted small"><a class="link" href="/cases/{{ case.case_id }}/review">‹ Konfirmasi lagi</a></p>
 <details class="tech-lite">
   <summary>Detail teknis</summary>
-  <p>Kode paket: {{ snapshot_hash[:16] }}… — cocok dengan kode cek keaslian di dalam arsip.</p>
+  <p>Kode paket: {{ snapshot_hash[:16] }}… — dipakai untuk cek apakah file berubah.</p>
 </details>
 <script>
 document.getElementById("approval-form").addEventListener("submit", function(){

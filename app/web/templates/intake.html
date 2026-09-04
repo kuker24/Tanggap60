@@ -1,10 +1,16 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Kirim bukti — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(1, "Langkah 1 dari 4: Bukti") }}{% endblock %}
+{% block title %}Kirim bukti — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(1, "Langkah 1 dari 4: Bukti", progress) }}{% endblock %}
 {% block content %}
-<h1>Kirim yang Anda punya</h1>
-<p class="lede" id="coach-lede">Foto, cerita, atau link — satu saja cukup untuk mulai.</p>
+{% set before = case.declared_condition.value == "BEFORE_LOSS" %}
+{% if before %}
+<h1>Periksa chat yang mencurigakan</h1>
+<p class="lede" id="coach-lede">Tempel percakapan, foto layar, atau link. Ini petunjuk awal, bukan vonis.</p>
+{% else %}
+<h1>Kumpulkan bukti transaksi</h1>
+<p class="lede" id="coach-lede">Foto transfer, chat, atau link — satu saja cukup untuk mulai.</p>
+{% endif %}
 
 <p class="notice" role="note">Demi keamanan: jangan kirim password, kode OTP, atau foto KTP. Data itu tidak kami butuhkan dan berbahaya kalau tersebar. Data demo otomatis dihapus setelah 60 menit.</p>
 
@@ -23,14 +29,20 @@
 {% endif %}
 
 <form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" novalidate>
-  <div class="coach-step is-on" data-step="files">
+  <div class="intake-tabs" role="tablist" aria-label="Cara kirim bukti">
+    <button type="button" role="tab" id="tab-files" data-tab="files" aria-selected="true" aria-controls="panel-files">Foto/File</button>
+    <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Tempel Chat</button>
+    <button type="button" role="tab" id="tab-url" data-tab="url" aria-selected="false" aria-controls="panel-url">Masukkan Link</button>
+  </div>
+
+  <div class="coach-step is-on" data-step="files" id="panel-files" role="tabpanel" aria-labelledby="tab-files">
     <div class="drop" id="drop" data-guide-id="upload-evidence" tabindex="0" role="button" aria-label="Pilih foto atau file bukti. Foto JPG atau PNG, atau PDF. Maksimal 8 file, total 25 MB.">
       <div class="drop-head">
         <span class="drop-title">Ketuk di sini untuk pilih foto atau file</span>
         <span class="muted small">Foto (JPG/PNG) atau PDF · maks 8 file · total maks 25 MB</span>
       </div>
       <input id="files" name="files" type="file" class="file-input" aria-label="Pilih foto atau file bukti" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
-      <p class="muted small">Di HP, Anda bisa foto struk langsung. Foto chat yang jelas sudah cukup.</p>
+      <p class="muted small">{% if before %}Foto layar chat yang jelas sudah cukup.{% else %}Di HP, Anda bisa foto struk langsung. Foto chat yang jelas sudah cukup.{% endif %}</p>
     </div>
     <div id="file-list" class="file-list" aria-live="polite"></div>
     {% if evidence %}
@@ -50,38 +62,26 @@
       {% if evidence %}
       <button class="btn-text" type="button" id="add-more">Tambah foto atau file lagi ›</button>
       {% endif %}
-      <button class="btn-text" type="button" id="skip-files">Saya tidak punya file, lanjut ›</button>
     </div>
   </div>
 
-  <div class="coach-step" data-step="text" data-guide-id="case-story">
-    <label for="text">Ceritakan singkat <span class="opt">(boleh kosong)</span></label>
+  <div class="coach-step" data-step="text" id="panel-text" role="tabpanel" aria-labelledby="tab-text" data-guide-id="case-story">
+    <label for="text">Tempel percakapan{% if before %} yang mencurigakan{% endif %} <span class="opt">(boleh kosong)</span></label>
     <div class="field">
-      <textarea id="text" name="text" placeholder="Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang." rows="4"></textarea>
-    </div>
-    <div class="actions">
-      <button class="btn ember" type="button" id="next-text">Lanjut</button>
-      <button class="btn-text" type="button" id="skip-text">Lewati ›</button>
+      <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer ke rekening ini, bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
     </div>
   </div>
 
-  <div class="coach-step" data-step="url">
-    <label for="url">Link terkait <span class="opt">(boleh kosong)</span></label>
+  <div class="coach-step" data-step="url" id="panel-url" role="tabpanel" aria-labelledby="tab-url">
+    <label for="url">Masukkan link terkait <span class="opt">(boleh kosong)</span></label>
     <div class="field">
       <input id="url" name="url" type="url" placeholder="Contoh: https://toko-contoh.com/barang-abc" inputmode="url" autocomplete="url">
       <p class="help">Link toko, akun pelaku, atau bukti online lainnya.</p>
     </div>
-    <div class="actions">
-      <button class="btn ember" type="button" id="next-url">Lanjut</button>
-      <button class="btn-text" type="button" id="skip-url">Lewati ›</button>
-    </div>
   </div>
 
-  <div class="coach-step" data-step="submit">
-    <p class="muted small">Sudah cukup? Kami baca dulu isinya, biasanya 1–2 menit.</p>
-    <div class="actions flush">
-      <button class="btn ember" type="submit" id="submit-intake">Periksa bukti saya</button>
-    </div>
+  <div class="sticky-cta">
+    <button class="btn ember" type="submit" id="submit-intake">Periksa bukti</button>
   </div>
 </form>
 <noscript>

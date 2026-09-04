@@ -18,7 +18,6 @@ from app.infrastructure.repositories import (
     EvidenceRepository,
     FactRepository,
     ReceiptRepository,
-    TransactionRepository,
     UnitMappingRepository,
 )
 from app.services.ids import new_id
@@ -47,33 +46,144 @@ def _svc(request: Request) -> dict:
     return services_from(request.state.db, request.app.state.container)
 
 
-def _gap_texts(report: dict | None, units_report: dict | None) -> list[str]:
-    seen: set[str] = set()
-    out: list[str] = []
+def _progress(db, case) -> dict:
+    evidence = EvidenceRepository(db).list_for_case(case.case_id)
+    facts = FactRepository(db).list_for_case(case.case_id)
+    has_evidence = bool(evidence)
+    st = case.state
+    past_ingest = st not in {State.NEW, State.INGESTING}
+    past_extract = st not in {State.NEW, State.INGESTING, State.EXTRACTING}
+    packaged = st in {
+        State.GENERATING,
+        State.VERIFYING,
+        State.HANDOFF_READY,
+        State.RECEIPT_RECORDED,
+        State.COMPLETE,
+    }
+    return {
+        "bukti": has_evidence,
+        "periksa": has_evidence and past_ingest,
+        "konfirmasi": packaged or (bool(facts) and past_extract and st != State.REVIEW_REQUIRED),
+        "bertindak": packaged,
+        "has_evidence": has_evidence,
+        "has_facts": bool(facts),
+    }
 
-    def add(item: object) -> None:
-        if not isinstance(item, dict):
-            return
-        if item.get("status") not in {"MISSING", "CONFLICT"}:
+
+def _case_page(request: Request, template: str, case, status_code: int = 200, **ctx):
+    return TEMPLATES.TemplateResponse(
+        template,
+        {"request": request, "case": case, "progress": _progress(request.state.db, case), **ctx},
+        status_code=status_code,
+    )
+
+
+def _primary_cta(
+    case_id: str,
+    *,
+    has_tx: bool,
+    has_blocking: bool,
+    has_ambiguous: bool,
+    needs_evidence: bool,
+    ready_count: int,
+) -> dict[str, str]:
+    if has_blocking or has_ambiguous:
+        return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+    if not has_tx:
+        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+    if needs_evidence:
+        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+    if ready_count:
+        return {"label": "Buat dokumen", "href": f"/cases/{case_id}/approval"}
+    return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+
+
+def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has_evidence: bool = False) -> list[dict]:
+    units = (units_report or {}).get("units") or []
+    if not units:
+        if not has_evidence:
+            return [
+                {
+                    "key": "bukti",
+                    "title": "Belum ada transaksi untuk diperiksa",
+                    "points": ["Kirim foto transfer, chat, atau link yang memuat jumlah uang, rekening, dan waktu."],
+                    "href": f"/cases/{case_id}/intake",
+                    "cta": "Periksa bukti",
+                }
+            ]
+        return [
+            {
+                "key": "konfirm",
+                "title": "Konfirmasi data",
+                "points": ["Ada data yang perlu Anda periksa sebelum dokumen dibuat."],
+                "href": f"/cases/{case_id}/review",
+                "cta": "Konfirmasi data",
+            }
+        ]
+
+    bukti: list[str] = []
+    konfirm: list[str] = []
+    dokumen: list[str] = []
+
+    def add(bucket: list[str], text: str) -> None:
+        if text and text not in bucket:
+            bucket.append(text)
+
+    def take(item: object) -> None:
+        if not isinstance(item, dict) or item.get("status") not in {"MISSING", "CONFLICT"}:
             return
         text = soften(item.get("action") or item.get("label") or "")
-        if text and text not in seen:
-            seen.add(text)
-            out.append(text)
+        cid = str(item.get("check_id") or "")
+        if "EVIDENCE" in cid or "COMMUNICATION" in cid or "PROVENANCE" in cid:
+            add(bukti, text)
+        elif item.get("blocking") or item.get("status") == "CONFLICT" or any(
+            key in cid for key in ("AMOUNT", "DATETIME", "DESTINATION", "MAPPING", "REVIEW")
+        ):
+            add(konfirm, text)
+        else:
+            add(dokumen, text)
 
-    if units_report:
-        for urep in units_report.get("units") or []:
-            for ch in urep.get("channels") or []:
-                for ck in ch.get("checks") or []:
-                    add(ck)
-        for ck in (units_report.get("incident_police") or {}).get("checks") or []:
-            add(ck)
-        return out
-    if report:
-        for ch in report.get("channels") or []:
+    for urep in units:
+        for ch in urep.get("channels") or []:
             for ck in ch.get("checks") or []:
-                add(ck)
-    return out
+                take(ck)
+    for ck in (units_report.get("incident_police") or {}).get("checks") or []:
+        take(ck)
+    if has_ambiguous:
+        add(konfirm, "Ada transaksi yang belum terpasang.")
+
+    tasks: list[dict] = []
+    if bukti:
+        tasks.append(
+            {
+                "key": "bukti",
+                "title": "Lengkapi bukti",
+                "points": bukti[:3],
+                "href": f"/cases/{case_id}/intake",
+                "cta": "Periksa bukti",
+            }
+        )
+    if konfirm:
+        tasks.append(
+            {
+                "key": "konfirm",
+                "title": "Konfirmasi data",
+                "points": konfirm[:3],
+                "href": f"/cases/{case_id}/review",
+                "cta": "Konfirmasi data",
+            }
+        )
+    if dokumen and len(tasks) < 3:
+        tasks.append(
+            {
+                "key": "dokumen",
+                "title": "Siapkan dokumen",
+                "points": dokumen[:3],
+                "href": f"/cases/{case_id}/approval",
+                "cta": "Buat dokumen",
+            }
+        )
+    return tasks[:3]
 
 
 def _case_units(db, case_id: str):
@@ -195,7 +305,7 @@ def favicon():
 
 @web.get("/")
 def home(request: Request):
-    return TEMPLATES.TemplateResponse("home.html", {"request": request, "title": "SatuAman Tanggap60"})
+    return TEMPLATES.TemplateResponse("home.html", {"request": request, "title": "Tanggap60"})
 
 
 @web.post("/start")
@@ -216,17 +326,15 @@ def start(
 def intake(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
-    return TEMPLATES.TemplateResponse(
+    return _case_page(
+        request,
         "intake.html",
-        {
-            "request": request,
-            "case": case,
-            "evidence": [evidence_public(e) for e in evidence],
-            "can_delete_evidence": case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
-            "summary": case_summary(request.state.db, case),
-            "notice": request.query_params.get("notice", ""),
-            "notice_text": request.query_params.get("notice_text", ""),
-        },
+        case,
+        evidence=[evidence_public(e) for e in evidence],
+        can_delete_evidence=case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
+        summary=case_summary(request.state.db, case),
+        notice=request.query_params.get("notice", ""),
+        notice_text=request.query_params.get("notice_text", ""),
     )
 
 
@@ -269,18 +377,16 @@ async def intake_submit(case_id: str, request: Request):
     except AppError as exc:
         case = _svc(request)["cases"].get_owned(case_id, _sid(request))
         evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
-        return TEMPLATES.TemplateResponse(
+        return _case_page(
+            request,
             "intake.html",
-            {
-                "request": request,
-                "case": case,
-                "evidence": [evidence_public(e) for e in evidence],
-                "can_delete_evidence": case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
-                "summary": case_summary(request.state.db, case),
-                "notice": "file-gagal",
-                "notice_text": _friendly_file_error(exc.message),
-            },
+            case,
             status_code=exc.http_status,
+            evidence=[evidence_public(e) for e in evidence],
+            can_delete_evidence=case.state in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING},
+            summary=case_summary(request.state.db, case),
+            notice="file-gagal",
+            notice_text=_friendly_file_error(exc.message),
         )
     # Explicit action trigger (POST): start the pipeline here so that
     # GET /processing stays a pure, refresh-safe state render.
@@ -321,14 +427,9 @@ def processing(case_id: str, request: Request):
     # POST /api/v1/cases/{id}/runs, so refresh/back never mutates state.
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     has_evidence = bool(EvidenceRepository(request.state.db).list_for_case(case_id))
-    return TEMPLATES.TemplateResponse(
-        "processing.html",
-        {
-            "request": request,
-            "case": case,
-            "has_evidence": has_evidence,
-        },
-    )
+    if not has_evidence:
+        return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
+    return _case_page(request, "processing.html", case, has_evidence=has_evidence)
 
 
 @web.get("/cases/{case_id}/review")
@@ -351,27 +452,25 @@ def review(case_id: str, request: Request):
             continue
         seen_keys.add(key)
         visible.append(f)
-    return TEMPLATES.TemplateResponse(
+    return _case_page(
+        request,
         "review.html",
-        {
-            "request": request,
-            "case": case,
-            "facts": visible,
-            "facts_by_id": {f["fact_id"]: f for f in facts_pub},
-            "evidence_names": {e.evidence_id: e.original_name_display for e in evidence},
-            "conflicts": conflicts_pub,
-            "has_blocking": bool(blocking),
-            "pairing_units": [] if blocking else _pairing_cards(request.state.db, case_id),
-            "summaries": []
-            if blocking
-            else _tx_summaries(
-                request.state.db,
-                case_id,
-                {e.evidence_id: e.original_name_display for e in evidence},
-            ),
-            "notice": request.query_params.get("notice", ""),
-            "pairing_key": new_id("pair"),
-        },
+        case,
+        facts=visible,
+        facts_by_id={f["fact_id"]: f for f in facts_pub},
+        evidence_names={e.evidence_id: e.original_name_display for e in evidence},
+        conflicts=conflicts_pub,
+        has_blocking=bool(blocking),
+        pairing_units=[] if blocking else _pairing_cards(request.state.db, case_id),
+        summaries=[]
+        if blocking
+        else _tx_summaries(
+            request.state.db,
+            case_id,
+            {e.evidence_id: e.original_name_display for e in evidence},
+        ),
+        notice=request.query_params.get("notice", ""),
+        pairing_key=new_id("pair"),
     )
 
 
@@ -426,7 +525,7 @@ def readiness_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     from app.infrastructure.repositories import UnitMappingRepository
     from app.services.next_action import next_action_to_dict, recommend_next_action
-    from app.services.readiness import assess, assess_units, public_report
+    from app.services.readiness import assess_units
     from app.services.reporting_units import compile_reporting_units
 
     try:
@@ -449,10 +548,6 @@ def readiness_page(case_id: str, request: Request):
     facts = FactRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
-    transactions = TransactionRepository(request.state.db).list_for_case(case_id)
-    report = public_report(
-        assess(case_id=case_id, route=case.route, facts=facts, conflicts=conflicts, evidence=evidence, transactions=transactions)
-    )
     # try rescue units
     units = []
     units_report = None
@@ -482,7 +577,6 @@ def readiness_page(case_id: str, request: Request):
             "label": soften(next_action.get("label")),
             "reason": soften(next_action.get("reason")),
         }
-    gaps = _gap_texts(report, units_report)
     evidence_names = {e.evidence_id: e.original_name_display for e in evidence}
     summaries = _tx_summaries(request.state.db, case_id, evidence_names)
     tx_cards = []
@@ -545,19 +639,27 @@ def readiness_page(case_id: str, request: Request):
                     needs_evidence = True
                 else:
                     has_blocking = True
-    return TEMPLATES.TemplateResponse(
+    if not tx_cards:
+        next_view = None
+    return _case_page(
+        request,
         "readiness.html",
-        {
-            "request": request,
-            "case": case,
-            "next_view": next_view,
-            "gaps": gaps,
-            "tx_cards": tx_cards,
-            "has_blocking": has_blocking,
-            "needs_evidence": needs_evidence,
-            "ready_count": ready_count,
-            "has_ambiguous": has_ambiguous,
-        },
+        case,
+        next_view=next_view,
+        gap_tasks=_gap_tasks(case_id, units_report, has_ambiguous, has_evidence=bool(evidence)),
+        tx_cards=tx_cards,
+        has_blocking=has_blocking,
+        needs_evidence=needs_evidence,
+        ready_count=ready_count,
+        has_ambiguous=has_ambiguous,
+        primary=_primary_cta(
+            case_id,
+            has_tx=bool(tx_cards),
+            has_blocking=has_blocking,
+            has_ambiguous=has_ambiguous,
+            needs_evidence=needs_evidence,
+            ready_count=ready_count,
+        ),
     )
 
 
@@ -591,10 +693,7 @@ def result(case_id: str, request: Request):
         _, digest = _svc(request)["approval"].current_snapshot(case_id)
     except Exception:
         digest = ""
-    return TEMPLATES.TemplateResponse(
-        "result.html",
-        {"request": request, "case": case, "actions": actions, "snapshot_hash": digest},
-    )
+    return _case_page(request, "result.html", case, actions=actions, snapshot_hash=digest)
 
 
 @web.get("/cases/{case_id}/approval")
@@ -610,19 +709,17 @@ def approval_page(case_id: str, request: Request):
     for u in _case_units(request.state.db, case_id):
         if str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS":
             pending.append(soften(getattr(u, "mapping_reason", "") or "transaksi yang belum terpasang"))
-    return TEMPLATES.TemplateResponse(
+    return _case_page(
+        request,
         "approval.html",
-        {
-            "request": request,
-            "case": case,
-            "snapshot_hash": digest,
-            "blocking": blocking,
-            "ambiguous": ambiguous,
-            "scope_units": scope_units,
-            "pending": pending,
-            "notice": request.query_params.get("notice", ""),
-            "idempotency_key": new_id("apprweb"),
-        },
+        case,
+        snapshot_hash=digest,
+        blocking=blocking,
+        ambiguous=ambiguous,
+        scope_units=scope_units,
+        pending=pending,
+        notice=request.query_params.get("notice", ""),
+        idempotency_key=new_id("apprweb"),
     )
 
 
@@ -692,18 +789,16 @@ def artifacts_page(case_id: str, request: Request):
             groups.append({"key": key, "title": title, "files": members})
     rest = [a for a in pub if a["artifact_id"] not in used]
     pack = next((a for a in pub if a["type"] == "CASE_ZIP" and a["downloadable"]), None)
-    return TEMPLATES.TemplateResponse(
+    return _case_page(
+        request,
         "artifacts.html",
-        {
-            "request": request,
-            "case": case,
-            "artifacts": pub,
-            "groups": groups,
-            "rest": rest,
-            "pack": pack,
-            "official_url": url,
-            "domain": "iasc.ojk.go.id",
-        },
+        case,
+        artifacts=pub,
+        groups=groups,
+        rest=rest,
+        pack=pack,
+        official_url=url,
+        domain="iasc.ojk.go.id",
     )
 
 
@@ -711,19 +806,13 @@ def artifacts_page(case_id: str, request: Request):
 def receipt_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     record = ReceiptRepository(request.state.db).get_for_case(case_id)
-    return TEMPLATES.TemplateResponse(
-        "receipt.html",
-        {"request": request, "case": case, "receipt": record},
-    )
+    return _case_page(request, "receipt.html", case, receipt=record)
 
 
 @web.get("/cases/{case_id}/workspace")
 def workspace_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    return TEMPLATES.TemplateResponse(
-        "workspace.html",
-        {"request": request, "case": case},
-    )
+    return _case_page(request, "workspace.html", case)
 
 
 @web.get("/demo/dashboard")

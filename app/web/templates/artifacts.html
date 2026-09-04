@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Paket siap — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
+{% block title %}Paket siap — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 {% if artifacts %}
 <h1>Paket Anda siap dibawa</h1>

@@ -9,7 +9,7 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     home = client.get("/")
     assert home.status_code == 200
     assert 'content="light"' in home.text
-    assert 'content="#ffffff"' in home.text
+    assert 'content="#faf7f1"' in home.text
     assert "/static/app.css?v=" in home.text
     assert "is-landing" in home.text
     assert "c1-container" in home.text
@@ -21,7 +21,6 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     case_id = create_case(client)
     for path in (
         "intake",
-        "processing",
         "review",
         "readiness",
         "result",
@@ -40,14 +39,16 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert 'id="url"' in intake.text
     assert "coach-step" in intake.text
     assert "Pilih foto atau file" in intake.text
-    processing = client.get(f"/cases/{case_id}/processing")
-    assert "wait-ring" in processing.text
-    assert "timeline" in processing.text
-    assert "Lihat rincian proses" in processing.text
-    assert "Mengelompokkan bukti per transaksi." in processing.text
+    assert "Tempel Chat" in intake.text
+    assert "Masukkan Link" in intake.text
+    assert "Kumpulkan bukti transaksi" in intake.text
+    empty_proc = client.get(f"/cases/{case_id}/processing", follow_redirects=False)
+    assert empty_proc.status_code == 303
+    assert empty_proc.headers["location"].endswith("/intake")
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
-    assert "Belum ada data" in review.text
+    assert "Belum ada transaksi untuk diperiksa" in review.text
+    assert "Lanjut dulu" not in review.text
     css = client.get("/static/app.css")
     assert css.status_code == 200
     assert "#faf7f1" in css.text
