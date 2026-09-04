@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Yang perlu Anda lakukan — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
+{% block title %}Yang perlu Anda lakukan — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <h1>Yang perlu Anda lakukan</h1>
 <p class="lede">Satu hal dalam satu waktu. Mulai dari yang paling atas.</p>
@@ -10,9 +10,6 @@
 <div class="next-card" id="lakukan" data-guide-id="next-best-action">
   <h3>Lakukan sekarang: {{ next_view.label }}</h3>
   {% if next_view.reason %}<p class="muted small">{{ next_view.reason }}</p>{% endif %}
-  <div class="actions">
-    <a class="btn" href="#transaksi">Lihat data yang perlu disampaikan</a>
-  </div>
 </div>
 {% endif %}
 
@@ -42,9 +39,6 @@
     <li>{{ m }}</li>
     {% endfor %}
   </ul>
-  <div class="actions">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi transaksi</a>
-  </div>
   {% endif %}
   {% if tx.missing_evidence %}
   <ul class="tx-missing">
@@ -52,9 +46,6 @@
     <li>{{ m }}</li>
     {% endfor %}
   </ul>
-  <div class="actions">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
-  </div>
   {% endif %}
   {% if tx.missing_info %}
   <ul class="tx-missing">
@@ -65,43 +56,39 @@
   {% endif %}
 </article>
 {% endfor %}
-{% elif gaps %}
-<h2 class="muted small" style="margin-top:8px">Yang kurang</h2>
-<ul class="gaps">
-  {% for gap in gaps %}
-  <li>{{ gap }}</li>
-  {% endfor %}
-</ul>
-{% else %}
+{% endif %}
+
+{% if gap_tasks %}
+<div class="gap-tasks" data-guide-id="readiness-summary">
+{% for task in gap_tasks %}
+<article class="card" id="task-{{ task.key }}">
+  <h3>{{ task.title }}</h3>
+  <ul class="gaps">
+    {% for item in task.points %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  <div class="actions">
+    <a class="btn ember" href="{{ task.href }}">{{ task.cta }}</a>
+  </div>
+</article>
+{% endfor %}
+</div>
+{% endif %}
+
+{% if not tx_cards and not gap_tasks %}
 <div class="next-card">
   <h3>Semua pemeriksaan internal selesai</h3>
   <p class="muted small">Tinggal bawa paketnya ke situs resmi.</p>
 </div>
 {% endif %}
 
-<h2 class="muted small" style="margin-top:28px" data-guide-id="readiness-summary">Setelah itu</h2>
-<ol class="plan">
-  <li>Bawa paket ke situs resmi IASC (iasc.ojk.go.id), lalu ke bank bila diminta.</li>
-  <li>Catat nomor laporan atau tiket yang mereka berikan.</li>
-</ol>
-
+{% if not gap_tasks %}
 <div class="actions">
-  {% if has_blocking %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi transaksi</a>
-  <p class="muted small">Belum bisa membuat paket sebelum data yang ditandai selesai — supaya isinya tidak salah.</p>
-  {% elif has_ambiguous %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Pasangkan transaksi dulu</a>
-  <p class="muted small">Paket dibuat untuk seluruh kasus setelah semua transaksi terpasang.</p>
-  {% elif needs_evidence %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
-  <p class="muted small">Paket tetap bisa dibuat tanpa bukti tambahan, tapi bisa kurang kuat di bank atau IASC.</p>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/approval">Lanjut ke paket ›</a>
-  {% elif ready_count %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paket untuk {{ ready_count }} transaksi</a>
+  <a class="btn ember" href="{{ primary.href }}">{{ primary.label }}</a>
+  {% if ready_count %}
   <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Buka ruang persiapan ›</a>
-  {% else %}
-  <a class="btn ember" href="/cases/{{ case.case_id }}/review">Lengkapi dulu</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/approval">Lanjut ke paket ›</a>
   {% endif %}
 </div>
+{% endif %}
 {% endblock %}

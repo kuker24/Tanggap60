@@ -98,12 +98,13 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
         "checklist": checklist,
     }
     assert set(fields) <= WORKSPACE_FIELDS | {"transactions"}
-    log = [
-        "membuka workspace persiapan",
-        f"menyiapkan {identified_count} transaksi teridentifikasi ({complete_count} lengkap)",
-        "menyusun kronologi dari fakta yang ditinjau",
-        "identitas korban dibiarkan kosong untuk diisi pengguna sendiri",
-    ]
+    log = ["membuka workspace persiapan"]
+    if identified_count:
+        log.append(f"menyiapkan {identified_count} transaksi teridentifikasi ({complete_count} lengkap)")
+    if chronology:
+        log.append("menyusun kronologi dari fakta yang ditinjau")
+    if identified_count:
+        log.append("identitas korban dibiarkan kosong untuk diisi pengguna sendiri")
     return {
         "simulation": True,
         "simulation_label": "SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI",

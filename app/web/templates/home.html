@@ -1,15 +1,15 @@
 {% extends "base.html" %}
 {% block body_mod %}is-landing{% endblock %}
 {% block color_scheme %}light{% endblock %}
-{% block theme_color %}#ffffff{% endblock %}
-{% block title %}Ketipu online? Susun buktinya di sini — SatuAman{% endblock %}
+{% block theme_color %}#faf7f1{% endblock %}
+{% block title %}Ketipu online? Susun buktinya di sini — Tanggap60{% endblock %}
 {% block content %}
 <section class="land-hero">
   <div class="land-hero-inner">
     <div class="land-hero-copy">
       <p class="land-eyebrow"><span aria-hidden="true">✦</span> AI Rescue Agent</p>
       <h1>Bukti berantakan. Kami bantu tentukan apa yang harus dilakukan sekarang.</h1>
-      <p class="lede">Kirim bukti yang ada — foto, chat, atau link. SatuAman menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
+      <p class="lede">Kirim bukti yang ada — foto, chat, atau link. Tanggap60 menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
       <form class="choices land-choices" method="post" action="/start" aria-label="Pilih kondisi">
         <input type="hidden" name="mode" value="DEMO">
         <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
@@ -73,7 +73,7 @@
         <img class="c1-folder" src="/static/landing/library.svg?v={{ asset_v }}" width="170" height="124" alt="">
         <span class="c1-search" aria-hidden="true">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="8" stroke="#64748b" stroke-width="2" stroke-linecap="round"/><path d="M21 21L16.65 16.65" stroke="#64748b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Kode cek keaslian
+          Cek apakah file berubah
         </span>
         <h3>3. Paket siap dibawa</h3>
       </article>
@@ -87,7 +87,7 @@
     <ul class="land-proof-list">
       <li class="is-no"><span class="land-mark" aria-hidden="true">×</span><span><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</span></li>
       <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya — tidak menebak.</span></li>
-      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek keasliannya.</b> Ada kode cek di dalamnya supaya isinya terbukti tidak berubah. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
+      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek apakah filenya berubah.</b> Ada kode cek di dalamnya. Itu tidak membuktikan isi screenshot benar — hanya bahwa arsip tidak diubah setelah dibuat. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
     </ul>
   </div>
 </section>
@@ -97,7 +97,7 @@
     <h2 id="faq-title">Pertanyaan yang sering muncul</h2>
     <details>
       <summary>Apakah laporan saya langsung terkirim ke bank atau polisi?</summary>
-      <p>Tidak. SatuAman hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
+      <p>Tidak. Tanggap60 hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
     </details>
     <details>
       <summary>Apakah uang saya pasti kembali?</summary>
@@ -105,7 +105,7 @@
     </details>
     <details>
       <summary>Apa isi paketnya?</summary>
-      <p>Arsip ZIP berisi foto dan cerita Anda, ringkasan datanya, dan kode cek keaslian supaya isinya terbukti tidak berubah. Cara bukanya sama seperti file ZIP biasa.</p>
+      <p>Arsip ZIP berisi foto dan cerita Anda, ringkasan datanya, dan kode untuk cek apakah file berubah setelah paket dibuat. Cara bukanya sama seperti file ZIP biasa.</p>
     </details>
     <details>
       <summary>Apa itu IASC?</summary>

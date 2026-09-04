@@ -19,63 +19,42 @@
       fileList.appendChild(el);
     });
   }
-  const lede = document.getElementById("coach-lede");
-  const LEDES = {
-    files: "Foto, cerita, atau link — satu saja cukup untuk mulai.",
-    text: "Ceritakan singkat, atau lewati.",
-    url: "Punya link? Tempel di sini, atau lewati.",
-    submit: "Kirim. Kami baca dulu isinya.",
-  };
-  function showCoach(names) {
+  function showTab(name) {
     const steps = document.querySelectorAll(".coach-step");
     if (!steps.length) return;
     document.body.classList.add("coach-enabled");
     steps.forEach((el) => {
-      const on = names.indexOf(el.getAttribute("data-step")) !== -1;
+      const on = el.getAttribute("data-step") === name;
       el.classList.toggle("is-on", on);
+      if (el.hasAttribute("role")) el.hidden = !on;
     });
-    const focus = names[names.length - 1];
+    document.querySelectorAll(".intake-tabs [role='tab']").forEach((btn) => {
+      const on = btn.getAttribute("data-tab") === name;
+      btn.classList.toggle("is-on", on);
+      btn.setAttribute("aria-selected", on ? "true" : "false");
+    });
     const dropEl = document.getElementById("drop");
-    if (dropEl) dropEl.classList.toggle("is-focus", focus === "files");
-    const filesStep = document.querySelector('[data-step="files"]');
-    if (filesStep) filesStep.classList.toggle("submit-ready", names.indexOf("submit") !== -1);
-    const notice = document.querySelector(".notice");
-    if (notice) notice.hidden = focus !== "files";
-    if (lede && LEDES[focus]) lede.textContent = LEDES[focus];
+    if (dropEl) dropEl.classList.toggle("is-focus", name === "files");
   }
   if (document.getElementById("intake-form")) {
-    const saved = document.querySelector(".file-list.pack .file-chip");
-    if (saved) showCoach(["files", "submit"]);
-    else showCoach(["files"]);
-    const goText = () => showCoach(["text"]);
-    const goUrl = () => showCoach(["url"]);
-    const goSubmit = () => showCoach(["files", "submit"]);
-    const skipFiles = document.getElementById("skip-files");
-    const nextText = document.getElementById("next-text");
-    const skipText = document.getElementById("skip-text");
-    const nextUrl = document.getElementById("next-url");
-    const skipUrl = document.getElementById("skip-url");
+    showTab("files");
+    document.querySelectorAll(".intake-tabs [role='tab']").forEach((btn) => {
+      btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab")));
+    });
     const pickFiles = document.getElementById("pick-files");
     if (pickFiles && filesInput) pickFiles.addEventListener("click", () => filesInput.click());
     const addMore = document.getElementById("add-more");
     if (addMore) addMore.addEventListener("click", () => {
-      const filesStep = document.querySelector('[data-step="files"]');
-      if (filesStep) filesStep.classList.remove("submit-ready");
-      showCoach(["files"]);
+      showTab("files");
       if (filesInput) filesInput.click();
     });
-    if (skipFiles) skipFiles.addEventListener("click", goText);
-    if (nextText) nextText.addEventListener("click", goUrl);
-    if (skipText) skipText.addEventListener("click", goUrl);
-    if (nextUrl) nextUrl.addEventListener("click", goSubmit);
-    if (skipUrl) skipUrl.addEventListener("click", goSubmit);
   }
   if (document.querySelector("#fact-grid .fact.is-on")) {
     document.body.classList.add("coach-enabled");
   }
   if (filesInput) filesInput.addEventListener("change", () => {
     renderFiles(filesInput.files);
-    if (filesInput.files && filesInput.files.length) showCoach(["text"]);
+    if (filesInput.files && filesInput.files.length) showTab("files");
   });
   if (drop && filesInput) {
     drop.addEventListener("click", (e) => {
@@ -100,7 +79,7 @@
             return;
           }
           renderFiles(filesInput.files);
-          if (filesInput.files && filesInput.files.length) showCoach(["text"]);
+          if (filesInput.files && filesInput.files.length) showTab("files");
         }
         drop.classList.remove("drag");
       })

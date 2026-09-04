@@ -1,5 +1,5 @@
 {
-  "name": "SatuAman Tanggap60",
+  "name": "Tanggap60",
   "short_name": "Tanggap60",
   "description": "Susun bukti jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.",
   "icons": [
@@ -7,8 +7,8 @@
     { "src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
     { "src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
   ],
-  "theme_color": "#0c1224",
-  "background_color": "#0c1224",
+  "theme_color": "#faf7f1",
+  "background_color": "#faf7f1",
   "display": "standalone",
   "lang": "id"
 }

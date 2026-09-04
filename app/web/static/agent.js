@@ -388,8 +388,17 @@
       d.style.width = Math.max(0, pos[i][2]) + "px"; d.style.height = Math.max(0, pos[i][3]) + "px";
     });
   }
+  function dockForGuide() {
+    document.body.classList.add("agent-docked");
+    if (panel) panel.classList.add("is-mini");
+  }
+  function undockGuide() {
+    document.body.classList.remove("agent-docked");
+    if (panel) panel.classList.remove("is-mini");
+  }
   function showSpotlight(el) {
     ensureLayer();
+    dockForGuide();
     hideSpotlight();
     spotTarget = el;
     for (let i = 0; i < 4; i++) {
@@ -430,6 +439,7 @@
   }
   function showCallout(el, title, message) {
     ensureLayer();
+    dockForGuide();
     hideCallout();
     calloutTarget = el;
     calloutEl = document.createElement("div");
@@ -449,7 +459,7 @@
     btn.type = "button";
     btn.className = "co-ok";
     btn.textContent = "Mengerti";
-    btn.addEventListener("click", () => { hideCallout(); hideSpotlight(); hideCursor(); });
+    btn.addEventListener("click", () => { hideCallout(); hideSpotlight(); hideCursor(); undockGuide(); });
     calloutEl.appendChild(head);
     calloutEl.appendChild(h);
     calloutEl.appendChild(p);
@@ -463,6 +473,7 @@
   }
   function clearVisuals() {
     hideCallout(); hideSpotlight(); hideCursor();
+    undockGuide();
     if (spotRaf) { cancelAnimationFrame(spotRaf); spotRaf = 0; }
   }
 
@@ -701,6 +712,7 @@
         case "MOVE_POINTER": {
           const el = findGuideTarget(s.target);
           if (!el) { this.next(); break; }
+          dockForGuide();
           el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
           // Ukur posisi kursor SETELAH scroll berhenti — kalau tidak,
           // kursor mendarat di koordinat basi (race scroll-vs-pointer).
@@ -890,6 +902,7 @@
       return;
     }
     const reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    dockForGuide();
     el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
     el.classList.add("guide-ring");
     ringEl = el;

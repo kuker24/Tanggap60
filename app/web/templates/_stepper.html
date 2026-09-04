@@ -1,13 +1,17 @@
 {# Satu-satunya sumber markup stepper Bukti→Periksa→Konfirmasi→Bertindak. #}
-{% macro stepper(active, label) %}
+{% macro stepper(active, label, progress=None) %}
+{% set p = progress or {} %}
+{% set finished = {1: p.get("bukti"), 2: p.get("periksa"), 3: p.get("konfirmasi"), 4: p.get("bertindak")} %}
 {% set names = [(1, "Bukti"), (2, "Periksa"), (3, "Konfirmasi"), (4, "Bertindak")] %}
 <nav class="stepper" aria-label="{{ label }}">
   <span role="list" class="step-list">
     {% for n, name in names %}
-    {% if n < active %}
-    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> {{ name }}</span>
-    {% elif n == active %}
+    {% if n == active %}
     <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
+    {% elif finished[n] %}
+    <span role="listitem" class="step done"><i aria-hidden="true">✓</i> {{ name }}</span>
+    {% elif n < active %}
+    <span role="listitem" class="step skipped"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
     {% else %}
     <span role="listitem" class="step"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
     {% endif %}

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Koreksi data — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(3, "Langkah 3 dari 4: Konfirmasi") }}{% endblock %}
+{% block title %}Koreksi data — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(3, "Langkah 3 dari 4: Konfirmasi", progress) }}{% endblock %}
 {% block content %}
 {% set ns = namespace(first=none, count=0) %}
 {% for fact in facts %}
@@ -167,20 +167,18 @@
 </article>
 {% else %}
 <article class="empty">
-  <h3>Belum ada data</h3>
-  <p>Tambah foto yang lebih jelas. Atau lanjut dulu — nanti kami tandai yang kurang.</p>
+  <h3>Belum ada transaksi untuk diperiksa</h3>
+  <p>Kirim foto transfer, chat, atau link dulu. Tanpa bukti, belum ada data yang bisa dikonfirmasi.</p>
   <div class="actions">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
-    <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">Lanjut dulu ›</a>
+    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a>
   </div>
 </article>
 {% endfor %}
 </div>
 
-{% if ns.count == 0 %}
+{% if ns.count == 0 and facts %}
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lanjut</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/intake">‹ Tambah atau ubah bukti</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Buat dokumen</a>
 </div>
 {% endif %}
 {% endif %}

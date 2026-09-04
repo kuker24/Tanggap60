@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Ruang persiapan — SatuAman{% endblock %}
-{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak") }}{% endblock %}
+{% block title %}Ruang persiapan — Tanggap60{% endblock %}
+{% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <section data-guide-id="workspace-open" aria-labelledby="ws-title">
   <p class="sim-badge" role="note">SIMULASI PERSIAPAN FORM — BUKAN PORTAL RESMI</p>
@@ -53,15 +53,16 @@
   const CASE = "{{ case.case_id }}";
   fetch(`/api/v1/cases/${CASE}/workspace`).then(r => r.json()).then(ws => {
     const log = document.getElementById("ws-log-list");
-    (ws.action_log || []).forEach(step => {
-      const li = document.createElement("li");
-      li.textContent = "✓ " + step;
-      log.appendChild(li);
-    });
     if(!ws.fields || !(ws.fields.transactions || []).length){
+      document.getElementById("ws-log").hidden = true;
       document.getElementById("ws-empty").hidden = false;
       return;
     }
+    (ws.action_log || []).forEach(step => {
+      const li = document.createElement("li");
+      li.textContent = step;
+      log.appendChild(li);
+    });
     document.getElementById("ws-body").hidden = false;
     const txBox = document.getElementById("ws-tx");
     ws.fields.transactions.forEach((t, i) => {

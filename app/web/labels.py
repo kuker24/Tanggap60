@@ -7,7 +7,7 @@ _ID_RE = re.compile(r"\b(?:ev|fact|conf|tx|act|art|case)-[0-9a-f]+\b", re.I)
 _SPACE_RE = re.compile(r"\s+")
 _JARGON = (
     ("AMBIGUOUS_MAPPING", "transaksi yang belum terpasang"),
-    ("SHA-256", "kode cek keaslian"),
+    ("SHA-256", "kode cek apakah file berubah"),
     ("Reporting Unit", "Transaksi"),
     ("reporting unit", "transaksi"),
     ("milik pelaku", "penerima"),
@@ -112,7 +112,7 @@ _TABLES: dict[str, dict[str, str]] = {
         "UNIT_IASC_PACK": "Untuk IASC",
         "CASE_JSON": "Arsip data kasus",
         "CHECKLIST": "Daftar cek",
-        "MANIFEST": "Kode cek keaslian",
+        "MANIFEST": "Kode cek apakah file berubah",
         "CASE_ZIP": "Semua file (ZIP)",
     },
 }

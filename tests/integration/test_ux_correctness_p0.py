@@ -182,8 +182,9 @@ def test_dashboard_evidence_path_and_informed_bypass(client: TestClient, ocr: Sc
     page = client.get(f"/cases/{case_id}/readiness")
     assert page.status_code == 200
     assert "Yang perlu Anda lakukan" in page.text
-    assert "Tambah bukti" in page.text
-    assert "Lanjut ke paket" in page.text
+    assert "Periksa bukti" in page.text
+    assert "Lanjut ke paket" not in page.text
+    assert "Lanjut dulu" not in page.text
     import re
 
     visible = re.sub(r"<[^>]+>", " ", page.text)

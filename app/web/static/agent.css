@@ -89,6 +89,18 @@
     border-radius: 18px 18px 0 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
+  body.agent-docked #agent-panel,
+  #agent-panel.is-mini {
+    max-height: 28dvh;
+  }
+  body.agent-docked #agent-messages,
+  body.agent-docked #agent-quick,
+  body.agent-docked .agent-note,
+  #agent-panel.is-mini #agent-messages,
+  #agent-panel.is-mini #agent-quick,
+  #agent-panel.is-mini .agent-note {
+    display: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   #agent-toast { transition: none; }
