@@ -53,6 +53,14 @@ GUIDE_STEP_TYPES: frozenset[str] = frozenset(
         "NAVIGATE_INTERNAL",
         "WAIT_FOR_USER",
         "CLEAR_GUIDANCE",
+        # Native Action Mode: langkah ACT — dieksekusi NativeActionBus,
+        # bukan sekadar visual. OPEN/ FOCUS = GREEN auto; SET_DRAFT =
+        # YELLOW prefill draf UI lokal, commit menunggu approval.
+        "OPEN_TRANSACTION",
+        "FOCUS_FIELD",
+        "SET_DRAFT",
+        "OPEN_EVIDENCE",
+        "OPEN_WORKSPACE_VIEW",
     }
 )
 
@@ -89,7 +97,10 @@ TARGET_PAGE: dict[str, str] = {
 }
 
 _TARGET_STEPS = frozenset({"SCROLL_TO", "SPOTLIGHT", "MOVE_POINTER", "CALLOUT", "OPEN_DISCLOSURE", "FOCUS"})
-_MAX_PLAN_STEPS = 8
+_NATIVE_TX_STEPS = frozenset({"OPEN_TRANSACTION", "FOCUS_FIELD"})
+# Aksi GREEN statis: target tetap di allowlist + halaman kanonisnya.
+_NATIVE_STATIC_PAGES = {"OPEN_EVIDENCE": "intake", "OPEN_WORKSPACE_VIEW": "workspace"}
+_MAX_PLAN_STEPS = 12
 _MAX_STEP_TEXT = 200
 
 
@@ -109,6 +120,36 @@ def validate_plan_step(step: Any, unit_ids: set[str]) -> dict[str, Any] | None:
     kind = str(step.get("type") or "")
     if kind not in GUIDE_STEP_TYPES:
         return None
+    if kind in _NATIVE_STATIC_PAGES:
+        target = validate_guide_target(str(step.get("target") or ""), unit_ids)
+        if target is None or canonical_page_for(target) != _NATIVE_STATIC_PAGES[kind]:
+            return None
+        return {"type": kind, "target": target}
+    if kind in _NATIVE_TX_STEPS:
+        target = validate_guide_target(str(step.get("target") or ""), unit_ids)
+        if target is None or not target.startswith("transaction-"):
+            return None
+        if kind == "FOCUS_FIELD":
+            match = _DYNAMIC_TX.match(target)
+            if not match or not match.group(2):
+                return None
+        return {"type": kind, "target": target}
+    if kind == "SET_DRAFT":
+        from app.agent.native_actions import NATIVE_FIELDS
+
+        unit = str(step.get("unit") or "")
+        field = str(step.get("field") or "")
+        fact_id = str(step.get("fact_id") or "")
+        label = str(step.get("label") or "")[:_MAX_STEP_TEXT]
+        if not re.fullmatch(r"ru_[0-9a-f]{12}", unit) or unit not in unit_ids:
+            return None
+        if field not in NATIVE_FIELDS:
+            return None
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,79}", fact_id):
+            return None
+        if not label:
+            return None
+        return {"type": kind, "unit": unit, "field": field, "fact_id": fact_id, "label": label}
     if kind in _TARGET_STEPS:
         target = validate_guide_target(str(step.get("target") or ""), unit_ids)
         if target is None:

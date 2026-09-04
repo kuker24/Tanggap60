@@ -156,7 +156,7 @@ def test_build_plan_fail_closed_and_capped() -> None:
     assert [s["type"] for s in plan] == ["STATUS", "WAIT_FOR_USER"]
     assert build_plan("bukan-list", units) == []
     long_plan = build_plan([{"type": "WAIT_FOR_USER"}] * 20, units)
-    assert len(long_plan) == 8
+    assert len(long_plan) == 12
     assert "review" in INTERNAL_ROUTES and "workspace" in INTERNAL_ROUTES
 
 

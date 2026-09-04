@@ -106,8 +106,9 @@
     if (mic) mic.disabled = busy;
   }
 
-  async function send(text) {
+  async function send(text, opts) {
     if (inFlight) return;
+    const viaVoice = !!(opts && opts.voice);
     text = (text || "").trim();
     if (!text && greeted) return;
     if (text) addMsg("user", text, null, false);
@@ -122,7 +123,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text,
-          ui_state: { current_page: currentPage(), pending_action: pendingAction },
+          ui_state: { current_page: currentPage(), pending_action: pendingAction, voice: viaVoice },
         }),
       });
       if (!res.ok) throw new Error("http-" + res.status);
@@ -132,7 +133,25 @@
       setStatus("Siap membantu");
       addMsg("ai", data.message, data.tools_used, true);
       renderQuick(data.quick_actions);
-      if (data.proposed_action) renderProposal(data.proposed_action);
+      if (data.proposed_action) {
+        renderProposal(data.proposed_action);
+        emit("t60:proposal-ready", { action_type: data.proposed_action.action_type });
+      }
+      if (data.rollback_drafts) rollbackDrafts();
+      if (data.draft_committed) { rollbackDrafts(); showToast("Tersimpan."); }
+      if (data.stop_agent) { stopAll(); return; }
+      if (data.pause_agent) {
+        RT.pause();
+        setHud("⏸ Panduan dijeda", "waiting");
+        announce("Panduan dijeda. Ucapkan Lanjut untuk melanjutkan.");
+        renderQuick(["Lanjut"]);
+        return;
+      }
+      if (data.open_url) {
+        setHud(null);
+        window.open(data.open_url, "_blank", "noopener");
+        return;
+      }
       if (data.guidance_plan && data.guidance_plan.length) {
         setHud("Menyiapkan panduan…", "working");
         if (!RT.run(data.guidance_plan)) setHud(null);
@@ -142,7 +161,7 @@
       } else {
         setHud(null);
       }
-      if (speakOn) speak(data.message);
+      if (speakOn) speak(data.voice_note || data.message);
     } catch (e) {
       setStatus("Siap membantu");
       setHud(null);
@@ -205,7 +224,9 @@
       }
       if (!res.ok) throw new Error("http-" + res.status);
       pendingAction = null;
+      rollbackDrafts();
       card.remove();
+      emit(ok ? "t60:proposal-approved" : "t60:proposal-denied", { action_type: prop.action_type });
       if (data.url) {
         addMsg("ai", data.message || "Silakan buka sendiri portal resminya.");
         window.open(data.url, "_blank", "noopener");
@@ -245,6 +266,13 @@
     hudText.className = "hud-text";
     hudEl.appendChild(spark);
     hudEl.appendChild(hudText);
+    const stop = document.createElement("button");
+    stop.id = "hud-stop";
+    stop.type = "button";
+    stop.textContent = "Hentikan AI";
+    stop.setAttribute("aria-label", "Hentikan panduan AI dan batalkan drafnya");
+    stop.addEventListener("click", stopAll);
+    hudEl.appendChild(stop);
     document.body.appendChild(hudEl);
   }
   function setHud(text, mode) {
@@ -299,6 +327,16 @@
     cursorEl.appendChild(tag);
     layerEl.appendChild(cursorEl);
     return cursorEl;
+  }
+  function afterScrollSettled(fn) {
+    if (reduceMotion()) { setTimeout(fn, 60); return; }
+    let lastY = window.scrollY, steady = 0, waited = 0;
+    const timer = setInterval(() => {
+      waited += 120;
+      if (window.scrollY === lastY) steady++;
+      else { steady = 0; lastY = window.scrollY; }
+      if (steady >= 2 || waited >= 2500) { clearInterval(timer); fn(); }
+    }, 120);
   }
   function movePointerTo(el, done) {
     const cur = ensureCursor();
@@ -428,6 +466,151 @@
     if (spotRaf) { cancelAnimationFrame(spotRaf); spotRaf = 0; }
   }
 
+  /* --- Native Action Mode: semantic action bus (§16-§18) ---
+     Handler berasal dari kode kita sendiri. Tidak ada eval/Function/
+     selector arbitrer: server hanya mengirim action+target+value,
+     frontend me-resolve lewat registry ini (data-guide-id yang ada). */
+  function emit(name, detail) {
+    try { document.dispatchEvent(new CustomEvent(name, { detail: detail || {} })); } catch (e) {}
+  }
+  const UID_RE = /^ru_[0-9a-f]{12}$/;
+  const FID_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$/;
+  function txCard(uid) {
+    if (!UID_RE.test(uid || "")) return null;
+    return document.querySelector('[data-guide-alt="transaction-' + uid + '"]')
+      || document.querySelector('[data-guide-id="transaction-' + uid + '"]');
+  }
+  const aiDrafts = [];
+  const Bus = {
+    handlers: {},
+    register(name, fn) { this.handlers[name] = fn; },
+    execute(step) {
+      const fn = this.handlers[step.type];
+      emit("t60:action-started", { action: step.type });
+      if (!fn) {
+        emit("t60:action-failed", { action: step.type, reason: "UNKNOWN_ACTION" });
+        return { action: step.type, status: "DENIED", changed: false, requires_human: false, message: "", reason: "UNKNOWN_ACTION" };
+      }
+      try {
+        const out = fn(step) || {};
+        const res = {
+          action: step.type,
+          status: out.status || "COMPLETED",
+          changed: !!out.changed,
+          requires_human: !!out.requires_human,
+          message: out.message || "",
+        };
+        if (out.reason) res.reason = out.reason;
+        emit(res.status === "COMPLETED" || res.status === "WAITING_APPROVAL" ? "t60:action-completed" : "t60:action-failed", res);
+        return res;
+      } catch (e) {
+        emit("t60:action-failed", { action: step.type, reason: "EXEC_ERROR" });
+        return { action: step.type, status: "DENIED", changed: false, requires_human: false, message: "", reason: "EXEC_ERROR" };
+      }
+    },
+  };
+  Bus.register("OPEN_TRANSACTION", (s) => {
+    const m = /^transaction-(ru_[0-9a-f]{12})$/.exec(s.target || "");
+    const el = m && txCard(m[1]);
+    if (!el) return { status: "DENIED", reason: "NOT_FOUND" };
+    el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+    announce("Tanggap60 membuka transaksi.");
+    return { status: "COMPLETED", message: "Transaksi dibuka." };
+  });
+  Bus.register("OPEN_EVIDENCE", (s) => {
+    const el = findGuideTarget(s.target);
+    if (!el) return { status: "DENIED", reason: "NOT_FOUND" };
+    el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+    announce("Tanggap60 membuka bukti.");
+    return { status: "COMPLETED", message: "Bukti dibuka." };
+  });
+  Bus.register("OPEN_WORKSPACE_VIEW", (s) => {
+    const el = findGuideTarget(s.target || "workspace-open");
+    if (!el) return { status: "DENIED", reason: "NOT_FOUND" };
+    el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+    announce("Tanggap60 membuka ruang persiapan.");
+    return { status: "COMPLETED", message: "Ruang persiapan dibuka." };
+  });
+  Bus.register("FOCUS_FIELD", (s) => {
+    const el = findGuideTarget(s.target);
+    if (!el) return { status: "DENIED", reason: "NOT_FOUND" };
+    const focusable = (el.matches && el.matches("input,select,textarea,button")) ? el
+      : el.querySelector("input,select,textarea,button");
+    const t = focusable || el;
+    try {
+      if (!t.hasAttribute("tabindex") && !/^(INPUT|SELECT|TEXTAREA|BUTTON)$/.test(t.tagName)) t.setAttribute("tabindex", "-1");
+      t.focus({ preventScroll: true });
+    } catch (e) {}
+    t.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
+    announce("Tanggap60 memfokuskan bagian yang perlu diisi.");
+    return { status: "COMPLETED", message: "Fokus dipindahkan." };
+  });
+  Bus.register("SET_DRAFT", (s) => {
+    // PREPARE (§7, §22): ubah draf UI lokal + tandai jelas; tanpa commit server.
+    if (!UID_RE.test(s.unit || "") || !FID_RE.test(s.fact_id || "") || !s.label) {
+      return { status: "DENIED", reason: "BAD_TARGET" };
+    }
+    const scope = txCard(s.unit);
+    if (!scope) return { status: "DENIED", reason: "NOT_FOUND" };
+    const radio = scope.querySelector('input[type="radio"][value="' + s.fact_id + '"]');
+    const select = !radio && scope.querySelector("select");
+    let anchor = null;
+    if (radio) {
+      const group = Array.prototype.slice.call(
+        scope.querySelectorAll('input[type="radio"][name="' + radio.name + '"]'));
+      const prev = group.filter(r => r.checked).map(r => r.value);
+      group.forEach(r => { r.checked = (r === radio); });
+      radio.dispatchEvent(new Event("change", { bubbles: true }));
+      anchor = radio.closest("fieldset") || radio.closest(".pair-card") || scope;
+      aiDrafts.push({ kind: "radio", group, prev });
+    } else if (select && select.querySelector('option[value="' + s.fact_id + '"]')) {
+      const prev = select.value;
+      select.value = s.fact_id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      anchor = select.closest(".pair-card") || select.closest("fieldset") || scope;
+      aiDrafts.push({ kind: "select", el: select, prev });
+    } else {
+      return { status: "DENIED", reason: "FIELD_NOT_FOUND" };
+    }
+    if (anchor && !anchor.querySelector(":scope > .ai-draft")) {
+      const badge = document.createElement("p");
+      badge.className = "ai-draft";
+      badge.setAttribute("role", "status");
+      badge.textContent = "✦ Disiapkan AI — " + s.label + ". Belum disimpan.";
+      anchor.appendChild(badge);
+      if (aiDrafts.length) aiDrafts[aiDrafts.length - 1].badge = badge;
+    }
+    emit("t60:draft-updated", { unit: s.unit, field: s.field, label: s.label });
+    announce("Tanggap60 menyiapkan " + s.label + ". Belum disimpan.");
+    return { status: "WAITING_APPROVAL", changed: true, requires_human: true, message: "Draf disiapkan." };
+  });
+  function rollbackDrafts() {
+    aiDrafts.splice(0).forEach(d => {
+      try {
+        if (d.kind === "radio") {
+          d.group.forEach(r => { r.checked = d.prev.indexOf(r.value) !== -1; });
+        } else if (d.kind === "select") {
+          d.el.value = d.prev;
+        }
+        if (d.badge) d.badge.remove();
+      } catch (e) {}
+    });
+    try {
+      Array.prototype.forEach.call(document.querySelectorAll(".ai-draft"), b => b.remove());
+    } catch (e) {}
+    emit("t60:draft-updated", { rolled_back: true });
+  }
+  function stopAll() {
+    RT.cancel(false);
+    rollbackDrafts();
+    try {
+      localStorage.setItem(AUTO_KEY, "0");
+      const box = document.getElementById("agent-autopilot");
+      if (box) box.checked = false;
+    } catch (e) {}
+    showToast("Panduan AI dihentikan. Draf AI dibatalkan.");
+  }
+
   function minimizePanel() {
     if (!panel.hidden) {
       panel.hidden = true;
@@ -519,10 +702,12 @@
           const el = findGuideTarget(s.target);
           if (!el) { this.next(); break; }
           el.scrollIntoView({ behavior: reduceMotion() ? "auto" : "smooth", block: "center" });
-          setTimeout(() => {
+          // Ukur posisi kursor SETELAH scroll berhenti — kalau tidak,
+          // kursor mendarat di koordinat basi (race scroll-vs-pointer).
+          afterScrollSettled(() => {
             if (!this.busy) return;
             movePointerTo(el, () => this.next());
-          }, reduceMotion() ? 50 : 500);
+          });
           break;
         }
         case "CALLOUT": {
@@ -550,6 +735,30 @@
             } catch (e) {}
           }
           this.next();
+          break;
+        }
+        case "OPEN_TRANSACTION":
+        case "OPEN_EVIDENCE":
+        case "OPEN_WORKSPACE_VIEW": {
+          setHud(s.type === "OPEN_TRANSACTION" ? "Membuka transaksi…" : "Membuka…", "working");
+          const res = Bus.execute(s);
+          if (res.status === "DENIED") { this.next(); break; }
+          this.later(null, reduceMotion() ? 200 : 800);
+          break;
+        }
+        case "FOCUS_FIELD": {
+          setHud("Memfokuskan…", "working");
+          Bus.execute(s);
+          this.later(null, reduceMotion() ? 200 : 600);
+          break;
+        }
+        case "SET_DRAFT": {
+          setHud("Menyiapkan pilihan…", "working");
+          const res = Bus.execute(s);
+          if (res.status === "WAITING_APPROVAL") {
+            setHud("Menunggu persetujuan Anda", "waiting");
+          }
+          this.later(null, reduceMotion() ? 200 : 800);
           break;
         }
         case "WAIT_FOR_USER":
@@ -594,6 +803,13 @@
     if (t === "WAIT_FOR_USER" || t === "CLEAR_GUIDANCE") return true;
     if (t === "CALLOUT") {
       return TARGET_RE.test(String(s.target || "")) && typeof s.message === "string" && !!s.message;
+    }
+    if (t === "OPEN_TRANSACTION" || t === "FOCUS_FIELD" || t === "OPEN_EVIDENCE" || t === "OPEN_WORKSPACE_VIEW") {
+      return TARGET_RE.test(String(s.target || ""));
+    }
+    if (t === "SET_DRAFT") {
+      return TARGET_RE.test(String(s.unit || "")) && typeof s.fact_id === "string" && !!s.fact_id
+        && typeof s.label === "string" && !!s.label;
     }
     if (TARGET_STEP[t]) return TARGET_RE.test(String(s.target || ""));
     return false;
@@ -699,23 +915,49 @@
     ringTimer = setTimeout(clearGuide, 9000);
   }
 
-  /* --- Voice bonus: push-to-talk STT + optional TTS, same agent API --- */
+  /* --- Voice native: push-to-talk STT + auto-send + TTS pendek --- */
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  function micState(state, label) {
+    if (!mic) return;
+    mic.dataset.state = state || "idle";
+    mic.classList.toggle("listening", state === "listening");
+    mic.classList.toggle("processing", state === "processing");
+    mic.setAttribute("aria-label", label || "Bicara dengan Tanggap60");
+  }
   if (!SR) { mic.hidden = true; }
   else {
     const rec = new SR();
     rec.lang = "id-ID";
     rec.interimResults = false;
     rec.maxAlternatives = 1;
-    rec.onresult = (ev) => {
-      const text = ev.results[0][0].transcript || "";
-      input.value = text;
-      input.focus();
+    rec.onstart = () => {
+      micState("listening", "Mendengarkan… ketuk untuk berhenti");
+      setStatus("🎙 Mendengarkan…");
+      announce("Mendengarkan. Silakan bicara.");
     };
-    rec.onend = () => { mic.classList.remove("listening"); mic.setAttribute("aria-label", "Bicara dengan Tanggap60"); };
-    rec.onerror = () => { mic.classList.remove("listening"); showToast("Suara tidak dikenali. Tulis saja pesannya."); };
+    rec.onresult = (ev) => {
+      const res = ev.results[0];
+      const text = (res[0] && res[0].transcript) || "";
+      input.value = text;
+      // STT final → langsung kirim ke agent, tanpa tekan Kirim (§9).
+      // Guard: jangan kirim ganda saat request berjalan; teks menetap di input.
+      if (res.isFinal && text.trim() && !inFlight) {
+        micState("processing", "Memproses suara…");
+        setStatus("Memproses suara…");
+        send(text, { voice: true });
+      } else if (res.isFinal && text.trim()) {
+        input.focus();
+        showToast("Tunggu sebentar, lalu tekan Kirim.");
+      }
+    };
+    rec.onend = () => { if (!inFlight) { micState("idle"); setStatus("Siap membantu"); } };
+    rec.onerror = () => { micState("idle"); showToast("Suara tidak dikenali. Tulis saja pesannya."); };
     mic.addEventListener("click", () => {
-      try { mic.classList.add("listening"); rec.start(); } catch (e) { mic.classList.remove("listening"); }
+      try {
+        if (mic.dataset.state === "listening") { rec.stop(); return; }
+        micState("listening");
+        rec.start();
+      } catch (e) { micState("idle"); }
     });
   }
   function speak(text) {

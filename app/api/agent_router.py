@@ -5,8 +5,13 @@ Kontrak respons POST messages:
   "message": str,            # template tetap dari hasil tool
   "quick_actions": [str],
   "guidance": {"target": str, "label": str} | None,
-  "proposed_action": {"action_id","action_type","risk","summary","payload","expected_version"} | None,
-  "tools_used": [{"tool","planner","duration_ms"}],
+   "proposed_action": {"action_id","action_type","risk","summary","payload","expected_version"} | None,
+   "guidance_plan": [langkah visual + ACT: OPEN_TRANSACTION/FOCUS_FIELD/SET_DRAFT] | None,
+   "voice_note": frasa TTS pendek | None,
+   "pause_agent": bool, "stop_agent": bool, "rollback_drafts": bool,
+   "draft_committed": bool (voice-approve sukses: badge draf dibersihkan),
+   "open_url": portal resmi untuk voice-approve OPEN_OFFICIAL | None,
+   "tools_used": [{"tool","planner","duration_ms"}],
   "agent_response_ms": int, "agent_tool_ms": int,
   "state": str, "case_version": int,
   "technical": {"planner_modes": [...], "fallback_note": str},
@@ -55,6 +60,9 @@ _AGENT_EVENT_TYPES = frozenset(
         "ACTION_PROPOSED",
         "ACTION_APPROVED",
         "ACTION_DENIED",
+        "DRAFT_PREPARED",
+        "VOICE_COMMAND",
+        "VOICE_APPROVAL",
         "WORKSPACE_ACTION",
         "SENSITIVE_STOP",
     }
@@ -67,7 +75,9 @@ def post_agent_message(case_id: str, request: Request, payload: dict[str, Any]) 
     ui_state = payload.get("ui_state") if isinstance(payload.get("ui_state"), dict) else {}
     lock = _get_case_lock(case_id)
     with lock:
-        return handle_message(request.state.db, request.app.state.container, case_id, sid(request), text, ui_state)
+        return handle_message(
+            request.state.db, request.app.state.container, case_id, sid(request), text, ui_state, request
+        )
 
 
 @agent_api.post("/cases/{case_id}/agent/actions/{action_id}/approve")

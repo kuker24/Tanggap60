@@ -106,7 +106,20 @@
 #agent-hud .hud-spark { color: #f5c518; font-weight: 700; }
 #agent-hud[data-mode="done"] .hud-spark { color: #7bc47f; }
 #agent-hud[data-mode="waiting"] { background: #92400e; }
-#agent-hud .hud-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#agent-hud .hud-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+#hud-stop {
+  flex: 0 0 auto; border: 1px solid rgba(255, 253, 248, .4); background: transparent;
+  color: #fffdf8; border-radius: 999px; padding: 8px 12px; font-size: 12px; font-weight: 700;
+  cursor: pointer; min-height: 44px;
+}
+#hud-stop:hover { background: rgba(255, 253, 248, .12); }
+#agent-mic.processing { background: #b45309; color: #fff; border-color: #b45309; }
+
+/* Native Action Mode: badge draf AI — jelas belum disimpan (§22) */
+.ai-draft {
+  margin: 10px 0 0; padding: 10px 12px; border: 1px dashed #1d4ed8; border-radius: 10px;
+  background: #e3ecfd; color: #1e3a8a; font-size: 13px; line-height: 1.5;
+}
 #agent-guide-layer { position: fixed; inset: 0; z-index: 85; pointer-events: none; }
 #agent-cursor {
   position: fixed; left: 0; top: 0; z-index: 90; pointer-events: none;

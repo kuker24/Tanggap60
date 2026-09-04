@@ -32,8 +32,9 @@ from app.agent.broker import (
     validate_url,
 )
 from app.agent.context import build_agent_context
-from app.agent.formatting import escape, format_rupiah, redact
+from app.agent.formatting import escape, format_rupiah, mask_account, redact
 from app.agent.intents import Intent, classify
+from app.agent.native_actions import validate_native_action
 from app.agent.workspace import prepare_workspace
 from app.config import TOOL_VERSION
 from app.deps import services_from
@@ -61,6 +62,16 @@ _INTENT_CANDIDATE_TOOLS: dict[str, tuple[str, ...]] = {
     "OPEN_WORKSPACE": ("compile_reporting_units",),
     "CONFIRM_MAPPING_VALUE": ("compile_reporting_units",),
     "OPEN_OFFICIAL": ("prepare_official_handoff",),
+    "ASSIST_FULL": ("recommend_next_action", "compile_reporting_units"),
+    "OPEN_TX": ("compile_reporting_units",),
+    "SHOW_EVIDENCE": ("compile_reporting_units",),
+    # Kontrol lokal murni (pause/resume/stop/voice-decide): konteks sudah
+    # dibangun di handle_message; tanpa eksekusi tool tambahan.
+    "CONFIRM_YES": (),
+    "CONFIRM_NO": (),
+    "PAUSE": (),
+    "RESUME": (),
+    "STOP_ALL": (),
     "UNKNOWN": ("recommend_next_action", "compile_reporting_units"),
 }
 
@@ -196,12 +207,14 @@ def handle_message(
     session_id: str,
     text: str,
     ui_state: dict[str, Any] | None = None,
+    request: Any = None,
 ) -> dict[str, Any]:
     """Titik masuk percakapan. Kembalikan respons terstruktur (JSON)."""
     started = time.perf_counter()
     services = services_from(db, container)
     services["cases"].get_owned(case_id, session_id)
-    ui_state = {**(ui_state or {}), "raw_text": text}
+    ui_state = {**(ui_state or {}), "raw_text": text, "_session": session_id, "_request": request}
+    voice = bool((ui_state or {}).get("voice"))
 
     intent = classify(text)
     if intent.kind == "RED":
@@ -213,6 +226,8 @@ def handle_message(
     context = build_agent_context(db, case_id)
     state = context["case"]["state"]
     _audit(db, case_id, "AGENT_MESSAGE", state, None, 0, "OK", None, text)
+    if voice:
+        _audit(db, case_id, "VOICE_COMMAND", state, None, 0, "OK", None, intent.kind)
 
     runner = _Runner(db, container, case_id, state)
     planner_mode, _ = runner.plan_and_execute(intent.kind)
@@ -234,7 +249,8 @@ def handle_message(
         )
     if guidance is not None:
         _audit(db, case_id, "GUIDANCE_SHOWN", state, None, 0, "OK", None, guidance["target"])
-    plan = _plan_for(guidance, context, ui_state)
+    inline = ui_state.pop("_inline_plan", None)
+    plan = inline if isinstance(inline, list) else _plan_for(guidance, context, ui_state)
     if plan:
         _audit(
             db,
@@ -249,7 +265,7 @@ def handle_message(
         )
 
     hermes_configured = bool(getattr(container.hermes, "hermes_cli_configured", False))
-    return _response(
+    body = _response(
         context,
         message,
         guidance,
@@ -261,6 +277,8 @@ def handle_message(
         planner_mode,
         hermes_configured,
     )
+    body.update(_take_control(ui_state))
+    return body
 
 
 def _response(
@@ -311,6 +329,138 @@ def _response(
         }
         body["quick_actions"] = []
     return body
+
+
+def _take_control(ui: dict[str, Any]) -> dict[str, Any]:
+    """Ambil flag kontrol sekali-pakai dari handler (voice_note/pause/stop/rollback/open_url)."""
+    control = ui.pop("_control", None)
+    base = {"voice_note": None, "pause_agent": False, "stop_agent": False, "rollback_drafts": False,
+            "draft_committed": False, "open_url": None}
+    if isinstance(control, dict):
+        for key in base:
+            if key in control:
+                base[key] = control[key]
+    return base
+
+
+def _native_steps_for_set_draft(unit_id: str, field: str, fact_id: str, label: str, context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Langkah SET_DRAFT yang lolos validasi kandidat penuh; kosong bila invalid."""
+    valid = validate_native_action(
+        {"action": "SET_DRAFT", "risk": "YELLOW", "target": unit_id, "field": field, "fact_id": fact_id, "label": label},
+        context,
+    )
+    if valid is None:
+        return []
+    return [{"type": "SET_DRAFT", "unit": unit_id, "field": field, "fact_id": fact_id, "label": label}]
+
+
+def _open_units(context: dict[str, Any]) -> list[dict[str, Any]]:
+    return [u for u in context["units"] if u.get("mapping_status") in {"AMBIGUOUS", "INCOMPLETE"}]
+
+
+def _nav_steps(page: str, ui: dict[str, Any]) -> list[dict[str, Any]]:
+    current = str((ui or {}).get("current_page") or "")
+    return [{"type": "NAVIGATE_INTERNAL", "route": page}] if page and page != current else []
+
+
+def _tx_action_plan(
+    unit: dict[str, Any],
+    context: dict[str, Any],
+    ui: dict[str, Any],
+    *,
+    status_text: str,
+    callout_title: str,
+    callout_text: str,
+    prefill: dict[str, str] | None = None,
+) -> list[dict[str, Any]]:
+    """Plan aksi native untuk satu transaksi: STATUS → buka → sorot → tunjuk → [draf] → CALLOUT → WAIT."""
+    uid = unit["unit_id"]
+    unit_ids = set(context["unit_ids"])
+    steps: list[dict[str, Any]] = [
+        {"type": "STATUS", "message": status_text},
+        *_nav_steps("review", ui),
+        {"type": "OPEN_TRANSACTION", "target": f"transaction-{uid}"},
+        {"type": "SPOTLIGHT", "target": f"transaction-{uid}"},
+        {"type": "MOVE_POINTER", "target": f"transaction-{uid}-amount"},
+    ]
+    if prefill:
+        steps.extend(_native_steps_for_set_draft(uid, prefill["field"], prefill["fact_id"], prefill["label"], context))
+    steps.extend(
+        [
+            {"type": "CALLOUT", "target": f"transaction-{uid}-amount", "title": callout_title, "message": callout_text},
+            {"type": "WAIT_FOR_USER"},
+        ]
+    )
+    return build_plan(steps, unit_ids)
+
+
+def _pick_unit(context: dict[str, Any], ordinal: int | None) -> dict[str, Any] | None:
+    """Pilih unit: ordinal 1-based (index tampilan), -1 = terakhir, 0/None = terbuka pertama."""
+    ordered = sorted(context["units"], key=lambda u: (u.get("index", 0), u.get("unit_id", "")))
+    if not ordered:
+        return None
+    if ordinal is not None and ordinal >= 1:
+        return ordered[ordinal - 1] if ordinal <= len(ordered) else None
+    if ordinal == -1:
+        return ordered[-1]
+    for unit in ordered:
+        if unit.get("mapping_status") in {"AMBIGUOUS", "INCOMPLETE"}:
+            return unit
+    return ordered[0]
+
+
+def _followup_plan(
+    guide: dict[str, str] | None,
+    fresh: dict[str, Any],
+    ui: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Rencana berikut setelah commit: buka target next-action secara native.
+
+    Agentic loop §26 — observe (fresh) → plan → execute. Target transaksi
+    mendapat alur ACT penuh; target lain mendapat alur visual generik.
+    """
+    if not guide:
+        return []
+    target = str(guide.get("target") or "")
+    unit_ids = set(fresh["unit_ids"])
+    if target.startswith("transaction-"):
+        uid = target[len("transaction-"):].split("-")[0]
+        unit = next((u for u in fresh.get("units", []) if u.get("unit_id") == uid), None)
+        if unit is not None and unit.get("mapping_status") in {"AMBIGUOUS", "INCOMPLETE"}:
+            return _tx_action_plan(
+                unit, fresh, ui,
+                status_text="Tersimpan. Lanjut ke transaksi berikut.",
+                callout_title="Pastikan nominal",
+                callout_text="Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
+            )
+    if target == "next-best-action":
+        return build_plan(
+            [
+                {"type": "STATUS", "message": "Tersimpan. Saya menunjukkan tindakan paling penting."},
+                *_nav_steps("readiness", ui),
+                {"type": "SCROLL_TO", "target": "next-best-action"},
+                {"type": "SPOTLIGHT", "target": "next-best-action"},
+                {"type": "MOVE_POINTER", "target": "next-best-action"},
+                {
+                    "type": "CALLOUT", "target": "next-best-action", "title": "Lakukan ini dulu",
+                    "message": "Ini langkah paling penting sekarang. Ikuti bagian yang disorot.",
+                },
+                {"type": "WAIT_FOR_USER"},
+            ],
+            unit_ids,
+        )
+    page = canonical_page_for(target)
+    steps: list[dict[str, Any]] = [{"type": "STATUS", "message": "Tersimpan. Lanjut ke langkah berikut."}]
+    if page:
+        steps.extend(_nav_steps(page, ui))
+    steps.extend(
+        [
+            {"type": "SCROLL_TO", "target": target},
+            {"type": "SPOTLIGHT", "target": target},
+            {"type": "WAIT_FOR_USER"},
+        ]
+    )
+    return build_plan(steps, unit_ids)
 
 
 def _guide(target: str | None, label: str, unit_ids: set[str]) -> dict[str, str] | None:
@@ -744,6 +894,26 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
     dest_label = dest_pick[0]["value"]
     payload = {"unit_id": unit["unit_id"], "target_evidence_id": evidence_id or "", "pairings": pairings}
     proposal = _propose(context, "SET_UNIT_MAPPING", {"amount": text_amount, "destination": dest_label}, payload, runner)
+    # Native Action Mode: sertakan prefill draf (PREPARE, bukan commit).
+    # Commit server tetap menunggu approval eksplisit (tombol / voice "iya").
+    ui["_inline_plan"] = _tx_action_plan(
+        unit,
+        context,
+        ui,
+        status_text="Saya menyiapkan pilihannya.",
+        callout_title="Periksa draf AI",
+        callout_text=f"Saya memilih {text_amount} sebagai draf. Belum disimpan — pastikan dulu.",
+        prefill={"field": "amount", "fact_id": amount_fact["fact_id"], "label": text_amount},
+    )
+    if any(s.get("type") == "SET_DRAFT" for s in ui["_inline_plan"]):
+        _audit(
+            runner.db, context["case"]["case_id"], "DRAFT_PREPARED",
+            context["case"]["state"], None, 0, "OK", None,
+            f"SET_DRAFT {unit['unit_id']} amount {amount_fact['fact_id']}",
+        )
+        ui["_control"] = {
+            "voice_note": f"{text_amount} ke {mask_account(dest_label)}. Benar?",
+        }
     return (
         f"Untuk memastikan: {text_amount} adalah nominal Transaksi {unit['index']} ke rekening {escape(dest_label)}? "
         "Sebelum saya menyimpan perubahan ini, pastikan datanya benar.",
@@ -789,12 +959,66 @@ def _propose(
     )
 
 
-def _handle_yes(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+def _pending_yellow(ui: dict[str, Any]) -> dict[str, Any] | None:
     pending = ui.get("pending_action") or {}
-    if not pending or pending.get("action_type") not in YELLOW_ACTIONS:
+    if isinstance(pending, dict) and pending.get("action_type") in YELLOW_ACTIONS:
+        return pending
+    return None
+
+
+def _handle_yes(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    pending = _pending_yellow(ui)
+    if not pending:
         return (
             "Baik. Ada lagi yang bisa saya bantu? Coba tanyakan apa yang harus dilakukan sekarang.",
             _guide_for_action(context),
+            None,
+        )
+    # Voice approval (§14): "iya/benar/simpan" via suara = approval eksplisit
+    # bila proposal aktif, jelas, Yellow, tak sensitif, belum expired (versi cocok).
+    if ui.get("voice") and ui.get("_request") is not None:
+        from app.domain.errors import StaleCaseVersion, ValidationFailed
+
+        try:
+            result = approve_action(
+                runner.db,
+                ui["_request"],
+                context["case"]["case_id"],
+                str(ui.get("_session") or ""),
+                str(pending.get("action_id") or ""),
+                str(pending.get("action_type") or ""),
+                dict(pending.get("payload") or {}),
+                int(pending.get("expected_version") or 0),
+            )
+        except StaleCaseVersion:
+            return (
+                "Data kasus sudah berubah. Saya perbarui dulu sebelum melanjutkan.",
+                _guide("review-facts", "Periksa lagi di sini", set(context["unit_ids"])),
+                None,
+            )
+        except (ValidationFailed, ValueError, TypeError) as exc:
+            return (
+                f"Konfirmasi tidak bisa dipakai ({exc}). Minta saya siapkan ulang.",
+                _guide("transaction-list", "Pilih di sini", set(context["unit_ids"])),
+                None,
+            )
+        _audit(
+            runner.db, context["case"]["case_id"], "VOICE_APPROVAL",
+            context["case"]["state"], None, 0, "OK", None,
+            str(pending.get("action_type") or ""),
+        )
+        if isinstance(result, dict) and result.get("url"):
+            ui["_control"] = {"open_url": result["url"]}
+            return (result.get("message") or "Silakan buka sendiri portal resminya.", None, None)
+        # Agentic loop (§26): setelah commit, baca ulang state → rencana berikut.
+        fresh = build_agent_context(runner.db, context["case"]["case_id"])
+        nxt = _guide_for_action(fresh, None)
+        ui["_inline_plan"] = _followup_plan(nxt, fresh, ui)
+        ui["_control"] = {"voice_note": "Transaksi disimpan.", "draft_committed": True}
+        saved_msg = result.get("message") if isinstance(result, dict) else None
+        return (
+            f"{saved_msg or 'Tersimpan.'} {_next_action_text(fresh, None)}",
+            nxt,
             None,
         )
     return (
@@ -805,11 +1029,202 @@ def _handle_yes(intent: Intent, context: dict[str, Any], runner: _Runner, ui: di
 
 
 def _handle_no(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    if _pending_yellow(ui):
+        try:
+            deny_action(
+                runner.db, runner.container, context["case"]["case_id"],
+                str(ui.get("_session") or ""), str((ui.get("pending_action") or {}).get("action_type") or ""),
+            )
+        except Exception:
+            pass
+        ui["_control"] = {"rollback_drafts": True}
     return (
         "Baik, tidak jadi disimpan. Anda tetap bisa memilih sendiri pasangan yang benar.",
         _guide("transaction-list", "Pilih sendiri di sini", set(context["unit_ids"])),
         None,
     )
+
+
+def _handle_assist(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    """"Bantu saya sampai selesai": observe state → plan aksi aman berikut (§11, §36)."""
+    unit_ids = set(context["unit_ids"])
+    blocking = [c for c in context["conflicts_open"] if c.get("severity") == "BLOCKING"]
+    if blocking:
+        ui["_inline_plan"] = build_plan(
+            [
+                {"type": "STATUS", "message": "Baik. Saya periksa kasus Anda."},
+                *_nav_steps("review", ui),
+                {"type": "SCROLL_TO", "target": "review-facts"},
+                {"type": "SPOTLIGHT", "target": "review-facts"},
+                {
+                    "type": "CALLOUT", "target": "review-facts", "title": "Pilih yang benar",
+                    "message": "Saya menemukan data yang berbeda. Saya tidak akan menebak — pilih yang sesuai bukti.",
+                },
+                {"type": "WAIT_FOR_USER"},
+            ],
+            unit_ids,
+        )
+        return (
+            "Baik. Saya periksa kasus Anda. Saya menemukan data yang saling bertentangan — pilih yang benar dulu.",
+            _guide("review-facts", "Selesaikan di sini", unit_ids),
+            None,
+        )
+    open_units = _open_units(context)
+    if open_units:
+        unit = open_units[0]
+        ui["_inline_plan"] = _tx_action_plan(
+            unit, context, ui,
+            status_text="Baik. Saya periksa kasus Anda.",
+            callout_title="Pastikan nominal",
+            callout_text="Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
+        )
+        ui["_control"] = {"voice_note": "Saya membuka transaksi yang perlu diperiksa."}
+        return (
+            f"Baik. Saya periksa kasus Anda. {_unit_label(unit)} perlu dikonfirmasi — saya bukakan sekarang.",
+            _guide(f"transaction-{unit['unit_id']}", "Periksa transaksi ini", unit_ids),
+            None,
+        )
+    if not context["units"]:
+        ui["_inline_plan"] = build_plan(
+            [
+                {"type": "STATUS", "message": "Baik. Saya siapkan dari awal."},
+                *_nav_steps("intake", ui),
+                {"type": "SCROLL_TO", "target": "upload-evidence"},
+                {"type": "SPOTLIGHT", "target": "upload-evidence"},
+                {
+                    "type": "CALLOUT", "target": "upload-evidence", "title": "Kirim bukti dulu",
+                    "message": "Foto transfer, chat, atau link — saya susun setelah bukti masuk.",
+                },
+                {"type": "WAIT_FOR_USER"},
+            ],
+            unit_ids,
+        )
+        return (
+            "Baik. Kirim bukti yang ada dulu — foto transfer, chat, atau link. Saya susun setelah bukti masuk.",
+            _guide("upload-evidence", "Kirim bukti di sini", unit_ids),
+            None,
+        )
+    obs = runner.observations.get("recommend_next_action")
+    return (
+        f"Baik. {_next_action_text(context, obs)}",
+        _guide_for_action(context, obs),
+        None,
+    )
+
+
+def _handle_open_tx(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    """Buka transaksi native: ordinal / belum selesai / pertama terbuka."""
+    unit_ids = set(context["unit_ids"])
+    ordinal = intent.extra.get("ordinal") if isinstance(intent.extra, dict) else None
+    unit = _pick_unit(context, ordinal if isinstance(ordinal, int) else None)
+    if unit is None:
+        return (
+            "Belum ada transaksi. Kirim bukti transfer yang memuat jumlah uang, rekening, dan waktu.",
+            _guide("upload-evidence", "Kirim bukti di sini", unit_ids),
+            None,
+        )
+    ui["_inline_plan"] = _tx_action_plan(
+        unit, context, ui,
+        status_text="Membuka transaksi yang perlu diperiksa…",
+        callout_title=_unit_label(unit),
+        callout_text="Transaksi sudah terbuka. Sebutkan nominalnya bila perlu dipastikan.",
+    )
+    ui["_control"] = {"voice_note": "Transaksi sudah terbuka."}
+    return (
+        f"{_unit_label(unit)} saya bukakan. Sebutkan nominalnya bila perlu dipastikan.",
+        _guide(f"transaction-{unit['unit_id']}", "Lihat transaksi ini", unit_ids),
+        None,
+    )
+
+
+def _handle_evidence(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    unit_ids = set(context["unit_ids"])
+    target = "evidence-list" if context["evidence_count"] else "upload-evidence"
+    ui["_inline_plan"] = build_plan(
+        [
+            {"type": "STATUS", "message": "Saya membuka buktinya."},
+            *_nav_steps("intake", ui),
+            {"type": "OPEN_EVIDENCE", "target": target},
+            {"type": "SCROLL_TO", "target": target},
+            {"type": "SPOTLIGHT", "target": target},
+            {
+                "type": "CALLOUT", "target": target, "title": "Bukti Anda",
+                "message": "Ini bukti yang sudah masuk untuk kasus ini.",
+            },
+            {"type": "WAIT_FOR_USER"},
+        ],
+        unit_ids,
+    )
+    return (
+        "Saya membuka buktinya.",
+        _guide(target, "Lihat bukti di sini", unit_ids),
+        None,
+    )
+
+
+def _handle_pause(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    ui["_control"] = {"pause_agent": True}
+    return (
+        "Baik, saya jeda di sini. Ucapkan “Lanjut” kalau siap melanjutkan.",
+        None,
+        None,
+    )
+
+
+def _handle_stop(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    if _pending_yellow(ui):
+        try:
+            deny_action(
+                runner.db, runner.container, context["case"]["case_id"],
+                str(ui.get("_session") or ""), str((ui.get("pending_action") or {}).get("action_type") or ""),
+            )
+        except Exception:
+            pass
+    ui["_control"] = {"stop_agent": True, "rollback_drafts": True}
+    return (
+        "Baik, saya berhenti. Draf yang saya siapkan dibatalkan; yang sudah Anda simpan tetap aman.",
+        None,
+        None,
+    )
+
+
+def _handle_resume(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    """Lanjut: teruskan loop TANPA meng-approve proposal (§35)."""
+    pending = _pending_yellow(ui)
+    if pending:
+        version = context["case"]["version"]
+        try:
+            want_version = int(pending.get("expected_version") or 0)
+        except (TypeError, ValueError):
+            want_version = -1
+        if want_version != version:
+            return (
+                "Data kasus sudah berubah. Saya perbarui dulu sebelum melanjutkan.",
+                _guide("review-facts", "Periksa lagi di sini", set(context["unit_ids"])),
+                None,
+            )
+        secret = str(getattr(getattr(runner, "container", None), "settings", None).secret_key or "")
+        expect = action_id_for(
+            context["case"]["case_id"], str(pending.get("action_type") or ""),
+            dict(pending.get("payload") or {}), version, secret_key=secret,
+        )
+        if expect != str(pending.get("action_id") or ""):
+            return (
+                "Konfirmasi sebelumnya tidak cocok. Minta saya siapkan ulang.",
+                _guide("transaction-list", "Pilih di sini", set(context["unit_ids"])),
+                None,
+            )
+        reproposed = _propose(
+            context, str(pending.get("action_type") or ""),
+            dict(pending.get("summary") or {}), dict(pending.get("payload") or {}), runner,
+        )
+        detail = ", ".join(f"{k}: {v}" for k, v in (reproposed.summary or {}).items())
+        return (
+            f"Masih menunggu keputusan Anda — {detail}. Ucapkan “Iya” untuk menyimpan, atau “Tidak” untuk membatalkan.",
+            _guide("confirm-mapping", "Konfirmasi di sini", set(context["unit_ids"])),
+            reproposed,
+        )
+    return _handle_assist(intent, context, runner, ui)
 
 
 def _handle_unknown(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
@@ -835,6 +1250,12 @@ _HANDLERS = {
     "CONFIRM_MAPPING_VALUE": _handle_confirm_value,
     "CONFIRM_YES": _handle_yes,
     "CONFIRM_NO": _handle_no,
+    "ASSIST_FULL": _handle_assist,
+    "OPEN_TX": _handle_open_tx,
+    "SHOW_EVIDENCE": _handle_evidence,
+    "PAUSE": _handle_pause,
+    "RESUME": _handle_resume,
+    "STOP_ALL": _handle_stop,
     "UNKNOWN": _handle_unknown,
 }
 

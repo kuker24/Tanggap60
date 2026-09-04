@@ -28,8 +28,19 @@ RED_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 )
 
 # --- Intent biasa ------------------------------------------------------------
+# Urutan penting: RESUME ("lanjut") harus menang atas CONFIRM_YES agar
+# "Lanjut." tidak sengaja meng-approve proposal Yellow (§35). Approval
+# eksplisit memakai iya/benar/simpan.
+
+_ORDINALS = r"(pertama|1|ke-? ?1|kedua|2|ke-? ?2|ketiga|3|ke-? ?3|keempat|4|ke-? ?4|kelima|5|ke-? ?5|terakhir|ini|itu|tersebut|berikutnya|belum selesai|belum jelas)"
 
 _INTENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("ASSIST_FULL", re.compile(r"(?i)\b(bantu (saya |aku |kami )?(sampai|sampe|hingga) (selesai|beres|akhir|tuntas)|dampingi (saya |aku )?(sampai|sampe|hingga) (selesai|beres)|bantu (terus |lanjut )?sampai (selesai|beres)|mode pendamping( langsung)?|pandu saya langsung)\b")),
+    ("OPEN_TX", re.compile(r"(?i)\b(buka(kan)? (transaksi |yang )?|lihat |tampilkan |tunjuk(kan)? )?(transaksi (yang |ke-? ?)?" + _ORDINALS + r"|yang " + _ORDINALS + r")\b")),
+    ("SHOW_EVIDENCE", re.compile(r"(?i)\b(buka(kan)? (bukti(nya)?|fotonya|lampirannya?)|lihat bukti|tunjuk(kan)? bukti|tampilkan bukti|mana buktinya)\b")),
+    ("PAUSE", re.compile(r"(?i)^(tunggu( dulu| sebentar| ya)?|jeda|pause|tahan dulu|berhenti dulu|stop dulu)\b")),
+    ("STOP_ALL", re.compile(r"(?i)\b(hentikan( ai| panduannya?)?|stop( ai)?|berhenti( total| semuanya| saja)?|batalkan (semua|panduan|pemandu|nya semua)|matikan (ai|panduan|pemandu))\b")),
+    ("RESUME", re.compile(r"(?i)^(lanjut(kan|lah)?|terus(kan|lah)?|ayo lanjut|mulai lagi|jalan lagi)\b")),
     ("GREETING", re.compile(r"(?i)^(halo|hai|hi|pagi|siang|sore|malam|assalamu|permisi|tes|test|halo+)\b")),
     ("ASK_NEXT", re.compile(r"(?i)\b(harus (ngapain|apa)|lakukan sekarang|langkah (selanjutnya|berikutnya)|apa yang (harus|sebaiknya|perlu) (saya |aku )?(lakukan|kerjakan)|tindakan (selanjutnya|berikutnya)|next|gimana (lagi|selanjutnya))\b")),
     ("SHOW_MISSING", re.compile(r"(?i)\b(tunjukin|tunjukkan|tampilkan|mana )?.*\b(kurang|belum (lengkap|isi|diisi|ada)|hilang|masih perlu|perlu dilengkapi|apa saja yang kurang)\b")),
@@ -40,12 +51,29 @@ _INTENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("EXPLAIN_READINESS", re.compile(r"(?i)\b(kenapa|mengapa|kok) .*?\b(belum siap|tidak siap|gak siap|kurang|belum bisa)\b")),
     ("EXPLAIN_PACKAGE", re.compile(r"(?i)\b(apa (saja |aja )?(yang )?(akan dikirim|dikirim|di dalam paket|isinya)|isi paket|apa isi|yang dikirim (nanti|ke|apa))\b")),
     ("OPEN_OFFICIAL", re.compile(r"(?i)\b(buka(kan)? )?(portal resmi|laman resmi|situs resmi|iasc|ojk|kanal resmi)\b")),
-    ("CONFIRM_YES", re.compile(r"(?i)^(ya|iya|betul|benar|oke|ok|setuju|simpan|lakukan|lanjut|ya,? simpan)\b")),
-    ("CONFIRM_NO", re.compile(r"(?i)^(bukan|jangan|tidak|gak|nggak|batal|jangan simpan)\b")),
+    ("CONFIRM_YES", re.compile(r"(?i)^(ya|iya|betul|benar|oke|ok|setuju|simpan|iya benar|ya benar|benar sekali|ya,? simpan)\b")),
+    ("CONFIRM_NO", re.compile(r"(?i)^(bukan|jangan|tidak|gak|nggak|batal|batalkan|jangan simpan)\b")),
     ("EXPLAIN_STATE", re.compile(r"(?i)\b(apa yang terjadi|status (kasus|saya)|kondisi (kasus|saya)|ringkas(an|kan)|rangkum|rekap)\b")),
 )
 
 _DEICTIC = re.compile(r"(?i)\b(yang ini|ini |tadi|tersebut|itu |transaksi (ini|itu|tersebut)|nominal (ini|itu))\b")
+
+_ORDINAL_MAP: dict[str, int] = {
+    "pertama": 1, "1": 1, "kedua": 2, "2": 2, "ketiga": 3, "3": 3,
+    "keempat": 4, "4": 4, "kelima": 5, "5": 5, "terakhir": -1,
+    "ini": 0, "itu": 0, "tersebut": 0, "berikutnya": 0,
+    "belum selesai": 0, "belum jelas": 0,
+}
+_ORDINAL_RE = re.compile(r"(?i)\b(pertama|kedua|ketiga|keempat|kelima|terakhir|ini|itu|tersebut|berikutnya|belum selesai|belum jelas|ke-? ?[1-5]|[1-5])\b")
+
+
+def extract_ordinal(text: str) -> int | None:
+    """1-based untuk 'kedua'→2; 0 = transaksi berjalan; -1 = terakhir; None = tak ada."""
+    match = _ORDINAL_RE.search(str(text or ""))
+    if not match:
+        return None
+    word = re.sub(r"(?i)^ke-? ?(?=[1-5]\b)", "", match.group(1)).strip().lower()
+    return _ORDINAL_MAP.get(word)
 
 
 @dataclass
@@ -73,6 +101,8 @@ def classify(text: str) -> Intent:
         return Intent(kind="CONFIRM_MAPPING_VALUE", amount=amount)
     for kind, pattern in _INTENT_RULES:
         if pattern.search(raw):
+            if kind == "OPEN_TX":
+                return Intent(kind=kind, extra={"ordinal": extract_ordinal(raw)})
             return Intent(kind=kind)
     if amount is not None:
         return Intent(kind="CONFIRM_MAPPING_VALUE", amount=amount, confidence="low")
