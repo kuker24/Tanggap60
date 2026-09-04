@@ -5,7 +5,7 @@ from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import APIRouter, File, Header, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 
 from app.api.helpers import (
     artifact_public,
@@ -19,7 +19,6 @@ from app.deps import services_from
 from app.domain.errors import (
     Forbidden,
     IdempotencyConflict,
-    InvalidStateTransition,
     NotFound,
     ResourceLimit,
     StaleCaseVersion,
@@ -94,7 +93,7 @@ def get_readiness(case_id: str, request: Request) -> dict[str, Any]:
 
 
 @api.delete("/cases/{case_id}")
-def delete_case(case_id: str, request: Request, payload: dict[str, str] | None = None) -> dict[str, str]:
+def delete_case(case_id: str, request: Request, payload: dict[str, str] | None = None) -> JSONResponse:
     confirmation = (payload or {}).get("confirmation", "")
     result = svc(request)["orchestrator"].run_tool(
         case_id,
@@ -102,7 +101,10 @@ def delete_case(case_id: str, request: Request, payload: dict[str, str] | None =
         "purge_case",
         {"confirmation": confirmation, "user_initiated": True, "session_id": sid(request)},
     )
-    return {"status": str(result.get("status") or "PURGED"), "case_id": case_id, "tool_name": "purge_case"}
+    return JSONResponse(
+        {"status": str(result.get("status") or "PURGED"), "case_id": case_id, "tool_name": "purge_case"},
+        headers={"Clear-Site-Data": '"storage"'},
+    )
 
 
 @api.post("/cases/{case_id}/evidence", status_code=202)
@@ -139,13 +141,7 @@ def list_evidence(case_id: str, request: Request) -> dict[str, Any]:
 
 @api.delete("/cases/{case_id}/evidence/{evidence_id}")
 def delete_evidence(case_id: str, evidence_id: str, request: Request) -> dict[str, str]:
-    case = svc(request)["cases"].get_owned(case_id, sid(request))
-    if case.state not in {State.NEW, State.INGESTING, State.REVIEW_REQUIRED, State.EXTRACTING}:
-        raise InvalidStateTransition("tidak bisa hapus bukti")
-    repo = EvidenceRepository(request.state.db)
-    item = repo.get(evidence_id)
-    request.app.state.container.storage.delete_key(case_id, item.storage_key)
-    repo.delete(evidence_id)
+    svc(request)["intake"].delete_unprocessed(case_id, sid(request), evidence_id)
     return {"status": "deleted"}
 
 
@@ -194,10 +190,10 @@ def start_run(
     request: Request,
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, Any]:
+    case = svc(request)["cases"].get_owned(case_id, sid(request))
     cached = _idempotency(request, case_id, idempotency_key, "run")
     if cached:
         return cached
-    case = svc(request)["cases"].get_owned(case_id, sid(request))
     settings = request.app.state.container.settings
     guard_resources(settings, str(request.app.state.container.storage.root))
     run_id = new_id("run")
@@ -469,32 +465,6 @@ def get_next_action(case_id: str, request: Request) -> dict[str, Any]:
     return next_action_to_dict(action)
 
 
-@api.get("/cases/{case_id}/reporting-units/{unit_id}/draft")
-def get_unit_draft(case_id: str, unit_id: str, request: Request) -> dict[str, Any]:
-    svc(request)["cases"].get_owned(case_id, sid(request))
-    payload, digest = svc(request)["approval"].unit_snapshot(case_id, unit_id)
-    return {"unit_id": unit_id, "snapshot_hash": digest, "draft": payload, "notice_version": __import__("app.config", fromlist=["NOTICE_VERSION"]).NOTICE_VERSION}
-
-
-@api.post("/cases/{case_id}/reporting-units/{unit_id}/approval")
-def post_unit_approval(
-    case_id: str,
-    unit_id: str,
-    request: Request,
-    payload: dict[str, Any],
-    idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
-) -> dict[str, Any]:
-    svc(request)["cases"].get_owned(case_id, sid(request))
-    cached = _idempotency(request, case_id, idempotency_key, json.dumps(payload, sort_keys=True) + unit_id)
-    if cached:
-        return cached
-    record = svc(request)["approval"].approve(case_id, sid(request), str(payload.get("snapshot_hash", "")), bool(payload.get("accepted_notice", False)), target_id=unit_id)
-    _kick_orchestrator(request, case_id)
-    body = {"approval_id": record.approval_id, "snapshot_hash": record.snapshot_hash, "unit_id": unit_id, "state": CaseRepository(request.state.db).get(case_id).state.value}
-    _store_idem(request, idempotency_key or record.approval_id, case_id, json.dumps(payload, sort_keys=True) + unit_id, body)
-    return body
-
-
 @api.post("/cases/{case_id}/draft")
 def build_draft(case_id: str, request: Request) -> dict[str, Any]:
     case = svc(request)["cases"].get_owned(case_id, sid(request))
@@ -532,6 +502,7 @@ def post_approval(
     payload: dict[str, Any],
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, Any]:
+    svc(request)["cases"].get_owned(case_id, sid(request))
     cached = _idempotency(request, case_id, idempotency_key, json.dumps(payload, sort_keys=True))
     if cached:
         return cached
@@ -565,10 +536,10 @@ def compile_artifacts(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, Any]:
     body_raw = json.dumps(payload or {}, sort_keys=True)
+    case = svc(request)["cases"].get_owned(case_id, sid(request))
     cached = _idempotency(request, case_id, idempotency_key, body_raw)
     if cached:
         return cached
-    case = svc(request)["cases"].get_owned(case_id, sid(request))
     if not case.approved_snapshot_hash:
         from app.domain.errors import ApprovalRequired
 
@@ -682,6 +653,7 @@ def post_receipt(
     idempotency_key: Annotated[str | None, Header(alias="Idempotency-Key")] = None,
 ) -> dict[str, Any]:
     raw = json.dumps(payload, sort_keys=True)
+    svc(request)["cases"].get_owned(case_id, sid(request))
     cached = _idempotency(request, case_id, idempotency_key, raw)
     if cached:
         return cached
@@ -694,6 +666,7 @@ def post_receipt(
             "ocr_text": payload.get("ocr_text"),
             "evidence_id": payload.get("evidence_id"),
             "user_confirms_unreadable": bool(payload.get("user_confirms_unreadable", False)),
+            "session_id": sid(request),
         },
     )
     record = ReceiptRepository(request.state.db).get_for_case(case_id)

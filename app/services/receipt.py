@@ -72,7 +72,7 @@ class ReceiptService:
             recorded_at=now_utc(),
             receipt_evidence_id=evidence_id,
         )
-        self.receipts.add(record, normalize_ticket(text))
+        self.receipts.add(record, "")
         if match != LocalMatchStatus.MISMATCH and case.state == State.HANDOFF_READY:
             self.cases.set_state(case, State.RECEIPT_RECORDED, event_type="RECEIPT_RECORDED_BY_USER")
         return record

@@ -76,6 +76,7 @@ class Orchestrator:
             summary = {
                 "route": case.route.value,
                 "candidates_done": bool(self.facts.list_for_case(case_id)),
+                "extract_done": "extract_candidate_facts" in trace,
                 "allowed_tools": list(allowed_tools(case.state.value)),
                 "handoff_prepared": "prepare_official_handoff" in trace,
                 "plan_done": "build_postincident_plan" in trace or "build_preincident_brief" in trace,
@@ -232,6 +233,8 @@ class Orchestrator:
         if extra:
             args.update(extra)
         result = execute_tool(tool, case.state, args, self.ctx)
+        if tool == "purge_case":
+            return result
         try:
             case = self.case_repo.get(case_id)
             state_after = case.state.value

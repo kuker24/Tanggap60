@@ -60,7 +60,7 @@ class DeterministicHermes:
 
     def propose_tool(self, state: str, summary: dict[str, Any]) -> str | None:
         self.last_mode = "deterministic"
-        if state == "EXTRACTING" and summary.get("candidates_done"):
+        if state == "EXTRACTING" and summary.get("extract_done"):
             return "validate_case_facts"
         if state == "READY_FOR_ACTION":
             if summary.get("route") == "PRE_INCIDENT_CHECK":

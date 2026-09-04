@@ -51,7 +51,7 @@ Hermes GUI dari laptop (tanpa IP publik):
 ssh -L 9119:127.0.0.1:9119 tanggap60-uji
 ```
 
-Lalu `http://127.0.0.1:9119` — isi API key / model di tab API Keys + Models. Tanpa itu `smoke_hermes.sh` keluar `HERMES_NEEDS_MODEL` dan Tanggap60 fallback deterministic. Origin dashboard `127.0.0.1:9119`. Jangan reboot VPS uji. Jangan restart `hermes-tunnel` jika sudah 1015.
+Lalu `http://127.0.0.1:9119` — isi API key / model di tab API Keys + Models. Tanpa itu `smoke_hermes.sh` keluar `HERMES_NEEDS_MODEL` dan Tanggap60 fallback deterministic. Origin dashboard `127.0.0.1:9119` saja. `hermes-tunnel` harus tetap masked. Jangan reboot VPS uji.
 
 Setelah web hidup: `./scripts/smoke_hermes.sh`, `./scripts/smoke_hero.sh`, `./scripts/benchmark.sh`. Fixture demo: `python scripts/make_demo_fixtures.py`.
 

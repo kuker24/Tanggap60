@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.domain.errors import ValidationFailed
 from app.domain.states import State
 from app.infrastructure.jobs import JobQueue
+from app.infrastructure.logging import hash_id
 from app.infrastructure.repositories import (
     ActionRepository,
     ApprovalRepository,
@@ -76,4 +77,5 @@ class PurgeService:
         self.jobs.delete_for_case(case_id)
         self.idem.delete_for_case(case_id)
         self.unit_maps.delete_for_case(case_id)
+        self.events.delete_content_for_case(hash_id(case_id))
         self.events.delete_content_for_case(case_id)

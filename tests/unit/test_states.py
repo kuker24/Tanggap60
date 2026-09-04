@@ -37,3 +37,14 @@ def test_purge_from_any() -> None:
         if state == State.PURGED:
             continue
         assert can_transition(state, State.PURGED)
+
+
+def test_preapproval_can_return_to_ingesting() -> None:
+    for current in (
+        State.EXTRACTING,
+        State.REVIEW_REQUIRED,
+        State.READY_FOR_ACTION,
+        State.WAITING_APPROVAL,
+    ):
+        assert can_transition(current, State.INGESTING)
+        assert transition(current, State.INGESTING) == State.INGESTING

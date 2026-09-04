@@ -34,7 +34,7 @@ def set_session_cookie(response: Response, settings: Settings, session_id: str) 
         serializer(settings).dumps(session_id),
         httponly=True,
         samesite="lax",
-        secure=settings.app_env == "competition",
+        secure=settings.app_env in {"competition", "production"},
         max_age=60 * 60 * 24,
     )
 

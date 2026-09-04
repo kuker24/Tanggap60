@@ -66,10 +66,53 @@ def test_t18_purge(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
     res = client.request("DELETE", f"/api/v1/cases/{case_id}", json={"confirmation": "PURGE"})
     assert res.status_code == 200
     assert res.json()["tool_name"] == "purge_case"
+    assert "storage" in res.headers.get("Clear-Site-Data", "").lower()
     missing = client.get(f"/api/v1/cases/{case_id}")
     assert missing.status_code in {403, 404, 410}
     _settings, _ocr, container = tmp_env
     assert not any(container.storage.root.joinpath(case_id).rglob("*"))
+
+
+def test_purge_scrubs_hashed_audit(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
+    from sqlalchemy import select
+
+    from app.infrastructure.db import AuditEventRow
+    from app.infrastructure.logging import hash_id
+
+    case_id = _ready_pack(client, ocr)
+    hashed = hash_id(case_id)
+    _settings, _ocr, container = tmp_env
+    session = container.sessions()
+    before = session.scalars(select(AuditEventRow).where(AuditEventRow.case_id == hashed)).all()
+    session.close()
+    assert before
+    client.request("DELETE", f"/api/v1/cases/{case_id}", json={"confirmation": "PURGE"})
+    session = container.sessions()
+    after = session.scalars(select(AuditEventRow).where(AuditEventRow.case_id == hashed)).all()
+    session.close()
+    assert after == []
+
+
+def test_receipt_does_not_persist_normalized_ticket(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
+    from sqlalchemy import select
+
+    from app.infrastructure.db import ReceiptRow
+
+    case_id = _ready_pack(client, ocr)
+    match = client.post(
+        f"/api/v1/cases/{case_id}/receipt",
+        headers={"Idempotency-Key": "rc-norm"},
+        json={"ticket_text": "IASC123456", "ocr_text": "IASC123456"},
+    )
+    assert match.status_code == 200
+    page = client.get(f"/cases/{case_id}/receipt")
+    assert "hanya tersimpan lokal" not in page.text.lower()
+    _settings, _ocr, container = tmp_env
+    session = container.sessions()
+    rows = session.scalars(select(ReceiptRow).where(ReceiptRow.case_id == case_id)).all()
+    session.close()
+    assert rows
+    assert all(not (row.ticket_normalized or "").strip() for row in rows)
 
 
 def test_t11_tamper_blocks_download(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:

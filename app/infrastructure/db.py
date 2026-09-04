@@ -299,10 +299,21 @@ def _migrate_approvals(engine: Engine) -> None:
             conn.execute(text("ALTER TABLE approvals ADD COLUMN profile_version VARCHAR(40)"))
 
 
+def _migrate_receipts(engine: Engine) -> None:
+    with engine.begin() as conn:
+        try:
+            names = {row[1] for row in conn.execute(text("PRAGMA table_info(receipts)"))}
+        except Exception:
+            return
+        if "ticket_normalized" in names:
+            conn.execute(text("UPDATE receipts SET ticket_normalized = ''"))
+
+
 def init_db(engine: Engine) -> None:
     Base.metadata.create_all(engine)
     _migrate_audit_events(engine)
     _migrate_approvals(engine)
+    _migrate_receipts(engine)
     with engine.connect() as conn:
         conn.execute(text("PRAGMA foreign_keys=ON"))
         conn.commit()
