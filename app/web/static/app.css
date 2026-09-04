@@ -150,9 +150,10 @@ legend{padding:0;margin-bottom:4px}
 .tl-dot.ok{border-color:var(--ok);color:var(--ok)}
 .tl-dot.run{border-color:var(--signal);color:var(--signal)}
 .tl-main b{font:500 15px/1.2 var(--sans)}
-.pulse{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--signal);margin-right:8px;vertical-align:middle;animation:pulse 1s linear infinite}
+.pulse{display:inline-block;width:8px;height:8px;border-radius:999px;background:var(--signal);margin-right:8px;vertical-align:middle;animation:pulse 1s linear infinite;flex:none}
 @keyframes pulse{50%{opacity:.28}}
-.status-line{display:flex;align-items:center;margin:0 0 8px}
+.status-line{display:flex;align-items:flex-start;margin:0 0 8px}
+.status-line .pulse{margin-top:8px}
 
 .fact-grid{display:grid;gap:16px;margin-top:20px}
 .fact{border:1px solid var(--line);border-radius:var(--radius-card);background:var(--surface);padding:18px}
