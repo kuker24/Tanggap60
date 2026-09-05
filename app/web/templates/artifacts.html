@@ -8,29 +8,18 @@
 <p class="lede">Paket belum dikirim ke mana pun. Anda tetap yang mengirimkannya ke situs resmi.</p>
 
 <div class="next-card" data-guide-id="official-handoff">
-  <h3>Buka portal resmi IASC</h3>
-  <p class="muted small">Isi data diri di situs mereka, bukan di sini. Mulai dari IASC — kanal resmi OJK untuk melapor penipuan ({{ domain }}).</p>
+  <h3>Lanjut di kanal resmi</h3>
+  <p class="muted small">Paket ini alat bantu. Laporan dikirim oleh Anda di situs resmi, bukan di sini.</p>
   <div class="actions">
-    <a class="btn" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC</a>
-    {% if pack %}
-    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh semua paket</a>
+    {% if summary %}
+    <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ summary.artifact_id }}/download">Unduh ringkasan PDF</a>
     {% endif %}
+    {% if pack %}
+    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh arsip lengkap (ZIP)</a>
+    {% endif %}
+    <a class="btn-text" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC ›</a>
   </div>
 </div>
-
-{% for group in groups %}
-<section class="card" aria-labelledby="grp-{{ group.key }}">
-  <h3 id="grp-{{ group.key }}">{{ group.title }}</h3>
-  <ul class="file-list">
-    {% for a in group.files %}
-    <li class="file-chip">
-      <span><b>{{ a.type | human("artifact") }}</b><br><span class="meta">{{ (a.size_bytes / 1024) | round(1) }} KB · terverifikasi</span></span>
-      <a class="link" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ a.artifact_id }}/download">Unduh</a>
-    </li>
-    {% endfor %}
-  </ul>
-</section>
-{% endfor %}
 
 <div class="actions">
   <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan ›</a>

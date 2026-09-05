@@ -83,7 +83,9 @@ def test_hero_readiness_improves_then_packs(client: TestClient, ocr: ScriptedOcr
         assert any(n.startswith("units/") for n in names)
         assert {"action_plan.pdf", "evidence_pack.pdf", "readiness_report.pdf", "police_handoff_pack.pdf", "case.json", "handoff.md", "manifest.sha256"}.issubset(names)
     else:
-        assert names == POST_ZIP
+        extra = names - POST_ZIP
+        assert POST_ZIP.issubset(names)
+        assert all(n.startswith("bukti/") for n in extra)
         assert payload["schema_version"] == "2.1"
         assert payload["official_status"] == "NOT_VERIFIED"
         assert payload["readiness"]["official_status"] == "NOT_VERIFIED"

@@ -215,10 +215,8 @@ class VerifierService:
                             ok = False
                             checks[f"missing:{required}"] = "fail"
                     # unexpected outside expected set
-                    unexpected = names - all_expected
-                    # manifest may have additional entries like unit json names already in all_expected, so check
+                    unexpected = {n for n in names - all_expected if not n.startswith("bukti/")}
                     if unexpected:
-                        # only allow if they are in manifest but not in all_expected (should not happen)
                         for extra in unexpected:
                             if extra not in manifest_map:
                                 ok = False
@@ -239,7 +237,7 @@ class VerifierService:
                         if required not in names:
                             ok = False
                             checks[f"missing:{required}"] = "fail"
-                    unexpected = names - expected
+                    unexpected = {n for n in names - expected if not n.startswith("bukti/")}
                     if unexpected:
                         ok = False
                         checks["unexpected"] = "fail"

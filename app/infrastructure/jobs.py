@@ -59,7 +59,7 @@ class JobQueue:
 
     def finish(self, job_id: str, result: dict[str, object], ok: bool) -> None:
         row = self.session.get(JobRow, job_id)
-        if row is None:
+        if row is None or row.status not in {"running", "pending"}:
             return
         row.status = "done" if ok else "failed"
         row.result_json = json.dumps(result)
@@ -68,11 +68,29 @@ class JobQueue:
     def stale_running(self) -> list[JobRow]:
         return list(self.session.scalars(select(JobRow).where(JobRow.status == "running")))
 
-    def recover_stale(self) -> int:
+    def recover_stale(self, *, max_attempts: int = 3, lease_seconds: int = 600) -> int:
+        from datetime import datetime, timedelta
+
+        from app.services.cases import now_utc as _now
+
         rows = self.stale_running()
         count = 0
+        now = _now()
         for row in rows:
-            row.status = "pending"
+            started = row.started_at
+            if started is not None:
+                if isinstance(started, datetime):
+                    age = now - started
+                else:
+                    age = timedelta(seconds=lease_seconds + 1)
+                if age.total_seconds() < lease_seconds:
+                    continue
+            if int(row.attempts or 0) >= max_attempts:
+                row.status = "failed"
+                row.result_json = json.dumps({"error": "attempt_budget"})
+                row.finished_at = now
+            else:
+                row.status = "pending"
             count += 1
         return count
 

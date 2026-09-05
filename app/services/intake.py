@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 from io import BytesIO
+from typing import Any
 
 from PIL import Image, ImageFile
 from pypdf import PdfReader
@@ -61,13 +62,27 @@ def pdf_page_count(data: bytes) -> int:
         raise InvalidFileType("PDF tidak bisa dibaca") from None
 
 
+async def read_upload_limited(upload: Any, max_bytes: int) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    while True:
+        piece = await upload.read(65536)
+        if not piece:
+            break
+        total += len(piece)
+        if total > max_bytes:
+            raise UploadLimitExceeded("ukuran unggahan melebihi 25 MB")
+        chunks.append(piece)
+    return b"".join(chunks)
+
+
 def check_image_pixels(data: bytes, max_pixels: int) -> None:
     try:
         with Image.open(BytesIO(data)) as image:
-            image.load()
-            pixels = image.width * image.height
+            pixels = int(image.width) * int(image.height)
             if pixels > max_pixels:
                 raise InvalidFileType("gambar melebihi batas piksel")
+            image.verify()
     except InvalidFileType:
         raise
     except (OSError, ValueError, Image.DecompressionBombError):

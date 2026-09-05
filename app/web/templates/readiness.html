@@ -19,11 +19,11 @@
 <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
   <div class="tx-top">
     <h3>Transaksi {{ tx.n }}</h3>
-    {% if tx.ready %}
-    <span class="badge ok">✓ Siap</span>
-    {% else %}
-    <span class="badge err">Perlu dilengkapi</span>
-    {% endif %}
+     {% if tx.ready %}
+     <span class="badge ok">Dokumen dapat dibuat</span>
+     {% else %}
+     <span class="badge err">Perlu dilengkapi</span>
+     {% endif %}
   </div>
   {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
   {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
@@ -83,11 +83,12 @@
 </div>
 {% endif %}
 
+<p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 {% if not gap_tasks %}
 <div class="actions">
   <a class="btn ember" href="{{ primary.href }}">{{ primary.label }}</a>
   {% if ready_count %}
-  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Buka ruang persiapan ›</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
   {% endif %}
 </div>
 {% endif %}

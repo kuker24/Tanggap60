@@ -28,7 +28,7 @@
   {% endfor %}
 {% endif %}
 
-<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" novalidate>
+<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" data-default-tab="{% if before %}text{% else %}files{% endif %}" novalidate>
   <div class="intake-tabs" role="tablist" aria-label="Cara kirim bukti">
     <button type="button" role="tab" id="tab-files" data-tab="files" aria-selected="true" aria-controls="panel-files">Foto/File</button>
     <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Tempel Chat</button>
@@ -57,29 +57,29 @@
       {% endfor %}
     </div>
     {% endif %}
+    {% if evidence %}
     <div class="actions">
-      <button class="btn ember" type="button" id="pick-files">Pilih foto atau file</button>
-      {% if evidence %}
       <button class="btn-text" type="button" id="add-more">Tambah foto atau file lagi ›</button>
-      {% endif %}
     </div>
+    {% endif %}
   </div>
 
   <div class="coach-step" data-step="text" id="panel-text" role="tabpanel" aria-labelledby="tab-text" data-guide-id="case-story">
-    <label for="text">Tempel percakapan{% if before %} yang mencurigakan{% endif %} <span class="opt">(boleh kosong)</span></label>
+    <label for="text">Tempel percakapan{% if before %} yang mencurigakan{% endif %}</label>
     <div class="field">
       <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer ke rekening ini, bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
     </div>
   </div>
 
   <div class="coach-step" data-step="url" id="panel-url" role="tabpanel" aria-labelledby="tab-url">
-    <label for="url">Masukkan link terkait <span class="opt">(boleh kosong)</span></label>
+    <label for="url">Masukkan link terkait</label>
     <div class="field">
       <input id="url" name="url" type="url" placeholder="Contoh: https://toko-contoh.com/barang-abc" inputmode="url" autocomplete="url">
       <p class="help">Link toko, akun pelaku, atau bukti online lainnya.</p>
     </div>
   </div>
 
+  <p class="muted small">Isi salah satu pilihan untuk mulai. Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
   <div class="sticky-cta">
     <button class="btn ember" type="submit" id="submit-intake">Periksa bukti</button>
   </div>

@@ -23,13 +23,15 @@ from app.infrastructure.repositories import (
 )
 from app.infrastructure.storage import CaseStorage
 from app.services.cases import CaseService, now_utc
+from app.services.extraction import OcrPort
 
 
 class PurgeService:
-    def __init__(self, session: Session, cases: CaseService, storage: CaseStorage) -> None:
+    def __init__(self, session: Session, cases: CaseService, storage: CaseStorage, ocr: OcrPort | None = None) -> None:
         self.session = session
         self.cases = cases
         self.storage = storage
+        self.ocr = ocr
         self.case_repo = CaseRepository(session)
         self.evidence = EvidenceRepository(session)
         self.facts = FactRepository(session)
@@ -64,6 +66,9 @@ class PurgeService:
         return count
 
     def _wipe(self, case_id: str) -> None:
+        clearer = getattr(self.ocr, "clear_cache", None)
+        if callable(clearer):
+            clearer()
         self.storage.purge_case(case_id)
         self.derived.delete_for_case(case_id)
         self.evidence.delete_for_case(case_id)

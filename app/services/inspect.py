@@ -71,12 +71,18 @@ class InspectService:
 
     def inspect_evidence(self, case_id: str) -> dict[str, object]:
         items = self.evidence.list_for_case(case_id)
-        results: list[dict[str, object]] = []
-        ocr_total_ms = 0
+        pending: list[tuple[object, bytes]] = []
         for item in items:
             if item.status != EvidenceStatus.ACCEPTED:
                 continue
-            data = self.storage.read_bytes(case_id, item.storage_key)
+            pending.append((item, self.storage.read_bytes(case_id, item.storage_key)))
+        self.session.commit()
+        results: list[dict[str, object]] = []
+        ocr_total_ms = 0
+        clearer = getattr(self.ocr, "clear_cache", None)
+        if callable(clearer):
+            clearer()
+        for item, data in pending:
             pages: list[PageText] = []
             warning = None
             try:
@@ -84,10 +90,13 @@ class InspectService:
                     pages = [PageText(page=1, text=extract_plain(data))]
                 elif item.mime == "application/pdf":
                     pages = extract_pdf_pages(data)
-                    if not any(page.text for page in pages):
-                        by_page: dict[int, list[str]] = {}
-                        boxes_by: dict[int, list[tuple[str, int, int, int, int]]] = {}
-                        for page_no, image_bytes in iter_pdf_images(data):
+                    images_by: dict[int, list[bytes]] = {}
+                    for page_no, image_bytes in iter_pdf_images(data):
+                        images_by.setdefault(page_no, []).append(image_bytes)
+                    for page in pages:
+                        if page.text.strip():
+                            continue
+                        for image_bytes in images_by.get(page.page, []):
                             try:
                                 ocr_start = time.perf_counter()
                                 text = self.ocr.recognize(image_bytes)
@@ -95,24 +104,15 @@ class InspectService:
                             except Exception:
                                 text = ""
                             if text:
-                                by_page.setdefault(page_no, []).append(text)
+                                page.text = ((page.text + "\n") if page.text else "") + text
                             recognize_boxes = getattr(self.ocr, "recognize_boxes", None)
                             if callable(recognize_boxes):
                                 try:
-                                    boxes_by.setdefault(page_no, []).extend(list(recognize_boxes(image_bytes)))
+                                    page.boxes.extend(list(recognize_boxes(image_bytes)))
                                 except Exception:
                                     pass
-                        if by_page:
-                            pages = [
-                                PageText(
-                                    page=num,
-                                    text="\n".join(by_page[num]),
-                                    boxes=boxes_by.get(num, []),
-                                )
-                                for num in sorted(by_page)
-                            ]
-                        else:
-                            warning = "MANUAL_REVIEW_REQUIRED"
+                    if not any(page.text for page in pages):
+                        warning = "MANUAL_REVIEW_REQUIRED"
                 else:
                     try:
                         ocr_start = time.perf_counter()
@@ -176,6 +176,7 @@ class InspectService:
             pages = decode_pages(self.storage.read_bytes(case_id, derived[0].storage_key))
             text_all = "\n".join(page.text for page in pages)
             lowered = text_all.lower()
+            self.session.commit()
             if any(marker in lowered for marker in INJECTION_MARKERS):
                 fact = FactRecord(
                     fact_id=new_id("fact"),
@@ -195,7 +196,7 @@ class InspectService:
                 created += 1
                 continue
             m_start = time.perf_counter()
-            extras = extract_with_model(text_all, self.settings)
+            extras = extract_with_model(text_all, self.settings) if self.settings.model_api_key else []
             model_total_ms += int((time.perf_counter() - m_start) * 1000)
             if extras:
                 used_model = True

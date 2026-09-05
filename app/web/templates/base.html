@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/agent.css?v={{ asset_v }}">
 </head>
-<body class="{% block body_mod %}{% endblock %}">
+<body class="{% block body_mod %}{% endblock %}"{% if case is defined %} data-case-id="{{ case.case_id }}"{% endif %}>
   <!--
     THESIS: Satu dunia terang-tenang dari beranda sampai paket; korban hanya melihat keputusan yang perlu diambil.
     OWN-WORLD: Warm paper #faf7f1, tinta #1c1917, amber komitmen #92400e, hijau khusus siap, merah khusus blokir, biru khusus fokus.
@@ -31,13 +31,15 @@
         <img class="logomark" src="/static/favicon.svg?v={{ asset_v }}" width="32" height="32" alt="">
         <span class="brand-copy">
           <strong>Tanggap60</strong>
-          <span class="sub">SatuAman</span>
         </span>
       </a>
       {% if case is defined %}
-      <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Isi di halaman ini ikut terhapus dan tidak bisa dikembalikan.')">
-        <button class="btn-text" type="submit">Kasus baru</button>
-      </form>
+      <div class="top-actions">
+        {% include "_agent_chat.html" %}
+        <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Isi di halaman ini ikut terhapus dan tidak bisa dikembalikan.')">
+          <button class="btn-text" type="submit">Kasus baru</button>
+        </form>
+      </div>
       {% endif %}
     </div>
     {% block stepper %}{% endblock %}
@@ -49,10 +51,18 @@
 
   <footer class="foot">
     <span>Tanggap60 hanya menyusun. Laporan dikirim oleh Anda ke bank, IASC, atau polisi.</span>
+    {% if case is defined %}
+    <details class="tech-lite kelola-data">
+      <summary>Kelola data</summary>
+      <p class="muted small">Mode {{ case.mode.value }}. Data kedaluwarsa {{ case.expires_at }}.</p>
+      <form method="post" action="#" onsubmit="return window.t60Purge(event)">
+        <button class="btn-text" type="submit">Hapus permanen</button>
+      </form>
+    </details>
+    {% endif %}
   </footer>
 
   <div id="toast" role="status" aria-live="polite"></div>
-  {% if case is defined %}{% include "_agent_chat.html" %}{% endif %}
   <script src="/static/app.js?v={{ asset_v }}"></script>
   {% if case is defined %}<script src="/static/agent.js?v={{ asset_v }}"></script>{% endif %}
 </body>

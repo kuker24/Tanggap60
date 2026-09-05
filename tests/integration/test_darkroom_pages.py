@@ -14,8 +14,8 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "is-landing" in home.text
     assert "c1-container" in home.text
     assert "c1-card" in home.text
-    assert "Saya sudah kirim uang" in home.text
-    assert "Saya baru curiga, belum kirim uang" in home.text
+    assert "Sudah kirim uang" in home.text
+    assert "Belum kirim uang" in home.text
     assert "choice-arrow" not in home.text
     assert "cheerful cartoon" not in home.text
     case_id = create_case(client)

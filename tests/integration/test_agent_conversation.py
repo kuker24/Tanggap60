@@ -330,7 +330,7 @@ def test_core_ui_works_without_chat(client: TestClient, ocr: ScriptedOcr) -> Non
     case_id = _agent_case(client, ocr)
     page = client.get(f"/cases/{case_id}/review")
     assert page.status_code == 200
-    assert "Tanya AI" in page.text  # panel tersedia tetapi opsional
+    assert "Bantu saya" in page.text
     ws = client.get(f"/cases/{case_id}/workspace")
     assert ws.status_code == 200
     assert "Yang Tanggap60 siapkan" in ws.text

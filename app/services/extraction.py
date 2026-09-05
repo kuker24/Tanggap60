@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from io import BytesIO
 from typing import Protocol
@@ -25,8 +26,14 @@ class OcrPort(Protocol):
 
 
 class TesseractOcr:
+    _MAX_CACHE = 32
+    _TTL_SECONDS = 600
+
     def __init__(self) -> None:
-        self._cache: dict[str, tuple[str, list[tuple[str, int, int, int, int]]]] = {}
+        self._cache: dict[str, tuple[str, list[tuple[str, int, int, int, int]], float]] = {}
+
+    def clear_cache(self) -> None:
+        self._cache.clear()
 
     def recognize(self, image_bytes: bytes) -> str:
         return self._run(image_bytes)[0]
@@ -37,8 +44,8 @@ class TesseractOcr:
     def _run(self, image_bytes: bytes) -> tuple[str, list[tuple[str, int, int, int, int]]]:
         digest = sha256_bytes(image_bytes)
         cached = self._cache.get(digest)
-        if cached is not None:
-            return cached
+        if cached is not None and (time.monotonic() - cached[2]) < self._TTL_SECONDS:
+            return cached[0], cached[1]
         try:
             import pytesseract
         except ImportError as exc:
@@ -66,13 +73,19 @@ class TesseractOcr:
                 )
             )
         result = (" ".join(words).strip(), boxes)
-        self._cache[digest] = result
+        if len(self._cache) >= self._MAX_CACHE:
+            oldest = next(iter(self._cache))
+            self._cache.pop(oldest, None)
+        self._cache[digest] = (result[0], result[1], time.monotonic())
         return result
 
 
 class NullOcr:
     def recognize(self, image_bytes: bytes) -> str:
         raise EvidenceParseFailed("ocr disabled")
+
+    def clear_cache(self) -> None:
+        return None
 
 
 def extract_pdf_pages(data: bytes) -> list[PageText]:

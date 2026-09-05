@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi import APIRouter, Form, Request
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
 from app.api.helpers import artifact_public, case_summary, conflict_public, evidence_public, fact_public
@@ -13,7 +13,6 @@ from app.domain.states import DeclaredCondition, Mode, State
 from app.infrastructure.repositories import (
     ActionRepository,
     ArtifactRepository,
-    CaseRepository,
     ConflictRepository,
     EvidenceRepository,
     FactRepository,
@@ -94,7 +93,7 @@ def _primary_cta(
     if needs_evidence:
         return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
     if ready_count:
-        return {"label": "Buat dokumen", "href": f"/cases/{case_id}/approval"}
+        return {"label": "Setujui dan buat paket", "href": f"/cases/{case_id}/approval"}
     return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
 
 
@@ -180,7 +179,7 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
                 "title": "Siapkan dokumen",
                 "points": dokumen[:3],
                 "href": f"/cases/{case_id}/approval",
-                "cta": "Buat dokumen",
+                "cta": "Setujui dan buat paket",
             }
         )
     return tasks[:3]
@@ -230,12 +229,6 @@ def _pairing_cards(db, case_id: str) -> list[dict]:
     return cards
 
 
-_ID_MONTHS = {
-    1: "Januari", 2: "Februari", 3: "Maret", 4: "April", 5: "Mei", 6: "Juni",
-    7: "Juli", 8: "Agustus", 9: "September", 10: "Oktober", 11: "November", 12: "Desember",
-}
-
-
 def _format_rupiah(value: float | int | str | None) -> str:
     if value is None or value == "":
         return ""
@@ -260,16 +253,12 @@ def _mask_account(raw: object) -> str:
 
 
 def _format_when(value: object) -> str:
-    text = str(value or "").strip()
-    if not text:
-        return ""
-    try:
-        from datetime import datetime
+    from app.domain.policies import format_when
 
-        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
-        return f"{dt.day} {_ID_MONTHS.get(dt.month, '')} {dt.year} · {dt.hour:02d}:{dt.minute:02d}".strip()
-    except (ValueError, TypeError):
-        return text
+    date, time = format_when(str(value or "").strip() or None)
+    if date and time:
+        return f"{date} · {time}"
+    return date or str(value or "").strip()
 
 
 def _tx_summaries(db, case_id: str, evidence_names: dict[str, str]) -> list[dict]:
@@ -367,7 +356,9 @@ async def intake_submit(case_id: str, request: Request):
     try:
         for upload in files:
             if getattr(upload, "filename", None):
-                data = await upload.read()  # type: ignore[union-attr]
+                from app.services.intake import read_upload_limited
+
+                data = await read_upload_limited(upload, request.app.state.container.settings.max_upload_bytes)
                 if data:
                     intake.upload_bytes(case_id, _sid(request), upload.filename, data)  # type: ignore[union-attr]
         if text:
@@ -388,14 +379,9 @@ async def intake_submit(case_id: str, request: Request):
             notice="file-gagal",
             notice_text=_friendly_file_error(exc.message),
         )
-    # Explicit action trigger (POST): start the pipeline here so that
-    # GET /processing stays a pure, refresh-safe state render.
-    try:
-        from app.api.router import _kick_orchestrator
+    from app.api.router import _kick_orchestrator
 
-        _kick_orchestrator(request, case_id)
-    except Exception:
-        pass
+    _kick_orchestrator(request, case_id)
     return RedirectResponse(f"/cases/{case_id}/processing", status_code=303)
 
 
@@ -406,6 +392,47 @@ def delete_evidence_web(case_id: str, evidence_id: str, request: Request):
     except AppError:
         return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
     return RedirectResponse(f"/cases/{case_id}/intake", status_code=303)
+
+
+@web.get("/cases/{case_id}/evidence/{evidence_id}/preview")
+def evidence_preview(case_id: str, evidence_id: str, request: Request):
+    _svc(request)["cases"].get_owned(case_id, _sid(request))
+    item = EvidenceRepository(request.state.db).get(evidence_id)
+    if item.case_id != case_id:
+        from app.domain.errors import NotFound
+
+        raise NotFound("bukti tidak ditemukan")
+    data = request.app.state.container.storage.read_bytes(case_id, item.storage_key)
+    return Response(content=data, media_type=item.mime, headers={"Content-Disposition": "inline"})
+
+
+@web.post("/cases/{case_id}/condition")
+def confirm_condition(case_id: str, request: Request, declared_condition: str = Form(...)):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    if declared_condition not in {"AFTER_LOSS", "BEFORE_LOSS"}:
+        return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+    case.declared_condition = DeclaredCondition(declared_condition)
+    case.ask_loss_question = False
+    _svc(request)["cases"].touch(case)
+    _svc(request)["inspect"].validate_case_facts(case_id)
+    return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+
+
+@web.post("/cases/{case_id}/facts/manual")
+def add_manual_fact_web(
+    case_id: str,
+    request: Request,
+    fact_type: str = Form(...),
+    value: str = Form(...),
+    expected_version: str = Form("0"),
+):
+    try:
+        _svc(request)["review"].add_manual_fact(
+            case_id, _sid(request), fact_type, value, int(expected_version or 0)
+        )
+    except AppError:
+        return RedirectResponse(f"/cases/{case_id}/review?notice=manual-gagal", status_code=303)
+    return RedirectResponse(f"/cases/{case_id}/review?notice=manual-ok", status_code=303)
 
 
 @web.post("/cases/{case_id}/baru")
@@ -443,14 +470,9 @@ def review(case_id: str, request: Request):
     blocking = [c for c in conflicts_pub if c["severity"] == "BLOCKING" and c["status"] == "OPEN"]
     blocking_ids = {fid for c in blocking for fid in c["fact_ids"]}
     visible = []
-    seen_keys: set[tuple[str, str]] = set()
     for f in facts_pub:
         if f["review_status"] == "REJECTED" or (blocking and f["fact_id"] in blocking_ids):
             continue
-        key = (str(f["type"]), str(f.get("normalized_value") or f["raw_value"]))
-        if key in seen_keys:
-            continue
-        seen_keys.add(key)
         visible.append(f)
     return _case_page(
         request,
@@ -471,6 +493,7 @@ def review(case_id: str, request: Request):
         ),
         notice=request.query_params.get("notice", ""),
         pairing_key=new_id("pair"),
+        evidence_kinds={e.evidence_id: e.kind.value for e in evidence},
     )
 
 
@@ -527,23 +550,6 @@ def readiness_page(case_id: str, request: Request):
     from app.services.next_action import next_action_to_dict, recommend_next_action
     from app.services.readiness import assess_units
     from app.services.reporting_units import compile_reporting_units
-
-    try:
-        if case.state == State.REVIEW_REQUIRED:
-            _svc(request)["inspect"].validate_case_facts(case_id)
-            case = CaseRepository(request.state.db).get(case_id)
-        if case.state == State.READY_FOR_ACTION:
-            from app.api.router import _kick_orchestrator
-            from app.infrastructure.jobs import JobQueue
-
-            # Refresh-safe: never enqueue a duplicate orchestrate job while
-            # one is still pending/running for this case.
-            jobs = JobQueue(request.state.db).list_for_case(case_id)
-            if not any(j.kind == "orchestrate" and j.status in {"pending", "running"} for j in jobs):
-                _kick_orchestrator(request, case_id)
-            case = CaseRepository(request.state.db).get(case_id)
-    except Exception:
-        case = CaseRepository(request.state.db).get(case_id)
 
     facts = FactRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -666,27 +672,10 @@ def readiness_page(case_id: str, request: Request):
 @web.get("/cases/{case_id}/result")
 def result(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
-    try:
-        if case.state == State.REVIEW_REQUIRED:
-            _svc(request)["inspect"].validate_case_facts(case_id)
-            case = CaseRepository(request.state.db).get(case_id)
-        if case.state == State.REVIEW_REQUIRED:
-            return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
-        if case.route.value != "PRE_INCIDENT_CHECK":
-            # Post-incident plan lives on the rescue dashboard now.
-            return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
-        if case.state == State.READY_FOR_ACTION:
-            from app.api.router import _kick_orchestrator
-            from app.infrastructure.jobs import JobQueue
-
-            # Refresh-safe: never enqueue a duplicate orchestrate job while
-            # one is still pending/running for this case.
-            jobs = JobQueue(request.state.db).list_for_case(case_id)
-            if not any(j.kind == "orchestrate" and j.status in {"pending", "running"} for j in jobs):
-                _kick_orchestrator(request, case_id)
-            case = CaseRepository(request.state.db).get(case_id)
-    except Exception:
-        case = CaseRepository(request.state.db).get(case_id)
+    if case.state == State.REVIEW_REQUIRED:
+        return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+    if case.route.value != "PRE_INCIDENT_CHECK":
+        return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
     actions = ActionRepository(request.state.db).list_for_case(case_id)
     digest = ""
     try:
@@ -705,6 +694,28 @@ def approval_page(case_id: str, request: Request):
     ambiguous = any(str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS" for u in _case_units(request.state.db, case_id))
     evidence_names = {e.evidence_id: e.original_name_display for e in EvidenceRepository(request.state.db).list_for_case(case_id)}
     scope_units = _tx_summaries(request.state.db, case_id, evidence_names)
+    docs_by: dict[str, str] = {}
+    try:
+        from app.services.readiness import assess_units
+        from app.services.reporting_units import compile_reporting_units
+
+        facts = FactRepository(request.state.db).list_for_case(case_id)
+        evidence_rows = EvidenceRepository(request.state.db).list_for_case(case_id)
+        mappings = UnitMappingRepository(request.state.db).list_for_case(case_id)
+        decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
+        units = compile_reporting_units(case_id, facts, evidence_rows, decs if decs else None)
+        report = assess_units(case_id=case_id, units=units, facts=facts, evidence=evidence_rows, conflicts=conflicts, route=case.route)
+        for uid, channels in (report.get("readiness_by_unit") or {}).items():
+            labels = []
+            if channels.get("BANK_PJP") == "READY":
+                labels.append("Lembar Bank")
+            if channels.get("IASC") == "READY":
+                labels.append("Lembar IASC")
+            docs_by[uid] = ", ".join(labels) if labels else "Belum ada lembar yang siap"
+    except Exception:
+        docs_by = {}
+    for tx in scope_units:
+        tx["docs"] = docs_by.get(tx["unit_id"], "Belum ada lembar yang siap")
     pending: list[str] = []
     for u in _case_units(request.state.db, case_id):
         if str(getattr(u.mapping_status, "value", u.mapping_status)) == "AMBIGUOUS":
@@ -773,28 +784,23 @@ def artifacts_page(case_id: str, request: Request):
     items = ArtifactRepository(request.state.db).list_for_case(case_id)
     url = request.app.state.container.settings.official_iasc_url
     pub = [artifact_public(a) for a in items]
-    roles = [
-        ("bank", "Untuk bank", {"BANK_HANDOFF_PACK", "UNIT_BANK_PACK"}),
-        ("iasc", "Untuk IASC", {"IASC_HANDOFF_PACK", "UNIT_IASC_PACK"}),
-        ("police", "Ringkasan seluruh kejadian", {"POLICE_HANDOFF_PACK", "ACTION_PLAN"}),
-        ("brief", "Ringkasan & cek", {"VERIFICATION_BRIEF", "READINESS_REPORT", "CHECKLIST", "EVIDENCE_PACK"}),
-    ]
-    groups = []
-    used: set[str] = set()
-    for key, title, types in roles:
-        members = [a for a in pub if a["type"] in types and a["downloadable"]]
-        for a in members:
-            used.add(a["artifact_id"])
-        if members:
-            groups.append({"key": key, "title": title, "files": members})
-    rest = [a for a in pub if a["artifact_id"] not in used]
+    summary = next(
+        (
+            a
+            for a in pub
+            if a["type"] in {"ACTION_PLAN", "VERIFICATION_BRIEF", "POLICE_HANDOFF_PACK"} and a["downloadable"]
+        ),
+        None,
+    )
     pack = next((a for a in pub if a["type"] == "CASE_ZIP" and a["downloadable"]), None)
+    primary_ids = {a["artifact_id"] for a in (summary, pack) if a}
+    rest = [a for a in pub if a["artifact_id"] not in primary_ids]
     return _case_page(
         request,
         "artifacts.html",
         case,
         artifacts=pub,
-        groups=groups,
+        summary=summary,
         rest=rest,
         pack=pack,
         official_url=url,

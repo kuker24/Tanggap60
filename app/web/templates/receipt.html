@@ -10,12 +10,34 @@
 <div class="card">
   <h3>Sudah tercatat</h3>
   <p class="ticket-value">{{ receipt.ticket_value_masked }}</p>
-  <p class="muted small">Hanya Anda yang bisa lihat ini. Nomor aslinya tetap ada di bank, IASC, atau polisi.</p>
-  <div class="actions">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/artifacts">Kembali ke paket</a>
-    <a class="btn-text" href="/">Selesai, ke beranda ›</a>
-  </div>
+  <p class="muted small">Ini catatan lokal yang disamarkan, bukan pelacak resmi. Status resmi tetap di situs mereka.</p>
+  <form id="rcpt-fix" class="stack" novalidate>
+    <label for="ticket-fix">Ubah catatan nomor</label>
+    <input id="ticket-fix" name="ticket_text" type="text" placeholder="Nomor baru" autocomplete="off">
+    <div class="actions">
+      <button class="btn ghost" type="submit">Simpan perubahan</button>
+      <a class="btn ember" href="/cases/{{ case.case_id }}/artifacts">Kembali ke paket</a>
+    </div>
+  </form>
 </div>
+<script>
+document.getElementById("rcpt-fix").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const btn = ev.target.querySelector('[type="submit"]');
+  const ticket_text = document.getElementById("ticket-fix").value.trim();
+  if(!ticket_text){ window._alert("purge-alert", "error", "Belum ada nomor", "Isi nomor barunya, atau biarkan catatan lama."); return; }
+  btn.disabled = true;
+  try {
+    const res = await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-fix-{{ case.case_id }}-" + Date.now()},
+      body: JSON.stringify({ticket_text, replace: true})
+    });
+    if(res.ok){ location.reload(); return; }
+  } catch (_) {}
+  btn.disabled = false;
+});
+</script>
 {% else %}
 <form id="rcpt" class="card" data-guide-id="receipt-form" novalidate>
   <label for="ticket">Nomor laporan</label>
@@ -34,15 +56,19 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
   const ticket_text = document.getElementById("ticket").value.trim();
   if(!ticket_text){ window._alert("rcpt-alert", "error", "Belum ada nomor", "Isi dulu nomor laporannya, atau tekan Lewati."); document.getElementById("ticket").focus(); return; }
   btn.disabled = true;
-  const res = await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
-    method: "POST",
-    headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
-    body: JSON.stringify({ticket_text})
-  });
-  if(res.ok){ location.reload(); return; }
+  try {
+    const res = await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
+      method: "POST",
+      headers: {"Content-Type":"application/json","Idempotency-Key":"rcpt-{{ case.case_id }}"},
+      body: JSON.stringify({ticket_text})
+    });
+    if(res.ok){ location.reload(); return; }
+    const j = await res.json().catch(()=>({}));
+    window._alert("rcpt-alert", "error", "Belum tersimpan", (j.message || "Gagal menyimpan") + ". Pilihan Anda masih ada di layar — coba simpan lagi.");
+  } catch (_) {
+    window._alert("rcpt-alert", "error", "Koneksi terputus", "Nomor masih di layar — coba simpan lagi.");
+  }
   btn.disabled = false;
-  const j = await res.json().catch(()=>({}));
-  window._alert("rcpt-alert", "error", "Belum tersimpan", (j.message || "Gagal menyimpan") + ". Pilihan Anda masih ada di layar — coba simpan lagi.");
 });
 </script>
 {% endif %}

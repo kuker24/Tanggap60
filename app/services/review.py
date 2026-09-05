@@ -3,12 +3,13 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 
 from app.domain.errors import NotFound, ValidationFailed
-from app.domain.models import ConflictStatus, FactRecord, ReviewStatus
-from app.domain.policies import normalize_amount
+from app.domain.models import ConflictStatus, Criticality, FactRecord, FactType, ReviewStatus
+from app.domain.policies import normalize_amount, normalize_datetime, sha256_text
 from app.domain.states import State
 from app.infrastructure.repositories import ConflictRepository, FactRepository
 from app.services.approval import ApprovalService
 from app.services.cases import CaseService, now_utc
+from app.services.ids import new_id
 
 
 class ReviewService:
@@ -47,7 +48,12 @@ class ReviewService:
                 raise ValidationFailed("nilai koreksi wajib")
             fact.raw_value = value
             if fact.type.value == "AMOUNT":
-                fact.normalized_value = normalize_amount(value)
+                norm = normalize_amount(value)
+                if not norm:
+                    raise ValidationFailed("format jumlah tidak dikenali")
+                fact.normalized_value = norm
+            elif fact.type.value == "DATETIME":
+                fact.normalized_value = normalize_datetime(value) or value
             else:
                 fact.normalized_value = value
             fact.review_status = ReviewStatus.CORRECTED
@@ -100,6 +106,52 @@ class ReviewService:
                 self.approval.revoke(case_id, session_id, "fact changed")
         else:
             self.cases.touch(case)
+        return fact
+
+    def add_manual_fact(
+        self,
+        case_id: str,
+        session_id: str,
+        fact_type: str,
+        value: str,
+        expected_version: int,
+    ) -> FactRecord:
+        case = self.cases.get_owned(case_id, session_id)
+        if case.version != expected_version:
+            from app.domain.errors import StaleCaseVersion
+
+            raise StaleCaseVersion("versi kasus usang")
+        try:
+            ftype = FactType(fact_type)
+        except ValueError as exc:
+            raise ValidationFailed("tipe data tidak dikenal") from exc
+        raw = value.strip()
+        if not raw:
+            raise ValidationFailed("nilai wajib diisi")
+        if ftype == FactType.AMOUNT:
+            norm = normalize_amount(raw)
+            if not norm:
+                raise ValidationFailed("format jumlah tidak dikenali")
+        elif ftype == FactType.DATETIME:
+            norm = normalize_datetime(raw) or raw
+        else:
+            norm = raw
+        fact = FactRecord(
+            fact_id=new_id("fact"),
+            case_id=case_id,
+            type=ftype,
+            raw_value=raw,
+            normalized_value=norm,
+            criticality=Criticality.CRITICAL if ftype.value in {"AMOUNT", "ACCOUNT", "DATETIME"} else Criticality.IMPORTANT,
+            confidence=1.0,
+            review_status=ReviewStatus.CORRECTED,
+            source_evidence_id="user-entered",
+            source_page=None,
+            source_bbox="USER_ENTERED",
+            source_excerpt_hash=sha256_text(raw),
+        )
+        self.facts.add(fact)
+        self.cases.touch(case)
         return fact
 
     def resolve_conflict(

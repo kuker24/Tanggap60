@@ -2,19 +2,21 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse, urlunparse
 
 from app.domain.models import Criticality, FactType
-from app.domain.policies import normalize_amount, sha256_text
+from app.domain.policies import normalize_amount, normalize_datetime, sha256_text
 from app.services.extraction import locator_for
 
-AMOUNT_RE = re.compile(r"Rp\s?[\d.]+", re.IGNORECASE)
+AMOUNT_RE = re.compile(r"Rp\.?\s*\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?", re.IGNORECASE)
 ACCOUNT_RE = re.compile(r"\b(?:DEMO-(?:DEST|VICTIM)-[A-Z0-9-]+|\d{8,18})\b")
 MONTHS = (
     r"(?:January|February|March|April|May|June|July|August|September|October|November|December|"
     r"Januari|Februari|Maret|April|Mei|Juni|Juli|Agustus|September|Oktober|November|Desember)"
 )
 DATE_RE = re.compile(
-    rf"\b\d{{1,2}}\s+{MONTHS}\s+20\d{{2}}(?:\s+\d{{1,2}}[:.]\d{{2}}(?:\s*WIB)?)?\b",
+    rf"\b(?:\d{{1,2}}\s+{MONTHS}\s+20\d{{2}}(?:\s+\d{{1,2}}[:.]\d{{2}}(?:\s*(?:WIB|WITA|WIT))?)?|"
+    rf"\d{{1,2}}/\d{{1,2}}/20\d{{2}}(?:\s+\d{{1,2}}[:.]\d{{2}})?)\b",
     re.IGNORECASE,
 )
 PHONE_RE = re.compile(r"\b(?:\+62|08)\d{8,13}\b")
@@ -62,8 +64,12 @@ def extract_candidates(
                 locator=locator_for(raw, page, match.start(), match.end(), box_list),
             )
         )
+    phone_spans = [(m.start(), m.end(), m.group(0)) for m in PHONE_RE.finditer(text)]
+    phone_values = {span[2] for span in phone_spans}
     for match in ACCOUNT_RE.finditer(text):
         raw = match.group(0)
+        if raw in phone_values or PHONE_RE.fullmatch(raw):
+            continue
         criticality = (
             Criticality.CRITICAL if raw.startswith("DEMO-DEST") or raw.startswith("DEMO-VICTIM") else Criticality.IMPORTANT
         )
@@ -85,7 +91,7 @@ def extract_candidates(
             CandidateFact(
                 type=FactType.DATETIME,
                 raw_value=raw,
-                normalized_value=_normalize_demo_datetime(raw),
+                normalized_value=normalize_datetime(raw) or raw,
                 criticality=Criticality.CRITICAL,
                 confidence=0.86,
                 excerpt=text[max(0, match.start() - 20) : match.end() + 20],
@@ -113,7 +119,7 @@ def extract_candidates(
             CandidateFact(
                 type=FactType.URL,
                 raw_value=raw,
-                normalized_value=raw.lower(),
+                normalized_value=_normalize_url(raw),
                 criticality=Criticality.IMPORTANT,
                 confidence=0.8,
                 excerpt=text[max(0, match.start() - 20) : match.end() + 20],
@@ -140,10 +146,24 @@ def extract_candidates(
     return _dedupe(found)
 
 
-def _normalize_demo_datetime(raw: str) -> str:
-    if "08:42" in raw or "08.42" in raw:
-        return "2026-09-23T01:42:00Z"
-    return raw
+def _normalize_url(raw: str) -> str:
+    parsed = urlparse(raw)
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return raw
+    netloc = host
+    try:
+        port = parsed.port
+    except ValueError:
+        return raw
+    if port:
+        netloc = f"{host}:{port}"
+    if parsed.username:
+        user = parsed.username
+        if parsed.password:
+            user = f"{user}:{parsed.password}"
+        netloc = f"{user}@{netloc}"
+    return urlunparse((parsed.scheme.lower(), netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
 
 
 def _dedupe(items: list[CandidateFact]) -> list[CandidateFact]:
