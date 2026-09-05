@@ -613,18 +613,18 @@ def _next_action_text(context: dict[str, Any], observation: dict[str, Any] | Non
     unit = next((u for u in context["units"] if u["unit_id"] == target), None)
     who = f" {_unit_label(unit)}." if unit else "."
     mapping = {
-        "CONTACT_BANK_PJP": f"Ada transaksi yang banknya sudah siap{who} Hubungi bank lewat kanal resmi sekarang — tidak perlu menunggu transaksi lain.",
-        "PREPARE_IASC_UNIT": f"Ada transaksi yang siap dilaporkan{who} Siapkan datanya, lalu buka portal resmi IASC.",
+        "CONTACT_BANK_PJP": f"Ada transaksi yang banknya sudah siap{who} Hubungi bank lewat situs resmi sekarang. Tidak perlu menunggu transaksi lain.",
+        "PREPARE_IASC_UNIT": f"Ada transaksi yang siap dilaporkan{who} Siapkan datanya, lalu buka situs resmi IASC.",
         "RESOLVE_CONFLICT": "Ada data yang saling bertentangan. Pilih yang benar supaya paketnya akurat — saya tandai bagian itu.",
         "RESOLVE_UNIT_MAPPING": f"Ada transaksi yang belum terpasang{who} Pilih pasangan jumlah uang, rekening, dan waktu yang benar.",
         "CONFIRM_TRANSACTION_AMOUNT": f"Jumlah uang {who} belum jelas. Konfirmasi nominal yang sesuai bukti.",
         "CONFIRM_TRANSACTION_TIME": f"Waktu transfer {who} belum jelas. Konfirmasi waktunya.",
         "CONFIRM_DESTINATION": f"Rekening tujuan {who} belum jelas. Konfirmasi rekeningnya.",
         "ADD_TRANSFER_EVIDENCE": "Tambah bukti transfer yang memuat jumlah uang, rekening, dan waktu.",
-        "PREPARE_POLICE_INCIDENT": "Setelah urusan bank, siapkan kronologi untuk kanal resmi kepolisian.",
+        "PREPARE_POLICE_INCIDENT": "Setelah urusan bank, siapkan kronologi untuk situs resmi kepolisian.",
         "APPROVE_READY_UNIT": "Ada transaksi menunggu persetujuan Anda untuk dibuatkan paket terverifikasi.",
         "DOWNLOAD_VERIFIED_PACK": "Semua unit sudah diproses. Unduh paket terverifikasi lalu lakukan handoff manual.",
-        "OPEN_IASC_HANDOFF": "Buka portal resmi IASC dan isi datanya sendiri. Saya sudah menyiapkan ringkasannya.",
+        "OPEN_IASC_HANDOFF": "Buka situs resmi IASC dan isi datanya sendiri. Saya sudah menyiapkan ringkasannya.",
         "RECORD_RECEIPT": "Catat nomor laporan resmi bila sudah ada.",
     }
     return mapping.get(str(code or ""), action.get("reason") or "Mari periksa kondisi kasus Anda langkah demi langkah.")
@@ -640,9 +640,9 @@ def _guide_for_action(context: dict[str, Any], observation: dict[str, Any] | Non
     mapping = {
         "RESOLVE_CONFLICT": ("review-facts", "Selesaikan di sini"),
         "RESOLVE_UNIT_MAPPING": ("confirm-mapping", "Pasangkan di sini"),
-        "APPROVE_READY_UNIT": ("approve-package", "Setujui di sini"),
+        "APPROVE_READY_UNIT": ("approve-package", "Buat paket di sini"),
         "DOWNLOAD_VERIFIED_PACK": ("approve-package", "Unduh di sini"),
-        "OPEN_IASC_HANDOFF": ("official-handoff", "Buka portal resmi"),
+        "OPEN_IASC_HANDOFF": ("official-handoff", "Buka situs resmi"),
         "ADD_TRANSFER_EVIDENCE": ("upload-evidence", "Tambah bukti di sini"),
     }
     if code in mapping:
@@ -771,7 +771,7 @@ def _handle_readiness(intent: Intent, context: dict[str, Any], runner: _Runner, 
     if overall == "READY":
         return (
             "Semuanya siap. Tinggal persetujuan Anda untuk dibuatkan paket.",
-            _guide("approve-package", "Setujui di sini", set(context["unit_ids"])),
+            _guide("approve-package", "Buat paket di sini", set(context["unit_ids"])),
             None,
         )
     return _handle_missing(intent, context, runner, ui)
@@ -810,7 +810,7 @@ def _handle_prepare(intent: Intent, context: dict[str, Any], runner: _Runner, ui
 
 def _handle_workspace(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     return (
-        "Ruang persiapan adalah simulasi formulir — bukan portal resmi. Data terkonfirmasi terisi otomatis, sisanya Anda isi sendiri.",
+        "Ruang persiapan adalah simulasi formulir — bukan situs resmi. Data terkonfirmasi terisi otomatis, sisanya Anda isi sendiri.",
         _guide("workspace-open", "Buka ruang persiapan", set(context["unit_ids"])),
         None,
     )
@@ -824,8 +824,8 @@ def _handle_official(intent: Intent, context: dict[str, Any], runner: _Runner, u
     url = validate_url(configured) or "https://iasc.ojk.go.id/"
     proposal = _propose(context, "OPEN_OFFICIAL", {"url": url}, {"url": url}, runner)
     return (
-        "Saya siapkan tautan portal resmi IASC. Buka sendiri dan isi datanya — saya tidak akan mengirim apa pun.",
-        _guide("official-handoff", "Buka portal resmi", set(context["unit_ids"])),
+        "Saya siapkan tautan situs resmi IASC. Buka sendiri dan isi datanya — saya tidak akan mengirim apa pun.",
+        _guide("official-handoff", "Buka situs resmi", set(context["unit_ids"])),
         proposal,
     )
 
@@ -1029,7 +1029,7 @@ def _handle_yes(intent: Intent, context: dict[str, Any], runner: _Runner, ui: di
         )
         if isinstance(result, dict) and result.get("url"):
             ui["_control"] = {"open_url": result["url"]}
-            return (result.get("message") or "Silakan buka sendiri portal resminya.", None, None)
+            return (result.get("message") or "Silakan buka sendiri situs resminya.", None, None)
         # Agentic loop (§26): setelah commit, baca ulang state → rencana berikut.
         fresh = build_agent_context(runner.db, context["case"]["case_id"])
         nxt = _guide_for_action(fresh, None)
@@ -1367,7 +1367,7 @@ def approve_action(
         return {
             "status": "open",
             "url": url,
-            "message": "Silakan buka sendiri portal resminya. Saya tidak mengirim apa pun.",
+            "message": "Silakan buka sendiri situs resminya. Saya tidak mengirim apa pun.",
         }
 
     raise ValidationFailed("aksi tidak dikenal")

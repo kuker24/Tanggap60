@@ -93,7 +93,7 @@ def _primary_cta(
     if needs_evidence:
         return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
     if ready_count:
-        return {"label": "Setujui dan buat paket", "href": f"/cases/{case_id}/approval"}
+        return {"label": "Buat paket", "href": f"/cases/{case_id}/approval"}
     return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
 
 
@@ -179,7 +179,7 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
                 "title": "Siapkan dokumen",
                 "points": dokumen[:3],
                 "href": f"/cases/{case_id}/approval",
-                "cta": "Setujui dan buat paket",
+                "cta": "Buat paket",
             }
         )
     return tasks[:3]

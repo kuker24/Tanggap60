@@ -24,8 +24,13 @@ _JARGON = (
     ("Nominal", "Jumlah uang"),
     ("kanal resmi", "situs resmi"),
     ("Kanal resmi", "Situs resmi"),
+    ("portal resmi", "situs resmi"),
+    ("Portal resmi", "Situs resmi"),
     ("kanal", "cara bayar"),
     ("Kanal", "Cara bayar"),
+    ("mengunggah", "mengirim"),
+    ("Mengunggah", "Mengirim"),
+    ("diunggah", "dikirim"),
     ("Unggah", "Kirim"),
     ("unggah", "kirim"),
 )
@@ -93,7 +98,7 @@ _TABLES: dict[str, dict[str, str]] = {
         "READY": "Siap",
         "NEEDS_ACTION": "Perlu dilengkapi",
         "BLOCKED": "Belum bisa lanjut",
-        "PASS": "Siap",
+        "PASS": "Lolos cek file",
         "FAIL": "Belum lolos",
         "NOW": "Sekarang",
         "NEXT": "Berikutnya",
@@ -114,6 +119,11 @@ _TABLES: dict[str, dict[str, str]] = {
         "CHECKLIST": "Daftar cek",
         "MANIFEST": "Kode cek apakah file berubah",
         "CASE_ZIP": "Semua file (ZIP)",
+    },
+    "verify": {
+        "PASS": "Lolos cek file",
+        "FAIL": "Belum lolos",
+        "PENDING": "Sedang dicek",
     },
 }
 

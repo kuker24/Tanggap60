@@ -119,7 +119,7 @@ def recommend_next_action(
                 return NextBestAction(
                     code=NextActionCode.PREPARE_IASC_UNIT,
                     label="Siapkan laporan IASC yang sudah siap",
-                    reason="Ada transaksi yang siap dilaporkan ke IASC — buka portal resmi IASC dan isi datanya, jangan menunggu transaksi lain.",
+                    reason="Ada transaksi yang siap dilaporkan ke IASC — buka situs resmi IASC dan isi datanya, jangan menunggu transaksi lain.",
                     target_unit_id=target.unit_id,
                     priority=2,
                 )
@@ -224,16 +224,16 @@ def recommend_next_action(
         target = sorted(complete_units, key=lambda u: u.unit_id)[0]
         return NextBestAction(
             code=NextActionCode.APPROVE_READY_UNIT,
-            label="Setujui transaksi yang sudah siap",
-            reason="Ada transaksi menunggu persetujuan untuk dibuatkan paket terverifikasi.",
+            label="Buat paket untuk transaksi yang sudah siap",
+            reason="Ada transaksi yang sudah bisa dibuatkan paket.",
             target_unit_id=target.unit_id,
             priority=8,
         )
 
     return NextBestAction(
         code=NextActionCode.DOWNLOAD_VERIFIED_PACK,
-        label="Unduh paket terverifikasi",
-        reason="Semua unit sudah diproses — unduh ZIP dan lakukan handoff manual.",
+            label="Unduh paket",
+            reason="Unduh paket, lalu bawa sendiri ke situs resmi.",
         priority=9,
     )
 

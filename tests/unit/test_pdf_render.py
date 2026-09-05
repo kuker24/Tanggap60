@@ -16,7 +16,7 @@ def test_pdf_has_brand_and_safety_labels() -> None:
             "STATUS RESMI: NOT_VERIFIED",
             "Profile kesiapan 2026-09-02.mvp2",
             "## Ringkasan",
-            "- Nominal: Rp2.750.000 (Benar)",
+            "- Jumlah uang: Rp2.750.000 (Benar)",
         ],
         "2026-09-03T02:06:40",
         "abcd" * 16,
@@ -29,3 +29,5 @@ def test_pdf_has_brand_and_safety_labels() -> None:
     assert "Profile kesiapan" in text
     assert "Untuk bank" in text
     assert "case-" not in text
+    assert "kode paket" in text
+    assert "snapshot" not in text.lower()

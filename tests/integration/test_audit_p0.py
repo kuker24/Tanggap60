@@ -92,7 +92,7 @@ def test_kelola_data_and_intake_copy(client: TestClient) -> None:
     page = client.get(f"/cases/{case_id}/intake")
     assert page.status_code == 200
     assert "Kelola data" in page.text
-    assert "Isi salah satu pilihan untuk mulai" in page.text
+    assert "Isi salah satu untuk mulai" in page.text
     assert "(boleh kosong)" not in page.text
 
 

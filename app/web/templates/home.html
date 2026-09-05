@@ -26,20 +26,6 @@
         <li>Data demo otomatis dihapus setelah 60 menit.</li>
       </ul>
     </div>
-    <div class="land-hero-visual">
-      <div class="land-mock">
-        <p class="land-mock-title">Contoh hasil — 2 transaksi</p>
-        <div class="land-mock-row is-ok">
-          <span class="land-mock-amt">Rp2.750.000</span>
-          <span class="land-mock-tag">Lengkap</span>
-        </div>
-        <div class="land-mock-row is-wait">
-          <span class="land-mock-amt">Rp2.500.000</span>
-          <span class="land-mock-tag">Perlu konfirmasi</span>
-        </div>
-        <p class="land-mock-callout">Kami tidak akan menebak.</p>
-      </div>
-    </div>
   </div>
 </section>
 
@@ -57,24 +43,71 @@
       </li>
       <li>
         <h3>Konfirmasi</h3>
-        <p>Anda periksa datanya, perbaiki yang keliru, lalu setujui sebelum paket dibuat.</p>
+        <p>Anda periksa datanya, perbaiki yang keliru, lalu buat paket.</p>
       </li>
       <li>
         <h3>Bertindak</h3>
-        <p>Ikuti langkah sesuai kondisi Anda. Jika paket siap, unduh dan bawa sendiri ke kanal resmi.</p>
+        <p>Ikuti langkah sesuai kondisi Anda. Jika paket siap, unduh dan bawa sendiri ke situs resmi.</p>
       </li>
     </ol>
+    <div class="land-story" id="land-story">
+      <h3 class="land-story-title">Contoh</h3>
+      <div class="land-mock">
+        <p class="land-mock-title">Dua bukti, dua angka</p>
+        <div class="land-mock-row is-ok">
+          <span class="land-mock-amt">Rp2.750.000</span>
+          <span class="land-mock-tag" data-messy="Dari struk" data-told="Lengkap">Lengkap</span>
+        </div>
+        <div class="land-mock-row is-wait">
+          <span class="land-mock-amt">Rp2.500.000</span>
+          <span class="land-mock-tag" data-messy="Dari chat" data-told="Perlu konfirmasi">Perlu konfirmasi</span>
+        </div>
+        <p class="land-mock-callout">Kami tidak akan menebak.</p>
+      </div>
+    </div>
     <p class="land-how-note">Keputusan resmi tetap di bank, IASC, atau polisi.</p>
   </div>
 </section>
+<script>
+(function(){
+  var story = document.getElementById("land-story");
+  if (!story) return;
+  var tags = story.querySelectorAll(".land-mock-tag");
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  function told(){
+    story.classList.remove("is-live");
+    story.classList.add("is-told");
+    for (var i = 0; i < tags.length; i++) {
+      var next = tags[i].getAttribute("data-told");
+      if (next) tags[i].textContent = next;
+    }
+  }
+  if (reduce || !("IntersectionObserver" in window)) { told(); return; }
+  story.classList.add("is-live");
+  for (var j = 0; j < tags.length; j++) {
+    var messy = tags[j].getAttribute("data-messy");
+    if (messy) tags[j].textContent = messy;
+  }
+  var io = new IntersectionObserver(function(entries){
+    for (var k = 0; k < entries.length; k++) {
+      if (entries[k].isIntersecting && entries[k].intersectionRatio >= 0.35) {
+        told();
+        io.disconnect();
+        return;
+      }
+    }
+  }, {threshold: [0.15]});
+  io.observe(story);
+})();
+</script>
 
 <section class="land-proof" aria-labelledby="proof-title">
   <div class="land-section-inner">
     <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
     <ul class="land-proof-list">
       <li class="is-no"><span class="land-mark" aria-hidden="true">×</span><span><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</span></li>
-      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Setiap data ada sumbernya.</b> Kalau ada yang beda-beda (misalnya nominal di chat dan struk tidak sama), kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya — tidak menebak.</span></li>
-      <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek apakah filenya berubah.</b> Ada kode cek di dalamnya. Itu tidak membuktikan isi screenshot benar — hanya bahwa arsip tidak diubah setelah dibuat. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
+        <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Setiap data ada sumbernya.</b> Kalau jumlah uang di chat dan struk tidak sama, kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya. Tidak menebak.</span></li>
+        <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek apakah filenya berubah.</b> Ada kode cek di dalamnya. Itu tidak membuktikan isi screenshot benar, hanya bahwa arsip tidak diubah setelah dibuat. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
     </ul>
   </div>
 </section>
@@ -97,7 +130,7 @@
     </details>
     <details>
       <summary>Apa itu IASC?</summary>
-      <p>IASC adalah kanal resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id — bukan di sini.</p>
+      <p>IASC adalah situs resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id, bukan di sini.</p>
     </details>
     <details>
       <summary>Berapa lama data saya disimpan?</summary>

@@ -14,9 +14,9 @@
 </ol>
 {% if case.route.value != "PRE_INCIDENT_CHECK" %}
 <p class="muted small">Setelah paket siap: unduh ringkasan PDF dan periksa isinya, lalu buka situs resmi. Salin data dan kronologi ke kolom yang sesuai; lampirkan bukti transfer serta bukti pendukung menurut aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan. Ringkasan tidak menggantikan bukti asli. Tanggap60 tidak mengirim laporan.</p>
-<p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima kanal resmi. Untuk membukanya, gunakan aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan situs resmi.</p>
+  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima situs resmi. Untuk membukanya, gunakan aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan situs resmi.</p>
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui dan buat paket</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paket</a>
   <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
   <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
 </div>

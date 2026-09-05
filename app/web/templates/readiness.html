@@ -19,20 +19,11 @@
 <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
   <div class="tx-top">
     <h3>Transaksi {{ tx.n }}</h3>
-     {% if tx.ready %}
-     <span class="badge ok">Dokumen dapat dibuat</span>
-     {% else %}
-     <span class="badge err">Perlu dilengkapi</span>
-     {% endif %}
+    {% if not tx.ready %}<p class="tx-when">Perlu dilengkapi</p>{% endif %}
   </div>
   {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
   {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
   {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
-  <p class="tx-when">
-    {% for ch in tx.channels %}
-    {{ ch.label }}: {% if ch.status == "READY" %}Siap{% elif ch.status == "BLOCKED" %}Belum bisa{% elif ch.status %}Perlu dilengkapi{% else %}—{% endif %}{% if not loop.last %} · {% endif %}
-    {% endfor %}
-  </p>
   {% if tx.missing_review %}
   <ul class="tx-missing">
     {% for m in tx.missing_review %}
@@ -69,7 +60,7 @@
     {% endfor %}
   </ul>
   <div class="actions">
-    <a class="btn ember" href="{{ task.href }}">{{ task.cta }}</a>
+    <a class="{% if loop.first %}btn ember{% else %}btn-text{% endif %}" href="{{ task.href }}">{{ task.cta }}</a>
   </div>
 </article>
 {% endfor %}
@@ -78,23 +69,22 @@
 
 {% if not tx_cards and not gap_tasks %}
 <div class="next-card">
-  <h3>Semua pemeriksaan internal selesai</h3>
-  <p class="muted small">Tinggal bawa paketnya ke situs resmi.</p>
+  <h3>Siap dibawa ke situs resmi</h3>
+  <p class="muted small">Unduh paket, lalu isi laporan di situs mereka.</p>
 </div>
 {% endif %}
 
 {% if tx_cards %}
 <div class="next-card" data-guide-id="official-handoff">
-  <h3>Membawa paket ke situs resmi</h3>
+  <h3>Bawa ke situs resmi</h3>
   <ol class="plan">
-    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu buka dan periksa isinya.</li>
-    <li>Buka situs resmi melalui tautan IASC di bawah.</li>
-    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a> ke kolom yang sesuai. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
+    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
+    <li>Buka situs resmi IASC.</li>
+    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a>, isi identitas sendiri, lalu lampirkan bukti sesuai aturan formulir. Ringkasan tidak menggantikan bukti asli.</li>
   </ol>
-  <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir. Tanggap60 tidak mengirim laporan.</p>
+  <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Tanggap60 tidak mengirim laporan.</p>
 </div>
 {% endif %}
-<p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 {% if not gap_tasks %}
 <div class="actions">
   <a class="btn ember" href="{{ primary.href }}">{{ primary.label }}</a>

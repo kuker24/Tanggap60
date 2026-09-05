@@ -3,7 +3,7 @@
 <!-- impeccable:design-schema 1 -->
 
 ## World
-Satu dunia terang-tenang dari beranda sampai paket: **WASPADA TENANG**. Warm paper, tinta gelap, amber untuk satu aksi komitmen. Panel gelap hanya untuk jejak teknis (collapsed by default). Landing putih Motionsites (tiga kartu radial) tetap sebagai pembuka.
+Satu dunia terang-tenang dari beranda sampai paket: **WASPADA TENANG**. Warm paper, tinta gelap, amber untuk satu aksi komitmen. Panel gelap hanya untuk jejak teknis (collapsed by default). Landing: CTA kondisi di viewport pertama, lalu satu cerita bukti berantakan yang tersusun tanpa menebak.
 
 ## Palette
 - Kanvas `#faf7f1`, teks `#1c1917`, muted `#6f675c`, garis `#e6ddcb`, kartu `#ffffff`
@@ -33,4 +33,4 @@ Satu dunia terang-tenang dari beranda sampai paket: **WASPADA TENANG**. Warm pap
 - Pendamping AI: ringkas (1–2 kalimat), menunjuk bukan menggurui; “Saya tandai bagian yang perlu Anda cek”, “Sebelum saya menyimpan perubahan ini, pastikan datanya benar”, “Bagian ini perlu Anda isi sendiri”, “Dokumen belum dikirim ke mana pun”. Panel chat drawer desktop / bottom-sheet HP; pointer ring biru + tooltip, hormati prefers-reduced-motion; aria-live polite.
 
 ## Surface — Persuade + Operate
-Landing meyakinkan lalu memulai (satu cerita 3 langkah + FAQ + TTL). Kasus menyelesaikan tugas: bukti → susun → konfirmasi → lakukan sekarang → paket → bawa ke situs resmi.
+Landing meyakinkan lalu memulai (4 langkah + satu mock “tidak menebak” + FAQ + TTL). Kasus menyelesaikan tugas: bukti → susun → konfirmasi → lakukan sekarang → paket → bawa ke situs resmi.

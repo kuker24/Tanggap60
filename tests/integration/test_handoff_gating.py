@@ -53,8 +53,7 @@ def test_case_approval_rejects_ambiguous(client: TestClient, ocr: ScriptedOcr) -
 def test_review_pairing_one_decision_per_card(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = _ambiguous_case(client, ocr)
     page = client.get(f"/cases/{case_id}/review")
-    assert "Kami belum yakin" in page.text
-    assert "tidak akan menebak" in page.text
+    assert "Transaksi ini belum jelas" in page.text
     assert "Jumlah uang mana yang dikirim ke" in page.text
     assert "Tidak ada di pilihan ini" in page.text
     assert "pair-card" not in page.text

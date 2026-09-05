@@ -627,7 +627,7 @@ def get_handoff(case_id: str, request: Request) -> dict[str, Any]:
         "domain": "iasc.ojk.go.id",
         "state": case.state.value,
         "server_submission": False,
-        "copy": "Isi identitas dan KTP langsung di portal resmi.",
+        "copy": "Isi identitas dan KTP langsung di situs resmi.",
     }
 
 

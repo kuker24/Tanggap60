@@ -37,7 +37,7 @@ def test_review_reload_keeps_checked_facts_editable_and_refreshes_version(client
         page = client.get(f"/cases/{case_id}/review").text
         assert f"const VERSION = {version};" in page
         for checked in candidates[:index + 1]:
-            card = re.search(rf'<article class="fact" data-fact="{checked["fact_id"]}">(.*?)</article>', page, re.S)
+            card = re.search(rf'<article class="fact[^"]*" data-fact="{checked["fact_id"]}">(.*?)</article>', page, re.S)
             assert card is not None
             assert ">Ubah</button>" in card[1]
             assert f'id="input-{checked["fact_id"]}"' in card[1]

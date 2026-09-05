@@ -122,8 +122,6 @@
   box-shadow: 0 8px 24px rgba(28, 25, 23, .3);
 }
 #agent-hud[hidden] { display: none; }
-#agent-hud .hud-spark { color: #f5c518; font-weight: 700; }
-#agent-hud[data-mode="done"] .hud-spark { color: #7bc47f; }
 #agent-hud[data-mode="waiting"] { background: #92400e; }
 #agent-hud .hud-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
 #hud-stop {
@@ -155,7 +153,7 @@
   font-size: 11px; font-weight: 700; color: #fff; background: #92400e;
   border-radius: 999px; padding: 2px 8px; white-space: nowrap;
 }
-.spot-rect { position: fixed; background: rgba(28, 25, 23, .45); pointer-events: none; }
+.spot-rect { position: fixed; background: rgba(28, 25, 23, .28); pointer-events: none; }
 #agent-callout {
   position: fixed; z-index: 95; pointer-events: auto;
   background: #fffdf8; border: 1px solid #e6ddcb; border-radius: 14px;

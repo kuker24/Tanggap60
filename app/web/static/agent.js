@@ -65,7 +65,7 @@
       const det = document.createElement("details");
       det.className = "tech-toggle";
       const sum = document.createElement("summary");
-      sum.textContent = "Detail teknis: tool yang dipakai AI";
+      sum.textContent = "Detail teknis";
       det.appendChild(sum);
       const ul = document.createElement("ul");
       ul.className = "tech-body";
@@ -155,7 +155,7 @@
       if (data.stop_agent) { stopAll(); return; }
       if (data.pause_agent) {
         RT.pause();
-        setHud("⏸ Panduan dijeda", "waiting");
+        setHud("Panduan dijeda", "waiting");
         announce("Panduan dijeda. Ucapkan Lanjut untuk melanjutkan.");
         renderQuick(["Lanjut"]);
         return;
@@ -178,7 +178,7 @@
     } catch (e) {
       setStatus("Siap membantu");
       setHud(null);
-      addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.", null, false);
+      addMsg("ai", "Pendamping sedang tidak tersedia. Anda tetap bisa lanjut sendiri.", null, false);
     } finally {
       setBusy(false);
       if (hadInputFocus && !panel.hidden) input.focus({ preventScroll: true });
@@ -189,7 +189,7 @@
     const card = document.createElement("div");
     card.className = "agent-proposal";
     const title = document.createElement("strong");
-    title.textContent = "Tanggap60 AI ingin menyimpan:";
+    title.textContent = "Simpan pilihan ini?";
     card.appendChild(title);
     const dl = document.createElement("dl");
     Object.entries(prop.summary || {}).forEach(([k, v]) => {
@@ -241,7 +241,7 @@
       card.remove();
       emit(ok ? "t60:proposal-approved" : "t60:proposal-denied", { action_type: prop.action_type });
       if (data.url) {
-        addMsg("ai", data.message || "Silakan buka sendiri portal resminya.");
+        addMsg("ai", data.message || "Silakan buka sendiri situs resminya.");
         window.open(data.url, "_blank", "noopener");
         return;
       }
@@ -271,19 +271,14 @@
     hudEl = document.createElement("div");
     hudEl.id = "agent-hud";
     hudEl.hidden = true;
-    const spark = document.createElement("span");
-    spark.className = "hud-spark";
-    spark.setAttribute("aria-hidden", "true");
-    spark.textContent = "✦";
     hudText = document.createElement("span");
     hudText.className = "hud-text";
-    hudEl.appendChild(spark);
     hudEl.appendChild(hudText);
     const stop = document.createElement("button");
     stop.id = "hud-stop";
     stop.type = "button";
-    stop.textContent = "Hentikan AI";
-    stop.setAttribute("aria-label", "Hentikan panduan AI dan batalkan drafnya");
+    stop.textContent = "Hentikan panduan";
+    stop.setAttribute("aria-label", "Hentikan panduan dan batalkan draf");
     stop.addEventListener("click", stopAll);
     hudEl.appendChild(stop);
     document.body.appendChild(hudEl);
@@ -333,7 +328,7 @@
     cursorEl.hidden = true;
     const dot = document.createElement("span");
     dot.className = "cur-dot";
-    dot.textContent = "✦";
+    dot.textContent = "";
     const tag = document.createElement("span");
     tag.className = "cur-tag";
     tag.textContent = "Tanggap60";
@@ -462,7 +457,7 @@
     calloutEl.setAttribute("aria-label", title || "Panduan Tanggap60");
     const head = document.createElement("div");
     head.className = "co-head";
-    head.textContent = "✦ Tanggap60";
+    head.textContent = "Tanggap60";
     const h = document.createElement("strong");
     h.className = "co-title";
     h.textContent = title || "Perhatikan bagian ini";
@@ -601,7 +596,7 @@
       const badge = document.createElement("p");
       badge.className = "ai-draft";
       badge.setAttribute("role", "status");
-      badge.textContent = "✦ Disiapkan AI — " + s.label + ". Belum disimpan.";
+      badge.textContent = "Disiapkan Tanggap60 — " + s.label + ". Belum disimpan.";
       anchor.appendChild(badge);
       if (aiDrafts.length) aiDrafts[aiDrafts.length - 1].badge = badge;
     }
@@ -635,7 +630,7 @@
       const box = document.getElementById("agent-autopilot");
       if (box) box.checked = false;
     } catch (e) {}
-    showToast("Panduan AI dihentikan. Draf AI dibatalkan.");
+    showToast("Panduan dihentikan. Draf dibatalkan.");
   }
 
   function minimizePanel() {

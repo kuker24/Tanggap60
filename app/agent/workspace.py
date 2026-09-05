@@ -85,10 +85,10 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
             "done": identified_count > 0,
             "detail": f"{identified_count} transaksi teridentifikasi ({complete_count} terkonfirmasi lengkap)",
         },
-        {"item": "Nominal jelas", "done": all(t["amount"] != UNCONFIRMED for t in transactions), "detail": ""},
+        {"item": "Jumlah uang jelas", "done": all(t["amount"] != UNCONFIRMED for t in transactions), "detail": ""},
         {"item": "Waktu jelas", "done": all(t["date"] != UNCONFIRMED for t in transactions), "detail": ""},
-        {"item": "Identitas korban", "done": False, "detail": "Hanya Anda yang mengisi — AI tidak menyentuh data ini"},
-        {"item": "Kirim ke portal resmi", "done": False, "detail": "Anda lakukan sendiri — AI berhenti di sini"},
+        {"item": "Identitas korban", "done": False, "detail": "Hanya Anda yang mengisi di situs resmi"},
+        {"item": "Bawa ke situs resmi", "done": False, "detail": "Anda kirim sendiri. Tanggap60 berhenti di sini"},
     ]
 
     fields: dict[str, Any] = {
@@ -114,7 +114,7 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
         "action_log": log,
         "confirmed_transactions": identified_count,
         "complete_transactions": complete_count,
-        "official_note": "Dokumen belum dikirim ke mana pun. Pengiriman tetap Anda lakukan sendiri di portal resmi.",
+        "official_note": "Dokumen belum dikirim ke mana pun. Pengiriman tetap Anda lakukan sendiri di situs resmi.",
     }
 
 

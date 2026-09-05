@@ -39,7 +39,7 @@ def test_manual_document_handoff_contract(client: TestClient, handoff_case: str,
     if surface == "artifacts":
         assert "/download" in content
         assert f'/cases/{handoff_case}/workspace"' in content
-        assert "bukan laporan yang otomatis diterima kanal resmi" in instructions
+        assert "bukan laporan yang otomatis diterima situs resmi" in instructions
 
 
 def test_workspace_copy_and_load_recovery_contract(client: TestClient) -> None:

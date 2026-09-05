@@ -1,33 +1,32 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Kami susun kasusnya — Tanggap60{% endblock %}
+{% block title %}Membaca bukti — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(2, "Langkah 2 dari 4: Periksa", progress) }}{% endblock %}
 {% block content %}
 {% set st = case.state.value %}
 {% if st == "FAILED_SAFE" %}
 <h1>Ada yang perlu Anda putuskan</h1>
-<p class="lede">Buktinya tidak bisa dibaca otomatis, jadi tidak bisa lanjut sendiri. Tenang — isi manual cuma sebentar.</p>
+<p class="lede">Buktinya tidak bisa dibaca otomatis, jadi tidak bisa lanjut sendiri. Isi manual cuma sebentar.</p>
 <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Isi manual (cuma sebentar)</a></div>
 {% else %}
 {% if st not in ["REVIEW_REQUIRED"] %}
 <div class="wait-ring" aria-hidden="true"></div>
 {% endif %}
-<h1>Kami sedang menyusun kasus Anda</h1>
-<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Biasanya selesai kurang dari satu menit. Tunggu di halaman ini — pindah sendiri kalau sudah selesai.{% endif %}</p>
+<h1>Membaca bukti Anda</h1>
+<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Sudah dibaca. Lanjut ke pemeriksaan Anda.{% else %}<span class="pulse" aria-hidden="true"></span>Membaca bukti dan menyiapkan yang perlu Anda periksa. Biasanya kurang dari satu menit. Tetap di halaman ini.{% endif %}</p>
 <ol class="timeline" aria-label="Tahapan penyusunan" data-guide-id="processing-status" tabindex="0">
   <li><span class="tl-dot {% if has_evidence %}ok{% else %}run{% endif %}" aria-hidden="true">{% if has_evidence %}✓{% else %}…{% endif %}</span><span class="tl-main"><b>Bukti diterima</b><br><span class="muted small">Foto, cerita, atau link Anda sudah masuk.</span></span></li>
   <li><span class="tl-dot {% if not has_evidence %}{% elif st in ['NEW', 'INGESTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if not has_evidence %}2{% elif st in ['NEW', 'INGESTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Membaca isi bukti</b><br><span class="muted small">{% if has_evidence %}Mengenali jumlah uang, tanggal, dan rekening.{% else %}Belum mulai — kirim bukti dulu.{% endif %}</span></span></li>
   <li><span class="tl-dot {% if not has_evidence %}{% elif st in ['NEW', 'INGESTING', 'EXTRACTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if not has_evidence %}3{% elif st in ['NEW', 'INGESTING', 'EXTRACTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Menyusun transaksi</b><br><span class="muted small">{% if has_evidence %}Mengelompokkan bukti per transaksi.{% else %}Belum mulai.{% endif %}</span></span></li>
-  <li><span class="tl-dot {% if has_evidence and st == 'REVIEW_REQUIRED' %}ok{% endif %}" aria-hidden="true">{% if has_evidence and st == 'REVIEW_REQUIRED' %}✓{% else %}4{% endif %}</span><span class="tl-main"><b>Menyiapkan konfirmasi Anda</b><br><span class="muted small">Kalau ada yang meragukan, Anda yang memutuskan — bukan mesin.</span></span></li>
+  <li><span class="tl-dot {% if has_evidence and st == 'REVIEW_REQUIRED' %}ok{% endif %}" aria-hidden="true">{% if has_evidence and st == 'REVIEW_REQUIRED' %}✓{% else %}4{% endif %}</span><span class="tl-main"><b>Menyiapkan konfirmasi Anda</b><br><span class="muted small">Kalau ada yang meragukan, Anda yang memutuskan.</span></span></li>
 </ol>
 {% if st == "REVIEW_REQUIRED" %}
 <script>location.replace("/cases/{{ case.case_id }}/review");</script>
 {% endif %}
 <details class="tech-lite" id="trace">
-  <summary>Lihat rincian proses</summary>
+  <summary>Detail teknis</summary>
   <div class="tech-body" id="trace-body" data-case="{{ case.case_id }}">Memuat…</div>
 </details>
-<p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 <p class="muted small back-link"><a class="link" href="/">← Kembali ke beranda</a></p>
 {% endif %}
 <noscript>

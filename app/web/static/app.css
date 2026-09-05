@@ -182,7 +182,10 @@ legend{padding:0;margin-bottom:4px}
 .status-line .pulse{margin-top:8px}
 
 .fact-grid{display:grid;gap:16px;margin-top:20px}
-.fact{border:1px solid var(--line);border-radius:var(--radius-card);background:var(--surface);padding:18px}
+.fact{padding:16px 0;border-bottom:1px solid var(--line)}
+.fact.is-need{border:1px solid var(--line);border-radius:var(--radius-card);background:var(--surface);padding:18px}
+.fact.is-quiet{background:transparent;box-shadow:none}
+.fact.is-quiet .fact-actions .btn{width:auto}
 .fact.is-on{border-color:var(--signal)}
 .fact .muted.small{font:500 12px/1.4 var(--sans);color:var(--muted)}
 .fact b.value, .fact strong.value{font:500 22px/1.15 var(--sans);display:block;word-break:break-word;letter-spacing:-.04em}
@@ -361,6 +364,7 @@ body[data-page="processing"] .wait-ring{
   }
   .btn,.choice,#toast{transition:none}
   .btn:active,.choice:active{transform:none}
+  .land-story.is-live .land-mock-row.is-wait{opacity:1}
   #toast,#toast.show{transform:translateX(-50%)}
 }
 
@@ -386,8 +390,8 @@ body.is-landing .choice.primary span.desc{color:#cbd5e1}
 .land-section-inner{max-width:1100px;margin:0 auto}
 .land-section-inner.narrow{max-width:40rem}
 .land-hero{padding-top:72px;padding-bottom:56px}
-.land-hero-inner{max-width:1100px;margin:0 auto;display:grid;grid-template-columns:1.02fr .98fr;gap:56px;align-items:center}
-.land-hero h1{font:500 clamp(2.1rem,4.6vw,3.1rem)/1.1 var(--sans);letter-spacing:-.025em;color:#0f172a;margin:0 0 16px;text-wrap:balance}
+.land-hero-inner{max-width:40rem;margin:0 auto}
+.land-hero h1{font:500 clamp(2.1rem,4.6vw,3.1rem)/1.1 var(--sans);letter-spacing:-.025em;color:#0f172a;margin:0 0 16px;max-width:18ch;text-wrap:balance}
 .land-hero .lede{max-width:46ch}
 .land-choices{margin-top:26px}
 @media (min-width:900px){
@@ -397,7 +401,10 @@ body.is-landing .choice.primary span.desc{color:#cbd5e1}
 .land-trust{list-style:none;margin:22px 0 0;padding:18px 0 0;border-top:1px solid #e2e8f0;display:flex;flex-wrap:wrap;gap:8px 22px}
 .land-trust li{display:flex;align-items:center;gap:8px;font:500 13.5px/1.4 var(--sans);color:#334155}
 .land-trust li::before{content:"✓";display:grid;place-items:center;width:22px;height:22px;flex:0 0 22px;border-radius:999px;background:var(--ok-soft);color:var(--ok);font-size:13px;font-weight:700}
-.land-hero-visual{display:flex;justify-content:center}
+.land-story{margin-top:36px}
+.land-story-title{font:600 17px/1.4 var(--sans);margin:0 0 12px;color:#0f172a}
+.land-story.is-live .land-mock-row.is-wait{opacity:.7}
+.land-story.is-told .land-mock-row.is-wait{opacity:1}
 .land-mock{width:100%;max-width:420px;padding:24px;background:var(--soft);border:1px solid var(--line);border-radius:var(--radius-ghost)}
 .land-mock-title{margin:0 0 16px;font:500 14px/1.4 var(--sans);color:var(--muted)}
 .land-mock-row{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-top:1px solid var(--line)}
@@ -409,8 +416,8 @@ body.is-landing .choice.primary span.desc{color:#cbd5e1}
 .land-proof{background:var(--soft)}
 .land-how h2,.land-proof h2,.land-faq h2,.land-cta h2{font:500 clamp(1.5rem,4vw,2rem)/1.2 var(--sans);letter-spacing:-.02em;color:#0f172a;margin:0 0 8px;text-wrap:balance}
 .land-proof .land-section-inner>p.sub,.land-faq .land-section-inner>p.sub{color:#64748b;margin:0 0 28px}
-.land-proof-list{margin:28px 0 0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.land-proof-list li{display:flex;gap:12px;align-items:flex-start;padding:22px 20px;border:1px solid #e2e8f0;border-radius:16px;background:#fff;color:#334155;font:400 15px/1.55 var(--sans);box-shadow:0 10px 30px -18px rgba(15,23,42,.25)}
+.land-proof-list{margin:28px 0 0;padding:0;list-style:none;display:grid;gap:18px;max-width:40rem}
+.land-proof-list li{display:flex;gap:12px;align-items:flex-start;padding:0;color:#334155;font:400 15px/1.55 var(--sans)}
 .land-proof-list b{color:#0f172a}
 .land-mark{display:grid;place-items:center;width:28px;height:28px;flex:0 0 28px;border-radius:999px;font-size:15px;font-weight:700}
 .is-yes .land-mark{background:var(--ok-soft);color:var(--ok)}
@@ -438,10 +445,7 @@ body.is-landing .choice.primary span.desc{color:#cbd5e1}
 .land-steps p{margin:0;color:var(--muted);font:400 16px/1.55 var(--sans)}
 .land-how-note{margin:16px 0 0;color:var(--muted);font-size:14px}
 @media (max-width:900px){
-  .land-hero-inner{grid-template-columns:1fr;gap:40px}
-  .land-hero-visual{order:2}
   .land-mock{max-width:480px}
-  .land-proof-list{grid-template-columns:1fr;max-width:40rem;margin-left:auto;margin-right:auto}
 }
 @media (max-width:768px){
   .land-hero,.land-how,.land-proof,.land-faq,.land-cta{padding:48px 16px}

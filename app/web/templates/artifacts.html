@@ -8,7 +8,7 @@
 <p class="lede">Paket belum dikirim ke mana pun. Anda tetap yang mengirimkannya ke situs resmi.</p>
 
 <div class="next-card" data-guide-id="official-handoff">
-  <h3>Lanjut di kanal resmi</h3>
+  <h3>Bawa ke situs resmi</h3>
   <p class="muted small">Paket ini alat bantu. Laporan dikirim oleh Anda di situs resmi, bukan di sini.</p>
   <ol class="plan">
     <li>Unduh ringkasan PDF, lalu buka dan periksa isinya.</li>
@@ -25,7 +25,7 @@
   {% if pack %}
   <details>
     <summary>Arsip ZIP (opsional)</summary>
-    <p class="muted small">ZIP hanya arsip untuk Anda, bukan laporan yang otomatis diterima kanal resmi. Setelah diunduh, buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Buka file hasil ekstraksi; lampirkan hanya file yang sesuai aturan formulir, bukan langsung mengunggah ZIP.</p>
+    <p class="muted small">ZIP hanya arsip untuk Anda, bukan laporan yang otomatis diterima situs resmi. Setelah diunduh, buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Buka file hasil ekstraksi; lampirkan hanya file yang sesuai aturan formulir, bukan langsung mengirim ZIP.</p>
     <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh arsip lengkap (ZIP)</a>
   </details>
   {% endif %}
@@ -42,7 +42,7 @@
     <table>
       <tr><th>Dokumen</th><th>Status</th><th>Kode</th></tr>
       {% for a in rest %}
-      <tr><td>{{ a.type | human("artifact") }}</td><td>{{ a.verify_status }}</td><td>{{ a.sha256[:20] }}…</td></tr>
+      <tr><td>{{ a.type | human("artifact") }}</td><td>{{ a.verify_status | human("verify") }}</td><td>{{ a.sha256[:20] }}…</td></tr>
       {% endfor %}
     </table>
   </div>
