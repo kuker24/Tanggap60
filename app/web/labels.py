@@ -24,8 +24,13 @@ _JARGON = (
     ("Nominal", "Jumlah uang"),
     ("kanal resmi", "situs resmi"),
     ("Kanal resmi", "Situs resmi"),
+    ("portal resmi", "situs resmi"),
+    ("Portal resmi", "Situs resmi"),
     ("kanal", "cara bayar"),
     ("Kanal", "Cara bayar"),
+    ("mengunggah", "mengirim"),
+    ("Mengunggah", "Mengirim"),
+    ("diunggah", "dikirim"),
     ("Unggah", "Kirim"),
     ("unggah", "kirim"),
 )

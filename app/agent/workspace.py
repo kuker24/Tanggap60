@@ -114,7 +114,7 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
         "action_log": log,
         "confirmed_transactions": identified_count,
         "complete_transactions": complete_count,
-        "official_note": "Dokumen belum dikirim ke mana pun. Pengiriman tetap Anda lakukan sendiri di portal resmi.",
+        "official_note": "Dokumen belum dikirim ke mana pun. Pengiriman tetap Anda lakukan sendiri di situs resmi.",
     }
 
 

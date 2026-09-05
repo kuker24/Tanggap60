@@ -119,7 +119,7 @@ def recommend_next_action(
                 return NextBestAction(
                     code=NextActionCode.PREPARE_IASC_UNIT,
                     label="Siapkan laporan IASC yang sudah siap",
-                    reason="Ada transaksi yang siap dilaporkan ke IASC — buka portal resmi IASC dan isi datanya, jangan menunggu transaksi lain.",
+                    reason="Ada transaksi yang siap dilaporkan ke IASC — buka situs resmi IASC dan isi datanya, jangan menunggu transaksi lain.",
                     target_unit_id=target.unit_id,
                     priority=2,
                 )

@@ -241,7 +241,7 @@
       card.remove();
       emit(ok ? "t60:proposal-approved" : "t60:proposal-denied", { action_type: prop.action_type });
       if (data.url) {
-        addMsg("ai", data.message || "Silakan buka sendiri portal resminya.");
+        addMsg("ai", data.message || "Silakan buka sendiri situs resminya.");
         window.open(data.url, "_blank", "noopener");
         return;
       }

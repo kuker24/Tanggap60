@@ -78,7 +78,7 @@ def render_lines(title: str, lines: Iterable[str], generated_at: str, snapshot_h
         pdf.setFillColor(CREAM)
         pdf.setFont("Helvetica", 7.5)
         pdf.drawString(margin, 6 * mm, "Bukan dokumen resmi. Tidak dikirim ke bank atau polisi.")
-        stamp = f"{str(generated_at)[:10]}  ·  snapshot {snapshot_hash[:16]}"
+        stamp = f"{str(generated_at)[:10]}  ·  kode paket {snapshot_hash[:16]}"
         pdf.drawRightString(width - margin, 6 * mm, stamp)
 
     def wrap(text: str, font: str, size: float, limit: float) -> list[str]:

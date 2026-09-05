@@ -29,3 +29,5 @@ def test_pdf_has_brand_and_safety_labels() -> None:
     assert "Profile kesiapan" in text
     assert "Untuk bank" in text
     assert "case-" not in text
+    assert "kode paket" in text
+    assert "snapshot" not in text.lower()

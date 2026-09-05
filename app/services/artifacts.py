@@ -352,11 +352,11 @@ class ArtifactService:
                 seen.add(label)
                 status = str(check.get("status") or "")
                 if status == "MET":
-                    rows.append(f"- [x] {label}")
+                    rows.append(f"- [x] {soften(label)}")
                 elif status == "PREPARE_EXTERNALLY":
-                    rows.append(f"- [ ] {label} (isi di portal resmi)")
+                    rows.append(f"- [ ] {soften(label)} (isi di situs resmi)")
                 else:
-                    rows.append(f"- [ ] {label}")
+                    rows.append(f"- [ ] {soften(label)}")
         if not rows:
             rows = [
                 "- [ ] Kronologi dan waktu kejadian sudah ditinjau.",
@@ -364,14 +364,14 @@ class ArtifactService:
                 "- [ ] Jumlah uang dan waktu transaksi terkonfirmasi.",
                 "- [ ] Bukti transaksi tersedia.",
                 "- [ ] Bukti komunikasi tersedia.",
-                "- [ ] Identitas/KTP disiapkan untuk portal resmi, bukan diunggah ke SatuAman.",
+                "- [ ] Identitas/KTP disiapkan untuk situs resmi, bukan dikirim ke SatuAman.",
             ]
         body = "\n".join(rows)
         return (
             "# Daftar periksa sebelum lapor\n\n"
             "Draf pengguna. Bukan dokumen resmi. Status resmi: NOT_VERIFIED.\n\n"
             f"{body}\n\n"
-            "## Kanal resmi\n"
+            "## Situs resmi\n"
             f"- IASC: {self.settings.official_iasc_url}\n"
             "- Laporan polisi: Anda yang mengirim.\n"
             "- Bank: nomor resmi dari aplikasi, kartu, atau situs resmi.\n"
@@ -610,7 +610,7 @@ class ArtifactService:
             lines.append(f"## {channel['label']}")
             lines.append(f"{channel['status_label']} ({channel['checks_met']}/{channel['checks_total']})")
             for check in channel["checks"]:
-                lines.append(f"- {check['label']}: {soften(check['reason'])}")
+                lines.append(f"- {soften(check['label'])}: {soften(check['reason'])}")
         lines.append(str(report["disclaimer"]))
         return lines
 
@@ -627,7 +627,7 @@ class ArtifactService:
         if channel == "IASC":
             lines.append("Lembar bantu pengisian IASC.")
             lines.append("## Rekening korban")
-            lines.append("- Bank / nomor / nama: isi langsung di portal resmi.")
+            lines.append("- Bank / nomor / nama: isi langsung di situs resmi.")
             lines.append("## Rekening terlapor")
             dests = [f for f in self._locked_facts(case_id) if f.type.value == "ACCOUNT" and "VICTIM" not in (f.raw_value or "")]
             amounts = [f for f in self._locked_facts(case_id) if f.type.value == "AMOUNT"]
@@ -650,9 +650,9 @@ class ArtifactService:
         lines.append("## Yang masih kurang")
         if gaps:
             for check in gaps:
-                lines.append(f"- {check['label']}: {soften(check['action'] or check['reason'])}")
+                lines.append(f"- {soften(check['label'])}: {soften(check['action'] or check['reason'])}")
         else:
-            lines.append("- Tidak ada kekurangan wajib pada pemeriksaan internal.")
+            lines.append("- Tidak ada kekurangan wajib pada cek kelengkapan.")
         lines.append("Buka situs resmi sendiri. Tanggap60 tidak mengirim laporan.")
         lines.append(str(report["disclaimer"]))
         return lines
@@ -686,7 +686,7 @@ class ArtifactService:
         if gaps:
             lines.append("## Yang masih kurang")
             for check in gaps:
-                lines.append(f"- {check['label']}: {soften(check['action'] or check['reason'])}")
+                lines.append(f"- {soften(check['label'])}: {soften(check['action'] or check['reason'])}")
         lines.append("Buka situs resmi sendiri. Tanggap60 tidak mengirim laporan.")
         lines.append(str(report["disclaimer"]))
         return lines
@@ -705,7 +705,7 @@ class ArtifactService:
                 lines.append(
                     f"- Hubungi bank. Transaksi {_money(unit.amount)} ke {unit.destination_account or 'rekening tujuan'} {unit.transferred_at or ''}.".replace(" .", ".")
                 )
-            lines.append("- Buka portal resmi IASC. Gunakan lembar IASC untuk transaksi yang sudah terpasang.")
+            lines.append("- Buka situs resmi IASC. Gunakan lembar IASC untuk transaksi yang sudah terpasang.")
         elif next_action:
             label = soften(next_action.get("label"))
             reason = soften(next_action.get("reason"))
@@ -740,7 +740,7 @@ class ArtifactService:
                 lines.append(f"- {human(ch['channel'], 'channel')}: {ch['status_label']} ({ch['checks_met']}/{ch['checks_total']})")
                 for ck in ch["checks"]:
                     if ck["status"] in {"MISSING", "CONFLICT", "PREPARE_EXTERNALLY"}:
-                        lines.append(f"- {ck['label']}: {soften(ck['reason'])}")
+                        lines.append(f"- {soften(ck['label'])}: {soften(ck['reason'])}")
         incident = report.get("incident_police")
         if incident:
             lines.append("## Polisi")
@@ -761,7 +761,7 @@ class ArtifactService:
         if channel == "IASC":
             lines.append("Lembar bantu pengisian IASC.")
             lines.append("## Rekening korban")
-            lines.append("- Bank / nomor / nama: isi langsung di portal resmi.")
+            lines.append("- Bank / nomor / nama: isi langsung di situs resmi.")
             lines.append("## Rekening terlapor")
             lines.append(f"- Nomor: {unit.destination_account or 'Informasi ini belum tersedia.'}")
             lines.append("## Transaksi")
