@@ -3,12 +3,11 @@
    inserted via textContent (no raw HTML from server). */
 (function () {
   "use strict";
-  const root = document.getElementById("agent-root");
-  if (!root) return;
-  const CASE = root.getAttribute("data-case-id");
-  const WORKSPACE_URL = root.getAttribute("data-workspace-url");
   const fab = document.getElementById("agent-fab");
   const panel = document.getElementById("agent-panel");
+  if (!fab || !panel) return;
+  const CASE = document.body.getAttribute("data-case-id");
+  const WORKSPACE_URL = CASE ? ("/cases/" + CASE + "/workspace") : "";
   const msgs = document.getElementById("agent-messages");
   const quick = document.getElementById("agent-quick");
   const form = document.getElementById("agent-form");
@@ -27,6 +26,7 @@
   const GUIDANCE_OFF = true;
   let fetchCtl = null;
   let gen = 0;
+  let savedScroll = 0;
 
   function showToast(text) {
     toast.textContent = text;
@@ -112,6 +112,9 @@
   async function send(text, opts) {
     if (inFlight) return;
     const viaVoice = !!(opts && opts.voice);
+    // Only return focus to the input when the user was already typing there.
+    // Tapping a quick action or opening the panel must not pop the keyboard.
+    const hadInputFocus = (document.activeElement === input);
     text = (text || "").trim();
     if (!text && greeted) return;
     if (text) addMsg("user", text, null, false);
@@ -178,7 +181,7 @@
       addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.", null, false);
     } finally {
       setBusy(false);
-      setTimeout(() => input.focus(), 50);
+      if (hadInputFocus && !panel.hidden) input.focus({ preventScroll: true });
     }
   }
 
@@ -639,6 +642,7 @@
     if (!panel.hidden) {
       panel.hidden = true;
       fab.setAttribute("aria-expanded", "false");
+      document.body.classList.remove("agent-open");
       showToast("Lihat yang ditunjukkan — ketuk Bantu saya untuk kembali.");
     }
   }
@@ -840,7 +844,21 @@
     return false;
   }
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && RT.busy) RT.cancel(false);
+    if (ev.key === "Escape" && !panel.hidden) {
+      if (RT.busy) RT.cancel(false);
+      close();
+    }
+  });
+  // On small screens the panel is an overlay sheet: keep Tab inside it.
+  panel.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Tab" || panel.getAttribute("aria-modal") !== "true") return;
+    const focusables = Array.from(panel.querySelectorAll("button, input, a[href], summary"))
+      .filter((el) => !el.disabled && el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
   });
 
   async function silentFollowUp(text) {
@@ -950,51 +968,7 @@
     ringTimer = setTimeout(clearGuide, 9000);
   }
 
-  /* --- Voice native: push-to-talk STT + auto-send + TTS pendek --- */
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  function micState(state, label) {
-    if (!mic) return;
-    mic.dataset.state = state || "idle";
-    mic.classList.toggle("listening", state === "listening");
-    mic.classList.toggle("processing", state === "processing");
-    mic.setAttribute("aria-label", label || "Bicara dengan Tanggap60");
-  }
-  if (!SR) { mic.hidden = true; }
-  else {
-    const rec = new SR();
-    rec.lang = "id-ID";
-    rec.interimResults = false;
-    rec.maxAlternatives = 1;
-    rec.onstart = () => {
-      micState("listening", "Mendengarkan… ketuk untuk berhenti");
-      setStatus("🎙 Mendengarkan…");
-      announce("Mendengarkan. Silakan bicara.");
-    };
-    rec.onresult = (ev) => {
-      const res = ev.results[0];
-      const text = (res[0] && res[0].transcript) || "";
-      input.value = text;
-      // STT final → langsung kirim ke agent, tanpa tekan Kirim (§9).
-      // Guard: jangan kirim ganda saat request berjalan; teks menetap di input.
-      if (res.isFinal && text.trim() && !inFlight) {
-        micState("processing", "Memproses suara…");
-        setStatus("Memproses suara…");
-        send(text, { voice: true });
-      } else if (res.isFinal && text.trim()) {
-        input.focus();
-        showToast("Tunggu sebentar, lalu tekan Kirim.");
-      }
-    };
-    rec.onend = () => { if (!inFlight) { micState("idle"); setStatus("Siap membantu"); } };
-    rec.onerror = () => { micState("idle"); showToast("Suara tidak dikenali. Tulis saja pesannya."); };
-    mic.addEventListener("click", () => {
-      try {
-        if (mic.dataset.state === "listening") { rec.stop(); return; }
-        micState("listening");
-        rec.start();
-      } catch (e) { micState("idle"); }
-    });
-  }
+  if (mic) mic.hidden = true;
   function speak(text) {
     try {
       if (!("speechSynthesis" in window)) return;
@@ -1026,18 +1000,30 @@
 
   /* --- Panel wiring --- */
   function open() {
+    savedScroll = window.scrollY;
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
-    // Render stored history only once when container is currently empty
+    document.body.classList.add("agent-open");
+    // Desktop docks beside the form (non-modal); the phone sheet overlays it.
+    const sheet = window.matchMedia("(max-width: 1099px)").matches;
+    panel.setAttribute("aria-modal", sheet ? "true" : "false");
     if (msgs.children.length === 0 && hist.length > 0) {
       hist.forEach(h => {
         if (h && h.role === "ai") addMsg("ai", h.text, h.tools, false);
       });
     }
     if (!greeted && msgs.children.length === 0) send("");
-    setTimeout(() => input.focus(), 50);
+    // Move focus to the close control, never the text input: opening help
+    // must not pop the phone keyboard or steal the form context.
+    document.getElementById("agent-close").focus({ preventScroll: true });
   }
-  function close() { panel.hidden = true; fab.setAttribute("aria-expanded", "false"); fab.focus(); }
+  function close() {
+    panel.hidden = true;
+    fab.setAttribute("aria-expanded", "false");
+    document.body.classList.remove("agent-open");
+    window.scrollTo(0, savedScroll);
+    fab.focus();
+  }
   fab.addEventListener("click", () => (panel.hidden ? open() : close()));
   document.getElementById("agent-close").addEventListener("click", close);
   form.addEventListener("submit", (ev) => { ev.preventDefault(); send(input.value); });

@@ -12,11 +12,18 @@
 {% endfor %}
 <h1>Pastikan datanya benar</h1>
 <p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Periksa data di bawah. Betulkan yang salah.{% elif facts %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
+{% if not has_blocking and facts %}
+<p class="muted small" id="review-remaining" role="status">{% if ns.count %}{{ ns.count }} data lagi perlu diperiksa.{% else %}Semua data sudah diperiksa.{% endif %} Data yang sudah dicek tetap bisa diubah.</p>
+{% endif %}
+<div class="notice warn" id="review-stale" role="alert" hidden>
+  <p>Data berubah di tempat lain. Muat data terbaru sebelum menyimpan lagi. Tulisan yang belum disimpan akan hilang saat dimuat ulang.</p>
+  <button class="btn ghost" type="button" onclick="location.reload()">Muat data terbaru</button>
+</div>
 
 {% if notice == "pairing-ok" %}
-<p class="notice ok" role="status">Pasangan tersimpan. Lanjut ke data berikutnya.</p>
+<p class="notice ok" role="status">Tersimpan. Lanjut ke data berikutnya.</p>
 {% elif notice == "pairing-gagal" %}
-<p class="notice warn" role="alert">Belum tersimpan. Pasangkan dulu rekening dan jumlah uangnya, lalu tekan Simpan pasangan.</p>
+<p class="notice warn" role="alert">Belum tersimpan. Pilih rekening dan jumlah uangnya, lalu tekan Simpan.</p>
 {% elif notice == "pairing-basi" %}
 <p class="notice warn" role="alert">Data berubah sejak terakhir Anda memeriksa. Halaman sudah dimuat ulang — periksa lagi lalu simpan.</p>
 {% elif notice == "manual-ok" %}
@@ -129,7 +136,7 @@
       </article>
       {% endfor %}
       {% endif %}
-      <div class="sticky-cta"><button class="btn ember" type="submit">Simpan pasangan</button></div>
+      <div class="sticky-cta"><button class="btn ember" type="submit">Simpan</button></div>
     </form>
   </section>
   {% endfor %}
@@ -152,7 +159,7 @@
   {% endif %}
   {% if fact.review_status == "CANDIDATE" %}
   <div class="fact-actions">
-    <button class="btn ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
+    <button class="btn ember" data-action="confirm" aria-describedby="review-remaining" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
     <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Kurang tepat</button>
   </div>
   {% elif fact.review_status in ["CONFIRMED", "CORRECTED"] %}
@@ -172,8 +179,8 @@
 </article>
 {% else %}
 <article class="empty">
-  <h3>Belum ada transaksi untuk diperiksa</h3>
-  <p>Kirim foto transfer, chat, atau link dulu. Atau isi manual jika foto tidak terbaca. Data manual bukan hasil OCR.</p>
+  <h3>Belum ada data untuk diperiksa</h3>
+  <p>Kirim foto transfer, chat, atau link. Jika foto tidak terbaca, isi data sendiri. Data ini dicatat sebagai tulisan Anda, bukan hasil pembacaan foto.</p>
   <div class="actions">
     <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a>
   </div>
@@ -195,7 +202,7 @@
 
 {% if ns.count == 0 and facts %}
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lihat ringkasan</a>
+  <a class="btn ember" id="review-summary" href="/cases/{{ case.case_id }}/readiness">Lihat ringkasan</a>
   </div>
 {% endif %}
 <p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
@@ -204,47 +211,95 @@
 <script>
 const VERSION = {{ case.version }};
 const CASE = "{{ case.case_id }}";
+const CONTINUITY_KEY = `review-continuity:${CASE}`;
+let reviewSaving = false;
+function reloadReview(id){
+  const ids = Array.from(document.querySelectorAll("[data-fact]"), card => card.dataset.fact);
+  const index = ids.indexOf(id);
+  try {
+    sessionStorage.setItem(CONTINUITY_KEY, JSON.stringify({
+      next: ids.slice(index + 1).concat(ids.slice(0, index + 1)),
+      scrollY: window.scrollY,
+      savedAt: Date.now()
+    }));
+  } catch (_) { /* Storage may be unavailable; the server reload must still happen. */ }
+  location.reload();
+}
+window.addEventListener("load", () => {
+  let saved;
+  try {
+    saved = JSON.parse(sessionStorage.getItem(CONTINUITY_KEY));
+    sessionStorage.removeItem(CONTINUITY_KEY);
+  } catch (_) { return; }
+  if(!saved || !Array.isArray(saved.next) || !Number.isFinite(saved.scrollY) ||
+     !Number.isFinite(saved.savedAt) || Date.now() - saved.savedAt > 300000) return;
+  // Pick only from the newly rendered server state, never from an optimistic status.
+  const pending = Array.from(document.querySelectorAll('[data-fact] [data-action="confirm"]'));
+  const target = saved.next.map(id => pending.find(btn => btn.closest("[data-fact]").dataset.fact === id)).find(Boolean)
+    || pending[0] || document.getElementById("review-summary")
+    || document.querySelector('[name="resolution_fact_id"]');
+  requestAnimationFrame(() => {
+    window.scrollTo({top: saved.scrollY, behavior: "instant"});
+    if(target){
+      target.focus({preventScroll: true});
+      const rect = target.getBoundingClientRect();
+      if(rect.top < 120 || rect.bottom > window.innerHeight - 80){
+        target.scrollIntoView({block: "center", behavior: "instant"});
+      }
+    }
+    toast("Tersimpan");
+  });
+});
 function toast(m, isErr){ const t=document.getElementById("toast"); t.textContent=m; t.setAttribute("role", isErr ? "alert" : "status"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"), isErr ? 4000 : 2200); }
 async function patchFact(ev, id){
   ev.preventDefault();
+  if(reviewSaving) return false;
   const btn = ev.currentTarget || ev.submitter;
   const action = btn.getAttribute("data-action");
   if(action==="correct"){ openCorrect(id); return false; }
   btn.disabled = true;
+  reviewSaving = true;
   try {
     const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, expected_version: VERSION}) });
-    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); }
-    else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan. Coba lagi.", true); btn.disabled = false; }
+    if(res.ok){ reloadReview(id); }
+    else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan. Coba lagi.", true); btn.disabled = false; reviewSaving = false; if(res.status===409) document.getElementById("review-stale").hidden = false; }
   } catch (_) {
     toast("Koneksi terputus. Pilihan masih di layar — coba lagi.", true);
     btn.disabled = false;
+    reviewSaving = false;
   }
   return false;
 }
 function openCorrect(id){ document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
 function closeCorrect(id){ document.getElementById("correct-"+id).classList.remove("open"); return false; }
 async function submitCorrect(id){
+  if(reviewSaving) return false;
   const v=document.getElementById("input-"+id).value.trim();
   if(!v){ toast("Tulis dulu yang benar, contoh: Rp2.750.000", true); return false; }
+  reviewSaving = true;
   try {
     const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
-    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
+    if(res.ok){ reloadReview(id); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); reviewSaving = false; if(res.status===409) document.getElementById("review-stale").hidden = false; }
   } catch (_) {
     toast("Koneksi terputus. Tulisan masih di layar — coba simpan lagi.", true);
+    reviewSaving = false;
   }
   return false;
 }
 async function resolveConflict(ev, id){
   ev.preventDefault();
+  if(reviewSaving) return false;
   const fid = ev.submitter.value;
   const btn = ev.submitter;
   if (btn) btn.disabled = true;
+  reviewSaving = true;
   try {
     const res = await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({resolution_fact_id: fid, expected_version: VERSION})});
-    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); if (btn) btn.disabled = false; }
+    if(res.ok){ reloadReview(fid); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); if (btn) btn.disabled = false; reviewSaving = false; if(res.status===409) document.getElementById("review-stale").hidden = false; }
   } catch (_) {
     toast("Koneksi terputus. Pilihan masih di layar — coba lagi.", true);
     if (btn) btn.disabled = false;
+    reviewSaving = false;
   }
   return false;
 }

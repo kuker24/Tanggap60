@@ -104,7 +104,7 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
             return [
                 {
                     "key": "bukti",
-                    "title": "Belum ada transaksi untuk diperiksa",
+                    "title": "Belum ada data untuk diperiksa",
                     "points": ["Kirim foto transfer, chat, atau link yang memuat jumlah uang, rekening, dan waktu."],
                     "href": f"/cases/{case_id}/intake",
                     "cta": "Periksa bukti",

@@ -45,9 +45,14 @@
     {% block stepper %}{% endblock %}
   </header>
 
-  <main id="main" class="shell">
-    {% block content %}{% endblock %}
-  </main>
+  <div class="case-stage">
+    <main id="main" class="shell">
+      {% block content %}{% endblock %}
+    </main>
+    {% if case is defined %}
+    {% include "_agent_panel.html" %}
+    {% endif %}
+  </div>
 
   <footer class="foot">
     <span>Tanggap60 hanya menyusun. Laporan dikirim oleh Anda ke bank, IASC, atau polisi.</span>

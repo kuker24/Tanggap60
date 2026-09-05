@@ -7,6 +7,11 @@
   <p class="sim-badge" role="note">SALIN DATA — BUKAN PORTAL RESMI</p>
   <h1 id="ws-title">Data untuk disalin</h1>
   <p class="lede">Salin kronologi dan data yang sudah Anda konfirmasi. Ini bukan formulir portal resmi.</p>
+  <p id="ws-status" role="status" aria-live="polite">Memuat data untuk disalin...</p>
+  <div id="ws-error" class="notice" hidden>
+    <p>Data belum berhasil dimuat. Ini bukan berarti transaksi Anda kosong. Periksa koneksi, lalu coba lagi.</p>
+    <button id="ws-retry" class="btn ghost" type="button">Coba muat lagi</button>
+  </div>
 
   <div id="ws-log" class="card" aria-live="polite">
     <h3>Yang Tanggap60 siapkan</h3>
@@ -19,6 +24,12 @@
 
     <h2 class="muted small">Kronologi (dari fakta yang ditinjau)</h2>
     <ol id="ws-chrono" class="plan"></ol>
+    <button id="ws-copy-chrono" class="btn ghost" type="button" disabled>Salin kronologi</button>
+    <p id="ws-copy-status" role="status" aria-live="polite"></p>
+    <div id="ws-copy-manual" hidden>
+      <label for="ws-copy-text">Teks untuk disalin manual</label>
+      <textarea id="ws-copy-text" rows="5" readonly aria-describedby="ws-copy-status"></textarea>
+    </div>
 
     <h2 class="muted small">Bukti terlampir</h2>
     <ul id="ws-ev" class="gaps"></ul>
@@ -34,6 +45,13 @@
 
     <div class="next-card" data-guide-id="official-handoff">
       <h3>Buka portal resmi IASC</h3>
+      <ol class="plan">
+        <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
+        <li>Buka situs resmi IASC melalui tombol di bawah.</li>
+        <li>Salin data dan kronologi ke kolom yang sesuai. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
+      </ol>
+      <p class="muted small">Satu formulir IASC berfokus pada transaksi dari satu rekening korban ke satu rekening tujuan. Tujuan berbeda mungkin memerlukan laporan terpisah; ikuti petunjuk situs resmi.</p>
+      <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir, bukan langsung mengunggah ZIP. Tidak ada jaminan arsip diterima oleh kanal resmi.</p>
       <p class="muted small">Isi data diri di situs mereka, bukan di sini. Tanggap60 tidak mengirim laporan.</p>
       <div class="actions">
         <a class="btn" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Buka situs IASC</a>
@@ -51,13 +69,46 @@
 <script>
 (function(){
   const CASE = "{{ case.case_id }}";
-  fetch(`/api/v1/cases/${CASE}/workspace`).then(r => r.json()).then(ws => {
+  const retry = document.getElementById("ws-retry");
+  async function copyText(text, label) {
+    const status = document.getElementById("ws-copy-status");
+    const manual = document.getElementById("ws-copy-manual");
+    const input = document.getElementById("ws-copy-text");
+    manual.hidden = true;
+    input.value = "";
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.writeText) throw new Error("clipboard unavailable");
+      await navigator.clipboard.writeText(text);
+      status.textContent = label + " tersalin. Tempel di kolom yang sesuai pada situs resmi.";
+    } catch (_) {
+      status.textContent = "Salin otomatis gagal. Teks tersedia di bawah: tekan lama atau pilih semua, lalu pilih Salin. Anda juga bisa mencoba tombol salin lagi.";
+      manual.hidden = false;
+      input.value = text;
+      input.focus();
+      input.select();
+    }
+  }
+  async function loadWorkspace() {
+    retry.disabled = true;
+    document.getElementById("ws-error").hidden = true;
+    document.getElementById("ws-empty").hidden = true;
+    document.getElementById("ws-body").hidden = true;
+    document.getElementById("ws-log").hidden = true;
+    document.getElementById("ws-status").textContent = "Memuat data untuk disalin...";
+    ["ws-log-list", "ws-tx", "ws-chrono", "ws-ev", "ws-check"].forEach(id => document.getElementById(id).replaceChildren());
+    try {
+    const response = await fetch(`/api/v1/cases/${CASE}/workspace`);
+    if (!response.ok) throw new Error("workspace status");
+    const ws = await response.json();
+    if (!ws.fields || !Array.isArray(ws.fields.transactions)) throw new Error("workspace data");
     const log = document.getElementById("ws-log-list");
-    if(!ws.fields || !(ws.fields.transactions || []).length){
+    document.getElementById("ws-status").textContent = "Data selesai dimuat.";
+    if(!ws.fields.transactions.length){
       document.getElementById("ws-log").hidden = true;
       document.getElementById("ws-empty").hidden = false;
       return;
     }
+    document.getElementById("ws-log").hidden = false;
     (ws.action_log || []).forEach(step => {
       const li = document.createElement("li");
       li.textContent = step;
@@ -68,7 +119,6 @@
     ws.fields.transactions.forEach((t, i) => {
       const el = document.createElement("article");
       el.className = "tx";
-      el.innerHTML = "";
       const h = document.createElement("h3");
       h.textContent = "Transaksi " + (i + 1);
       el.appendChild(h);
@@ -77,8 +127,18 @@
        ["Tanggal", t.date], ["Waktu", t.time]].forEach(([k, v]) => {
         const p = document.createElement("p");
         p.className = "tx-when";
-        p.textContent = k + ": " + v;
+        const value = v == null ? "Belum tersedia" : String(v);
+        p.textContent = k + ": " + value;
         el.appendChild(p);
+        if (value && !value.startsWith("Belum ")) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "btn ghost";
+          button.textContent = "Salin " + k.toLowerCase();
+          button.setAttribute("aria-label", button.textContent + ", transaksi " + (i + 1));
+          button.addEventListener("click", () => copyText(value, k));
+          el.appendChild(button);
+        }
       });
       txBox.appendChild(el);
     });
@@ -88,6 +148,10 @@
       li.textContent = line;
       ch.appendChild(li);
     });
+    const chronology = (ws.fields.chronology || []).join("\n");
+    const copyChronology = document.getElementById("ws-copy-chrono");
+    copyChronology.disabled = !chronology;
+    copyChronology.onclick = () => copyText(chronology, "Kronologi");
     const ev = document.getElementById("ws-ev");
     (ws.fields.evidence_refs || []).forEach(name => {
       const li = document.createElement("li");
@@ -100,9 +164,17 @@
       li.textContent = (item.done ? "✓ " : "○ ") + item.item + (item.detail ? " — " + item.detail : "");
       ck.appendChild(li);
     });
-  }).catch(() => {
-    document.getElementById("ws-empty").hidden = false;
-  });
+    } catch (_) {
+      document.getElementById("ws-body").hidden = true;
+      document.getElementById("ws-log").hidden = true;
+      document.getElementById("ws-status").textContent = "Data gagal dimuat. Coba muat lagi.";
+      document.getElementById("ws-error").hidden = false;
+    } finally {
+      retry.disabled = false;
+    }
+  }
+  retry.addEventListener("click", loadWorkspace);
+  loadWorkspace();
 })();
 </script>
 {% endblock %}

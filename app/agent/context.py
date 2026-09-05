@@ -26,7 +26,7 @@ from app.services.reporting_units import compile_reporting_units
 _CANDIDATE_TYPES = {FactType.AMOUNT, FactType.ACCOUNT, FactType.PJP, FactType.DATETIME}
 
 _QUICK_BY_STATE: dict[str, list[str]] = {
-    "NEW": ["Saya harus apa?", "Tunjukkan yang kurang"],
+    "NEW": ["Bukti apa yang dibutuhkan?", "Cara mengunggah"],
     "INGESTING": ["Saya harus apa?", "Tunjukkan yang kurang"],
     "EXTRACTING": ["Saya harus apa?", "Tunjukkan yang kurang"],
     "REVIEW_REQUIRED": ["Saya harus apa?", "Tunjukkan yang kurang", "Bantu konfirmasi transaksi"],
@@ -39,6 +39,12 @@ _QUICK_BY_STATE: dict[str, list[str]] = {
     "COMPLETE": ["Saya harus apa?"],
     "FAILED_SAFE": ["Saya harus apa?", "Tunjukkan yang kurang"],
 }
+
+
+def _quick_actions(state: str, evidence_count: int) -> list[str]:
+    if state == "NEW" or evidence_count == 0:
+        return ["Bukti apa yang dibutuhkan?", "Cara mengunggah"]
+    return list(_QUICK_BY_STATE.get(state, ["Saya harus apa?"]))
 
 
 def build_agent_context(db: Any, case_id: str) -> dict[str, Any]:
@@ -129,7 +135,7 @@ def build_agent_context(db: Any, case_id: str) -> dict[str, Any]:
             for a in artifacts
         ],
         "evidence_count": len(evidence),
-        "quick_actions": list(_QUICK_BY_STATE.get(case.state.value, ["Saya harus apa?"])),
+        "quick_actions": _quick_actions(case.state.value, len(evidence)),
     }
 
 

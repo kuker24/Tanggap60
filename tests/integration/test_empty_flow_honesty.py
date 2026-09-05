@@ -9,7 +9,7 @@ def test_empty_review_and_approval_do_not_pretend_progress(client: TestClient) -
     case_id = create_case(client)
     review = client.get(f"/cases/{case_id}/review")
     assert review.status_code == 200
-    assert "Belum ada transaksi untuk diperiksa" in review.text
+    assert "Belum ada data untuk diperiksa" in review.text
     assert "Periksa bukti" in review.text
     assert "Lanjut dulu" not in review.text
     assert "Buat paket untuk 0" not in review.text
@@ -17,7 +17,7 @@ def test_empty_review_and_approval_do_not_pretend_progress(client: TestClient) -
 
     approval = client.get(f"/cases/{case_id}/approval")
     assert approval.status_code == 200
-    assert "Belum ada transaksi untuk diperiksa" in approval.text
+    assert "Belum ada data untuk diperiksa" in approval.text
     assert "Buat paket untuk 0" not in approval.text
     assert "Buat dokumen" not in approval.text
     assert 'name="accepted_notice"' not in approval.text
@@ -25,7 +25,7 @@ def test_empty_review_and_approval_do_not_pretend_progress(client: TestClient) -
 
     ready = client.get(f"/cases/{case_id}/readiness")
     assert ready.status_code == 200
-    assert "Belum ada transaksi untuk diperiksa" in ready.text
+    assert "Belum ada data untuk diperiksa" in ready.text
     assert ready.text.count("Periksa bukti") >= 1
     assert "Lanjut dulu" not in ready.text
     assert "Buat paket untuk 0" not in ready.text

@@ -47,7 +47,7 @@ def test_case_approval_rejects_ambiguous(client: TestClient, ocr: ScriptedOcr) -
     assert "Belum bisa dibuat" in page.text
     assert 'id="go"' not in page.text
     review = client.get(f"/cases/{case_id}/review")
-    assert "Simpan pasangan" in review.text
+    assert ">Simpan</button>" in review.text
 
 
 def test_review_pairing_one_decision_per_card(client: TestClient, ocr: ScriptedOcr) -> None:

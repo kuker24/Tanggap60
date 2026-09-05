@@ -83,6 +83,17 @@
 </div>
 {% endif %}
 
+{% if tx_cards %}
+<div class="next-card" data-guide-id="official-handoff">
+  <h3>Membawa paket ke situs resmi</h3>
+  <ol class="plan">
+    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu buka dan periksa isinya.</li>
+    <li>Buka situs resmi melalui tautan IASC di bawah.</li>
+    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a> ke kolom yang sesuai. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
+  </ol>
+  <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir. Tanggap60 tidak mengirim laporan.</p>
+</div>
+{% endif %}
 <p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 {% if not gap_tasks %}
 <div class="actions">

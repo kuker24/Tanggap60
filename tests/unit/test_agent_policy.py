@@ -47,6 +47,8 @@ def test_classify_red() -> None:
 
 def test_classify_read_intents() -> None:
     assert classify("Saya harus ngapain sekarang?").kind == "ASK_NEXT"
+    assert classify("Bukti apa yang dibutuhkan?").kind == "ASK_NEEDED_EVIDENCE"
+    assert classify("Cara mengunggah").kind == "EXPLAIN_UPLOAD"
     assert classify("Tunjukin yang kurang.").kind == "SHOW_MISSING"
     assert classify("Mana transaksi yang bermasalah?").kind == "SHOW_PROBLEM"
     assert classify("Bantu saya buat laporannya.").kind == "PREPARE_REPORT"

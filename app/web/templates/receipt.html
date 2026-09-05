@@ -13,7 +13,8 @@
   <p class="muted small">Ini catatan lokal yang disamarkan, bukan pelacak resmi. Status resmi tetap di situs mereka.</p>
   <form id="rcpt-fix" class="stack" novalidate>
     <label for="ticket-fix">Ubah catatan nomor</label>
-    <input id="ticket-fix" name="ticket_text" type="text" placeholder="Nomor baru" autocomplete="off">
+    <input id="ticket-fix" name="ticket_text" type="text" placeholder="Nomor baru" autocomplete="off" aria-describedby="rcpt-fix-alert">
+    <p id="rcpt-fix-alert" role="status" aria-live="polite"></p>
     <div class="actions">
       <button class="btn ghost" type="submit">Simpan perubahan</button>
       <a class="btn ember" href="/cases/{{ case.case_id }}/artifacts">Kembali ke paket</a>
@@ -25,8 +26,10 @@ document.getElementById("rcpt-fix").addEventListener("submit", async (ev) => {
   ev.preventDefault();
   const btn = ev.target.querySelector('[type="submit"]');
   const ticket_text = document.getElementById("ticket-fix").value.trim();
-  if(!ticket_text){ window._alert("purge-alert", "error", "Belum ada nomor", "Isi nomor barunya, atau biarkan catatan lama."); return; }
+  const feedback = document.getElementById("rcpt-fix-alert");
+  if(!ticket_text){ feedback.textContent = "Isi nomor barunya, atau biarkan catatan lama."; document.getElementById("ticket-fix").focus(); return; }
   btn.disabled = true;
+  feedback.textContent = "Menyimpan perubahan...";
   try {
     const res = await fetch("/api/v1/cases/{{ case.case_id }}/receipt", {
       method: "POST",
@@ -34,8 +37,13 @@ document.getElementById("rcpt-fix").addEventListener("submit", async (ev) => {
       body: JSON.stringify({ticket_text, replace: true})
     });
     if(res.ok){ location.reload(); return; }
-  } catch (_) {}
-  btn.disabled = false;
+    feedback.textContent = "Perubahan belum tersimpan. Nomor masih di layar. Periksa isian, lalu tekan Coba simpan lagi.";
+  } catch (_) {
+    feedback.textContent = "Koneksi terputus. Penyimpanan belum dapat dipastikan. Nomor masih di layar; tekan Coba simpan lagi.";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Coba simpan lagi";
+  }
 });
 </script>
 {% else %}
@@ -73,10 +81,20 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
 </script>
 {% endif %}
 
+<details>
+  <summary>Belum melapor? Cara membawa dokumen</summary>
+  <ol class="plan">
+    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
+    <li>Buka <a class="link" href="https://iasc.ojk.go.id/" target="_blank" rel="noopener">situs resmi IASC</a>.</li>
+    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a> ke kolom yang sesuai. Isi identitas sendiri dan lampirkan bukti transfer serta bukti pendukung sesuai aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan; ringkasan tidak menggantikan bukti asli.</li>
+  </ol>
+  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima kanal resmi. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak untuk membuka isinya. Unggah hanya file yang diminta situs resmi. Tanggap60 tidak mengirim laporan; nomor laporan baru diperoleh setelah Anda melapor sendiri.</p>
+</details>
+
 <div class="card danger-zone">
   <h3>Hapus semua data kasus ini</h3>
   <p class="muted small">Foto, data, dan paket di kasus ini dihapus permanen dan tidak bisa dikembalikan. Lakukan ini kalau sudah selesai melapor dan tidak butuh arsipnya.</p>
-  <div id="purge-alert"></div>
+  <div id="purge-alert" role="status" aria-live="polite"></div>
   <form method="post" action="#" onsubmit="return purgeNow(event)">
     <button class="btn danger" type="submit">Hapus permanen</button>
   </form>
@@ -85,6 +103,9 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
 async function purgeNow(ev) {
   ev.preventDefault();
   if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
+  const btn = ev.target.querySelector('[type="submit"]');
+  btn.disabled = true;
+  try {
   const res = await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
   if(res.ok){
     try {
@@ -98,6 +119,11 @@ async function purgeNow(ev) {
   }
   const j = await res.json().catch(()=>({}));
   window._alert("purge-alert", "error", "Belum terhapus", (j.message || "Gagal menghapus") + ". Coba lagi.");
+  } catch (_) {
+    window._alert("purge-alert", "error", "Koneksi terputus", "Penghapusan belum dapat dipastikan. Periksa koneksi, lalu coba hapus lagi atau muat ulang untuk memeriksa status kasus.");
+  } finally {
+    btn.disabled = false;
+  }
   return false;
 }
 </script>

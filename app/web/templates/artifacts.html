@@ -10,15 +10,25 @@
 <div class="next-card" data-guide-id="official-handoff">
   <h3>Lanjut di kanal resmi</h3>
   <p class="muted small">Paket ini alat bantu. Laporan dikirim oleh Anda di situs resmi, bukan di sini.</p>
+  <ol class="plan">
+    <li>Unduh ringkasan PDF, lalu buka dan periksa isinya.</li>
+    <li>Buka situs resmi IASC melalui tautan di bawah.</li>
+    <li>Gunakan <a class="link" href="/cases/{{ case.case_id }}/workspace">Data untuk disalin</a> untuk mengisi kolom data dan kronologi. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
+  </ol>
+  <p class="muted small">Satu formulir IASC berfokus pada transaksi dari satu rekening korban ke satu rekening tujuan. Tujuan berbeda mungkin memerlukan laporan terpisah; ikuti petunjuk situs resmi. Periksa semua isian sebelum Anda mengirim laporan sendiri.</p>
   <div class="actions">
     {% if summary %}
     <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ summary.artifact_id }}/download">Unduh ringkasan PDF</a>
     {% endif %}
-    {% if pack %}
-    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh arsip lengkap (ZIP)</a>
-    {% endif %}
     <a class="btn-text" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC ›</a>
   </div>
+  {% if pack %}
+  <details>
+    <summary>Arsip ZIP (opsional)</summary>
+    <p class="muted small">ZIP hanya arsip untuk Anda, bukan laporan yang otomatis diterima kanal resmi. Setelah diunduh, buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Buka file hasil ekstraksi; lampirkan hanya file yang sesuai aturan formulir, bukan langsung mengunggah ZIP.</p>
+    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh arsip lengkap (ZIP)</a>
+  </details>
+  {% endif %}
 </div>
 
 <div class="actions">
