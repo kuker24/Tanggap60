@@ -12,8 +12,8 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert 'content="#faf7f1"' in home.text
     assert "/static/app.css?v=" in home.text
     assert "is-landing" in home.text
-    assert "c1-container" in home.text
-    assert "c1-card" in home.text
+    assert "land-how" in home.text
+    assert "land-steps" in home.text
     assert "Sudah kirim uang" in home.text
     assert "Belum kirim uang" in home.text
     assert "choice-arrow" not in home.text
@@ -47,7 +47,7 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert empty_proc.headers["location"].endswith("/intake")
     review = client.get(f"/cases/{case_id}/review")
     assert "fact-grid" in review.text
-    assert "Belum ada transaksi untuk diperiksa" in review.text
+    assert "Belum ada data untuk diperiksa" in review.text
     assert "Lanjut dulu" not in review.text
     css = client.get("/static/app.css")
     assert css.status_code == 200
@@ -55,7 +55,7 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "--amber" in css.text
     assert "--aurora" not in css.text
     assert "body.is-landing" in css.text
-    assert ".c1-card" in css.text
+    assert ".land-steps" in css.text
     assert "#100904" not in css.text
     assert "#FFFEFB" not in css.text
     assert "#fffefb" not in css.text.lower()

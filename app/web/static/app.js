@@ -45,6 +45,7 @@
       const on = btn.getAttribute("data-tab") === name;
       btn.classList.toggle("is-on", on);
       btn.setAttribute("aria-selected", on ? "true" : "false");
+      btn.tabIndex = on ? 0 : -1;
     });
     const dropEl = document.getElementById("drop");
     if (dropEl) dropEl.classList.toggle("is-focus", name === "files");
@@ -52,8 +53,21 @@
   if (document.getElementById("intake-form")) {
     const formEl = document.getElementById("intake-form");
     showTab((formEl && formEl.getAttribute("data-default-tab")) || "files");
-    document.querySelectorAll(".intake-tabs [role='tab']").forEach((btn) => {
+    const tabs = Array.from(document.querySelectorAll(".intake-tabs [role='tab']"));
+    tabs.forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab")));
+      btn.addEventListener("keydown", (ev) => {
+        const i = tabs.indexOf(btn);
+        let next = -1;
+        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") next = (i + 1) % tabs.length;
+        else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") next = (i - 1 + tabs.length) % tabs.length;
+        else if (ev.key === "Home") next = 0;
+        else if (ev.key === "End") next = tabs.length - 1;
+        else return;
+        ev.preventDefault();
+        tabs[next].focus();
+        showTab(tabs[next].getAttribute("data-tab"));
+      });
     });
     const pickFiles = document.getElementById("pick-files");
     if (pickFiles && filesInput) pickFiles.addEventListener("click", () => filesInput.click());
@@ -312,12 +326,15 @@
   // one tick so the submitter's own name/value still ships with the payload.
   document.addEventListener("submit", (e) => {
     const f = e.target;
+    if (e.defaultPrevented) return;
     if (!(f instanceof HTMLFormElement) || f.dataset.noHarden !== undefined) return;
     if (f.method.toLowerCase() !== "post" || f.enctype === "multipart/form-data") return;
     const btn = f.querySelector('[type="submit"]:not([disabled])');
     if (!btn) return;
     const label = btn.textContent.trim();
     setTimeout(() => {
+      // Inline confirm()/validation may still cancel after this listener runs.
+      if (e.defaultPrevented || !btn.isConnected || btn.disabled) return;
       btn.disabled = true;
       if (label) btn.textContent = "Memproses…";
     }, 0);

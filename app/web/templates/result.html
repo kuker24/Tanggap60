@@ -13,6 +13,8 @@
   {% endfor %}
 </ol>
 {% if case.route.value != "PRE_INCIDENT_CHECK" %}
+<p class="muted small">Setelah paket siap: unduh ringkasan PDF dan periksa isinya, lalu buka situs resmi. Salin data dan kronologi ke kolom yang sesuai; lampirkan bukti transfer serta bukti pendukung menurut aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan. Ringkasan tidak menggantikan bukti asli. Tanggap60 tidak mengirim laporan.</p>
+<p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima kanal resmi. Untuk membukanya, gunakan aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan situs resmi.</p>
 <div class="actions">
   <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui dan buat paket</a>
   <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
@@ -49,7 +51,7 @@
 <script>
 (function(){
   const NEXT = {
-    VERIFY_VIA_OFFICIAL_CHANNEL: "Bagus. Buka situs resmi IASC (iasc.ojk.go.id) dan masukkan datanya di sana. Jangan klik link dari chat yang mencurigakan.",
+    VERIFY_VIA_OFFICIAL_CHANNEL: "Hubungi bank atau penyedia layanan terkait melalui aplikasi atau alamat resmi yang Anda cari sendiri, bukan tautan dari chat mencurigakan. IASC menangani laporan penipuan transaksi keuangan, bukan layanan untuk memastikan tawaran atau situs itu sah. Jangan transfer sebelum mendapat kejelasan.",
     CANCELLED_ACTION: "Oke, tidak ada langkah lanjutan. Mulai lagi kapan saja dari beranda kalau perlu.",
     PROCEED_BY_USER: "Hati-hati. Jangan transfer dulu sebelum yakin. Kalau nanti ada bukti baru, mulai dari beranda."
   };
@@ -58,11 +60,21 @@
     if (!btn || btn.disabled) return;
     const d = btn.getAttribute("data-d");
     ev.preventDefault();
+    const buttons = document.querySelectorAll("#decision [data-d]");
+    buttons.forEach(button => { button.disabled = true; });
     btn.disabled = true;
-    const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
     const box = document.getElementById("decision-next");
-    if(res.ok){ btn.textContent = "Tercatat ✓"; box.textContent = NEXT[d] || "Tercatat."; box.hidden = false; }
-    else { const j=await res.json().catch(()=>({})); const t=document.getElementById("toast"); t.textContent=(j.message||"Gagal menyimpan")+". Coba lagi."; t.setAttribute("role","alert"); t.classList.add("show"); setTimeout(()=>t.classList.remove("show"),4000); btn.disabled = false; }
+    box.hidden = false;
+    box.textContent = "Mencatat pilihan...";
+    try {
+      const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
+      if(res.ok){ box.textContent = "Pilihan tercatat. " + NEXT[d]; }
+      else { box.textContent = "Pilihan belum tercatat. Coba tekan pilihan Anda lagi."; }
+    } catch (_) {
+      box.textContent = "Koneksi terputus. Penyimpanan pilihan belum dapat dipastikan. Periksa koneksi, lalu tekan pilihan Anda lagi.";
+    } finally {
+      buttons.forEach(button => { button.disabled = false; });
+    }
   });
 })();
 </script>

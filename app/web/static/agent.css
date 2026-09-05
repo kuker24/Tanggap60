@@ -40,7 +40,7 @@
 .agent-quick button {
   border: 1px solid #d8cdb4; background: #fff; border-radius: 999px;
   padding: 8px 14px; font-size: 13px; cursor: pointer; color: #1c1917;
-  min-height: 38px; display: inline-flex; align-items: center;
+  min-height: 44px; display: inline-flex; align-items: center;
 }
 .agent-quick button:hover { background: #faf7f1; }
 #agent-form {
@@ -48,11 +48,12 @@
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
 #agent-input {
-  flex: 1; border: 1px solid #d8cdb4; border-radius: 10px; padding: 10px 12px;
+  flex: 1 1 auto; min-width: 0; border: 1px solid #d8cdb4; border-radius: 10px; padding: 10px 12px;
   font-size: 16px; /* iOS auto-zoom defense */
   min-height: 44px; box-sizing: border-box; background: #fff; color: #1c1917;
 }
 #agent-send, #agent-mic {
+  flex: 0 0 auto;
   border: 1px solid #d8cdb4; background: #faf7f1; border-radius: 10px;
   padding: 0 14px; cursor: pointer; font-size: 16px; color: #1c1917;
   min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center;

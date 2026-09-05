@@ -112,6 +112,9 @@
   async function send(text, opts) {
     if (inFlight) return;
     const viaVoice = !!(opts && opts.voice);
+    // Only return focus to the input when the user was already typing there.
+    // Tapping a quick action or opening the panel must not pop the keyboard.
+    const hadInputFocus = (document.activeElement === input);
     text = (text || "").trim();
     if (!text && greeted) return;
     if (text) addMsg("user", text, null, false);
@@ -178,7 +181,7 @@
       addMsg("ai", "Pendamping AI sedang tidak tersedia. Anda tetap bisa melanjutkan secara manual.", null, false);
     } finally {
       setBusy(false);
-      setTimeout(() => input.focus(), 50);
+      if (hadInputFocus && !panel.hidden) input.focus({ preventScroll: true });
     }
   }
 
@@ -841,7 +844,21 @@
     return false;
   }
   document.addEventListener("keydown", (ev) => {
-    if (ev.key === "Escape" && RT.busy) RT.cancel(false);
+    if (ev.key === "Escape" && !panel.hidden) {
+      if (RT.busy) RT.cancel(false);
+      close();
+    }
+  });
+  // On small screens the panel is an overlay sheet: keep Tab inside it.
+  panel.addEventListener("keydown", (ev) => {
+    if (ev.key !== "Tab" || panel.getAttribute("aria-modal") !== "true") return;
+    const focusables = Array.from(panel.querySelectorAll("button, input, a[href], summary"))
+      .filter((el) => !el.disabled && el.offsetParent !== null);
+    if (!focusables.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+    else if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
   });
 
   async function silentFollowUp(text) {
@@ -987,12 +1004,18 @@
     panel.hidden = false;
     fab.setAttribute("aria-expanded", "true");
     document.body.classList.add("agent-open");
+    // Desktop docks beside the form (non-modal); the phone sheet overlays it.
+    const sheet = window.matchMedia("(max-width: 1099px)").matches;
+    panel.setAttribute("aria-modal", sheet ? "true" : "false");
     if (msgs.children.length === 0 && hist.length > 0) {
       hist.forEach(h => {
         if (h && h.role === "ai") addMsg("ai", h.text, h.tools, false);
       });
     }
     if (!greeted && msgs.children.length === 0) send("");
+    // Move focus to the close control, never the text input: opening help
+    // must not pop the phone keyboard or steal the form context.
+    document.getElementById("agent-close").focus({ preventScroll: true });
   }
   function close() {
     panel.hidden = true;
