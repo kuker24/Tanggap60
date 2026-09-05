@@ -1,34 +1,34 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Buat paket — Tanggap60{% endblock %}
+{% block title %}Buat dokumen — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
-<h1>Paket yang akan dibuat</h1>
+<h1>Periksa sebelum membuat dokumen</h1>
 
 {% if notice == "coba-lagi" %}
-<p class="notice warn" role="alert">Belum berhasil dibuat. Coba sekali lagi.</p>
+<p class="notice warn" role="alert">Dokumen belum dibuat. Coba lagi.</p>
 {% endif %}
 
 {% if blocking %}
 <article class="card block">
-  <h3>Masih ada yang bentrok</h3>
-  <p class="muted small">Pilih dulu yang benar di halaman konfirmasi, baru paket bisa dibuat.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Ke halaman konfirmasi</a></div>
+  <h2>Masih ada data yang berbeda</h2>
+  <p>Pilih data yang benar sebelum membuat dokumen.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pastikan data</a></div>
 </article>
 {% elif ambiguous %}
 <article class="card block">
-  <h3>Belum bisa dibuat</h3>
-  <p class="muted small">Ada transaksi yang belum jelas. Pasangkan dulu supaya isinya tidak salah.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Konfirmasi data</a></div>
+  <h2>Dokumen belum bisa dibuat</h2>
+  <p>Ada transaksi yang belum jelas.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pastikan data</a></div>
 </article>
 {% elif not scope_units %}
 <article class="card">
-  <h3>Belum ada data untuk diperiksa</h3>
-  <p class="muted small">Kirim bukti dulu. Paket tidak bisa dibuat dari kasus kosong.</p>
-  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a></div>
+  <h2>Belum ada data</h2>
+  <p>Kirim satu bukti untuk mulai.</p>
+  <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a></div>
 </article>
 {% else %}
-<p class="lede">Anda akan membuat paket untuk transaksi di bawah. Tanggap60 tidak mengirim laporan. Anda yang membawanya ke situs resmi.</p>
+<p class="lede">Dokumen berisi transaksi di bawah. Dokumen belum dikirim ke mana pun.</p>
 {% for tx in scope_units %}
 <article class="tx" id="scope-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
   <div class="tx-top">
@@ -37,27 +37,26 @@
   {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
   {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
   {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
-  <p class="tx-when">Dokumen: {{ tx.docs or "Sesuai kelengkapan di ringkasan" }}</p>
 </article>
 {% endfor %}
 {% for reason in pending %}
-<p class="notice">Satu transaksi belum dibuat: {{ reason }}. Selesaikan di halaman konfirmasi kalau ingin ikut disertakan.</p>
+<p class="notice">Satu transaksi belum masuk: {{ reason }}.</p>
 {% endfor %}
 <form method="post" action="/cases/{{ case.case_id }}/approval" id="approval-form" data-guide-id="approve-package">
   <input type="hidden" name="snapshot_hash" value="{{ snapshot_hash }}">
   <input type="hidden" name="idempotency_key" value="{{ idempotency_key }}">
   <label class="check">
     <input id="notice" name="accepted_notice" type="checkbox" value="1" required>
-    <span>Saya sudah memeriksa transaksi di atas dan memahami bahwa Tanggap60 tidak mengirim laporan.</span>
+    <span>Data di atas sudah benar. Saya tahu Tanggap60 tidak mengirim laporan.</span>
   </label>
   <div class="sticky-cta">
-    <button class="btn ember" id="go" type="submit">Buat paket</button>
+    <button class="btn ember" id="go" type="submit">Buat dokumen</button>
   </div>
 </form>
-<p class="muted small"><a class="link" href="/cases/{{ case.case_id }}/review">‹ Konfirmasi lagi</a></p>
+<p class="muted small"><a class="link" href="/cases/{{ case.case_id }}/review">Kembali cek data</a></p>
 <details class="tech-lite">
   <summary>Detail teknis</summary>
-  <p>Kode paket: {{ snapshot_hash[:16] }}…. Dipakai untuk cek apakah file berubah.</p>
+  <p>Kode dokumen: {{ snapshot_hash[:16] }}…. Kode ini membantu memeriksa perubahan file.</p>
 </details>
 <script>
 document.getElementById("approval-form").addEventListener("submit", function(){

@@ -5,17 +5,17 @@
 {% block content %}
 {% set before = case.declared_condition.value == "BEFORE_LOSS" %}
 {% if before %}
-<h1>Periksa chat yang mencurigakan</h1>
-<p class="lede" id="coach-lede">Tempel percakapan, foto layar, atau link. Ini petunjuk awal, bukan vonis.</p>
+<h1>Cek chat atau link</h1>
+<p class="lede" id="coach-lede">Jangan transfer dulu. Kirim hal yang membuat Anda curiga.</p>
 {% else %}
-<h1>Kumpulkan bukti transaksi</h1>
-<p class="lede" id="coach-lede">Foto transfer, chat, atau link. Satu saja cukup untuk mulai.</p>
+<h1>Kirim bukti yang ada</h1>
+<p class="lede" id="coach-lede">Hubungi bank sekarang lewat nomor resmi. Setelah itu, kirim satu bukti untuk mulai.</p>
 {% endif %}
 
-<p class="notice" role="note">Demi keamanan: jangan kirim password, kode OTP, atau foto KTP. Data itu tidak kami butuhkan dan berbahaya kalau tersebar. Data demo otomatis dihapus setelah 60 menit.</p>
+<p class="notice" role="note"><strong>Jangan kirim</strong> OTP, PIN, kata sandi, atau foto KTP.</p>
 
 {% if notice == "kosong" %}
-<p class="notice warn" role="alert">Belum ada yang terkirim. Isi dulu salah satu: foto, cerita, atau link.</p>
+<p class="notice warn" role="alert">Belum ada bukti. Kirim foto, teks chat, atau link.</p>
 {% elif notice == "file-gagal" %}
 <p class="notice warn" role="alert">{{ notice_text or "File itu tidak bisa dipakai. Coba foto atau PDF lain." }} <a class="link" href="/cases/{{ case.case_id }}/intake">Coba lagi</a></p>
 {% endif %}
@@ -26,62 +26,63 @@
   <form id="del-{{ item.evidence_id }}" method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete"></form>
   {% endif %}
   {% endfor %}
-{% endif %}
-
-<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" data-default-tab="{% if before %}text{% else %}files{% endif %}" novalidate>
-  <div class="intake-tabs" role="tablist" aria-label="Cara kirim bukti">
-    <button type="button" role="tab" id="tab-files" data-tab="files" aria-selected="true" aria-controls="panel-files">Foto/File</button>
-    <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Tempel Chat</button>
-    <button type="button" role="tab" id="tab-url" data-tab="url" aria-selected="false" aria-controls="panel-url">Masukkan Link</button>
-  </div>
-
-  <div class="coach-step is-on" data-step="files" id="panel-files" role="tabpanel" aria-labelledby="tab-files">
-    <div class="drop" id="drop" data-guide-id="upload-evidence" tabindex="0" role="button" aria-label="Pilih foto atau file bukti. Foto JPG atau PNG, atau PDF. Maksimal 8 file, total 25 MB.">
-      <div class="drop-head">
-        <span class="drop-title">Ketuk di sini untuk pilih foto atau file</span>
-        <span class="muted small">Foto (JPG/PNG) atau PDF · maks 8 file · total maks 25 MB</span>
-      </div>
-      <input id="files" name="files" type="file" class="file-input" aria-label="Pilih foto atau file bukti" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
-      <p class="muted small">{% if before %}Foto layar chat yang jelas sudah cukup.{% else %}Di HP, Anda bisa foto struk langsung. Foto chat yang jelas sudah cukup.{% endif %}</p>
-    </div>
-    <div id="file-list" class="file-list" aria-live="polite"></div>
-    {% if evidence %}
-    <div class="file-list pack" aria-label="File tersimpan" data-guide-id="evidence-list">
+  <section class="saved-evidence" aria-labelledby="saved-evidence-title" data-guide-id="evidence-list">
+    <h2 id="saved-evidence-title">Bukti yang sudah masuk</h2>
+    <div class="file-list pack">
       {% for item in evidence %}
       <div class="file-chip">
-        <span><b>✓ {{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Cerita{% else %}File{% endif %} · {{ (item.size_bytes / 1024) | round(1) }} KB · sudah masuk</span></span>
+        <span><b>{{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Teks chat{% else %}File{% endif %} · sudah masuk</span></span>
         {% if can_delete_evidence %}
-        <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus ›</button>
+        <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus</button>
         {% endif %}
       </div>
       {% endfor %}
     </div>
-    {% endif %}
+  </section>
+{% endif %}
+
+<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" data-default-tab="{% if before %}text{% else %}files{% endif %}" novalidate>
+  <div class="intake-tabs" role="tablist" aria-label="Cara kirim bukti">
+    <button type="button" role="tab" id="tab-files" data-tab="files" aria-selected="true" aria-controls="panel-files">Foto atau PDF</button>
+    <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Teks chat</button>
+    <button type="button" role="tab" id="tab-url" data-tab="url" aria-selected="false" aria-controls="panel-url">Link</button>
+  </div>
+
+  <div class="coach-step is-on" data-step="files" id="panel-files" role="tabpanel" aria-labelledby="tab-files">
+    <div class="drop" id="drop" data-guide-id="upload-evidence">
+      <div class="drop-head">
+        <span class="drop-title">Pilih foto atau PDF</span>
+        <span class="muted small">Maksimal 8 file. Total 25 MB.</span>
+      </div>
+      <input id="files" name="files" type="file" class="file-input" aria-label="Pilih foto atau file bukti" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
+      <p class="muted small">{% if before %}Foto layar chat sudah cukup.{% else %}Foto struk atau chat sudah cukup.{% endif %}</p>
+    </div>
+    <div id="file-list" class="file-list" aria-live="polite"></div>
     {% if evidence %}
     <div class="actions">
-      <button class="btn-text" type="button" id="add-more">Tambah foto atau file lagi ›</button>
+      <button class="btn-text" type="button" id="add-more">Tambah file</button>
     </div>
     {% endif %}
   </div>
 
   <div class="coach-step" data-step="text" id="panel-text" role="tabpanel" aria-labelledby="tab-text" data-guide-id="case-story">
-    <label for="text">Tempel percakapan{% if before %} yang mencurigakan{% endif %}</label>
+    <label for="text">Tempel teks chat{% if before %} yang mencurigakan{% endif %}</label>
     <div class="field">
       <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer ke rekening ini, bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
     </div>
   </div>
 
   <div class="coach-step" data-step="url" id="panel-url" role="tabpanel" aria-labelledby="tab-url">
-    <label for="url">Masukkan link terkait</label>
+    <label for="url">Tempel link</label>
     <div class="field">
       <input id="url" name="url" type="url" placeholder="Contoh: https://toko-contoh.com/barang-abc" inputmode="url" autocomplete="url">
-      <p class="help">Link toko, akun pelaku, atau bukti online lainnya.</p>
+      <p class="help">Contoh: link toko, profil, atau iklan.</p>
     </div>
   </div>
 
-  <p class="muted small">Isi salah satu untuk mulai. Tidak perlu menunggu paket selesai untuk membuka situs IASC.</p>
+  <p class="muted small">Satu bukti saja cukup untuk mulai.</p>
   <div class="sticky-cta">
-    <button class="btn ember" type="submit" id="submit-intake">Periksa bukti</button>
+    <button class="btn ember" type="submit" id="submit-intake">Kirim bukti</button>
   </div>
 </form>
 <noscript>

@@ -6,8 +6,6 @@ from app.domain.models import (
     ActionRecord,
     ActionStatus,
     FactRecord,
-    FactType,
-    ReviewStatus,
 )
 from app.domain.states import Route
 from app.services.ids import new_id
@@ -21,8 +19,6 @@ FORBIDDEN_PLAN_PHRASES = (
 
 
 def build_post_actions(case_id: str, facts: list[FactRecord]) -> list[ActionRecord]:
-    reviewed = [f for f in facts if f.review_status in {ReviewStatus.CONFIRMED, ReviewStatus.CORRECTED}]
-    has_amount = any(f.type == FactType.AMOUNT for f in reviewed)
     actions = [
         ActionRecord(
             action_id=new_id("act"),
@@ -30,8 +26,8 @@ def build_post_actions(case_id: str, facts: list[FactRecord]) -> list[ActionReco
             priority=ActionPriority.NOW,
             channel=ActionChannel.BANK_PJP,
             instruction=(
-                "Hubungi bank atau PJP Anda lewat nomor resmi di aplikasi/kartu/situs resmi. "
-                "Sampaikan waktu dan nominal transfer yang sudah Anda konfirmasi. "
+                "Hubungi bank atau dompet digital lewat nomor resminya. "
+                "Sampaikan waktu dan jumlah uang yang sudah Anda cek. "
                 "Tanggap60 tidak menghubungi bank."
             ),
             status=ActionStatus.TODO,
@@ -43,8 +39,8 @@ def build_post_actions(case_id: str, facts: list[FactRecord]) -> list[ActionReco
             priority=ActionPriority.NEXT,
             channel=ActionChannel.IASC,
             instruction=(
-                "Buka portal IASC resmi yang ditampilkan di layar. Isi data sendiri. "
-                "Jangan unggah KTP ke Tanggap60. Pelaporan tidak menjamin dana kembali."
+                "Buka situs resmi IASC. Isi dan kirim laporannya sendiri. "
+                "Laporan tidak menjamin uang kembali."
             ),
             status=ActionStatus.TODO,
             official_url_key="IASC",
@@ -56,27 +52,12 @@ def build_post_actions(case_id: str, facts: list[FactRecord]) -> list[ActionReco
             priority=ActionPriority.NEXT,
             channel=ActionChannel.POLICE,
             instruction=(
-                "Siapkan kronologi untuk Laporan Polisi. Pengiriman dilakukan oleh Anda di situs resmi kepolisian."
+                "Siapkan cerita kejadian. Hubungi layanan Kepolisian yang resmi dan ikuti petunjuknya."
             ),
             status=ActionStatus.TODO,
             requires_external_user_action=True,
         ),
     ]
-    if has_amount:
-        actions.append(
-            ActionRecord(
-                action_id=new_id("act"),
-                case_id=case_id,
-                priority=ActionPriority.LATER,
-                channel=ActionChannel.ACCOUNT_SECURITY,
-                instruction=(
-                    "Ganti kata sandi dan hentikan percakapan dengan pihak yang meminta transfer. "
-                    "Langkah ini hanya muncul karena ada dana yang tercatat."
-                ),
-                status=ActionStatus.TODO,
-                requires_external_user_action=True,
-            )
-        )
     return actions
 
 

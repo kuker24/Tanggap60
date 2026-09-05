@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="{% block color_scheme %}light{% endblock %}">
   <meta name="theme-color" content="{% block theme_color %}#faf7f1{% endblock %}">
-  <meta name="description" content="Tanggap60 — susun foto, chat, dan link jadi paket yang bisa Anda bawa ke bank, IASC, atau polisi. Tidak mengirim laporan.">
+  <meta name="description" content="Tanggap60 membantu merapikan bukti dan menunjukkan langkah setelah penipuan online.">
   <title>{% block title %}Tanggap60{% endblock %}</title>
   <link rel="icon" href="/favicon.ico" sizes="32x32">
   <link rel="icon" href="/static/favicon.svg?v={{ asset_v }}" type="image/svg+xml">
@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="/static/app.css?v={{ asset_v }}">
   <link rel="stylesheet" href="/static/agent.css?v={{ asset_v }}">
 </head>
-<body class="{% block body_mod %}{% endblock %}"{% if case is defined %} data-case-id="{{ case.case_id }}"{% endif %}>
+<body class="{% block body_mod %}{% endblock %}"{% if case is defined %} data-case-id="{{ case.case_id }}"{% endif %}{% block body_attrs %}{% endblock %}>
   <!--
     THESIS: Satu dunia terang-tenang dari beranda sampai paket; korban hanya melihat keputusan yang perlu diambil.
     OWN-WORLD: Warm paper #faf7f1, tinta #1c1917, amber komitmen #92400e, hijau khusus siap, merah khusus blokir, biru khusus fokus.
@@ -36,9 +36,6 @@
       {% if case is defined %}
       <div class="top-actions">
         {% include "_agent_chat.html" %}
-        <form class="top-reset" method="post" action="/cases/{{ case.case_id }}/baru" onsubmit="return confirm('Mulai kasus baru? Isi di halaman ini ikut terhapus dan tidak bisa dikembalikan.')">
-          <button class="btn-text" type="submit">Kasus baru</button>
-        </form>
       </div>
       {% endif %}
     </div>
@@ -55,13 +52,16 @@
   </div>
 
   <footer class="foot">
-    <span>Tanggap60 hanya menyusun. Laporan dikirim oleh Anda ke bank, IASC, atau polisi. IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a></span>
+    <span>Tanggap60 menyiapkan data. Anda sendiri yang mengirim laporan. <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Situs IASC (tab baru)</a></span>
     {% if case is defined %}
     <details class="tech-lite kelola-data">
       <summary>Kelola data</summary>
-      <p class="muted small">Mode {{ case.mode.value }}. Data kedaluwarsa {{ case.expires_at }}.</p>
-      <form method="post" action="#" onsubmit="return window.t60Purge(event)">
-        <button class="btn-text" type="submit">Hapus permanen</button>
+      <p class="muted small">Kasus tidak bisa dibuka setelah 60 menit.</p>
+      <form method="post" action="/cases/{{ case.case_id }}/baru" data-confirm-message="Hapus data ini dan mulai kasus baru? Data tidak bisa dikembalikan.">
+        <button class="btn-text" type="submit">Hapus data dan mulai lagi</button>
+      </form>
+      <form method="post" action="#" id="purge-browser-form">
+        <button class="btn-text danger-link" type="submit">Hapus semua data</button>
       </form>
     </details>
     {% endif %}

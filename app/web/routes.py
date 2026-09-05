@@ -13,6 +13,7 @@ from app.domain.states import DeclaredCondition, Mode, State
 from app.infrastructure.repositories import (
     ActionRepository,
     ArtifactRepository,
+    CaseRepository,
     ConflictRepository,
     EvidenceRepository,
     FactRepository,
@@ -20,6 +21,7 @@ from app.infrastructure.repositories import (
     UnitMappingRepository,
 )
 from app.services.ids import new_id
+from app.services.urlcheck import analyze_url
 from app.web.labels import human, soften
 
 web = APIRouter()
@@ -71,8 +73,9 @@ def _progress(db, case) -> dict:
 
 def _case_page(request: Request, template: str, case, status_code: int = 200, **ctx):
     return TEMPLATES.TemplateResponse(
+        request,
         template,
-        {"request": request, "case": case, "progress": _progress(request.state.db, case), **ctx},
+        context={"case": case, "progress": _progress(request.state.db, case), **ctx},
         status_code=status_code,
     )
 
@@ -87,14 +90,14 @@ def _primary_cta(
     ready_count: int,
 ) -> dict[str, str]:
     if has_blocking or has_ambiguous:
-        return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+        return {"label": "Pastikan data", "href": f"/cases/{case_id}/review"}
     if not has_tx:
-        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+        return {"label": "Tambah bukti", "href": f"/cases/{case_id}/intake"}
     if needs_evidence:
-        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+        return {"label": "Tambah bukti", "href": f"/cases/{case_id}/intake"}
     if ready_count:
-        return {"label": "Buat paket", "href": f"/cases/{case_id}/approval"}
-    return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+        return {"label": "Siapkan data untuk bank", "href": f"/cases/{case_id}/approval"}
+    return {"label": "Pastikan data", "href": f"/cases/{case_id}/review"}
 
 
 def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has_evidence: bool = False) -> list[dict]:
@@ -105,18 +108,18 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
                 {
                     "key": "bukti",
                     "title": "Belum ada data untuk diperiksa",
-                    "points": ["Kirim foto transfer, chat, atau link yang memuat jumlah uang, rekening, dan waktu."],
+                    "points": ["Kirim foto transfer atau chat yang memuat jumlah uang dan rekening."],
                     "href": f"/cases/{case_id}/intake",
-                    "cta": "Periksa bukti",
+                    "cta": "Tambah bukti",
                 }
             ]
         return [
             {
                 "key": "konfirm",
-                "title": "Konfirmasi data",
-                "points": ["Ada data yang perlu Anda periksa sebelum dokumen dibuat."],
+                "title": "Pastikan data",
+                "points": ["Ada data yang perlu Anda cek sebelum membuat dokumen."],
                 "href": f"/cases/{case_id}/review",
-                "cta": "Konfirmasi data",
+                "cta": "Pastikan data",
             }
         ]
 
@@ -134,6 +137,11 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
         text = soften(item.get("action") or item.get("label") or "")
         cid = str(item.get("check_id") or "")
         if "EVIDENCE" in cid or "COMMUNICATION" in cid or "PROVENANCE" in cid:
+            lowered = text.lower()
+            if "transfer" in lowered:
+                text = "Kirim foto bukti transfer jika ada."
+            elif "chat" in lowered or "komunikasi" in lowered:
+                text = "Kirim foto chat atau percakapan jika ada."
             add(bukti, text)
         elif item.get("blocking") or item.get("status") == "CONFLICT" or any(
             key in cid for key in ("AMOUNT", "DATETIME", "DESTINATION", "MAPPING", "REVIEW")
@@ -156,30 +164,30 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
         tasks.append(
             {
                 "key": "bukti",
-                "title": "Lengkapi bukti",
+                "title": "Tambah bukti",
                 "points": bukti[:3],
                 "href": f"/cases/{case_id}/intake",
-                "cta": "Periksa bukti",
+                "cta": "Tambah bukti",
             }
         )
     if konfirm:
         tasks.append(
             {
                 "key": "konfirm",
-                "title": "Konfirmasi data",
+                "title": "Pastikan data",
                 "points": konfirm[:3],
                 "href": f"/cases/{case_id}/review",
-                "cta": "Konfirmasi data",
+                "cta": "Pastikan data",
             }
         )
     if dokumen and len(tasks) < 3:
         tasks.append(
             {
                 "key": "dokumen",
-                "title": "Siapkan dokumen",
+                "title": "Buat dokumen",
                 "points": dokumen[:3],
                 "href": f"/cases/{case_id}/approval",
-                "cta": "Buat paket",
+                "cta": "Buat dokumen",
             }
         )
     return tasks[:3]
@@ -294,7 +302,7 @@ def favicon():
 
 @web.get("/")
 def home(request: Request):
-    return TEMPLATES.TemplateResponse("home.html", {"request": request, "title": "Tanggap60"})
+    return TEMPLATES.TemplateResponse(request, "home.html", context={"title": "Tanggap60"})
 
 
 @web.post("/start")
@@ -329,10 +337,10 @@ def intake(case_id: str, request: Request):
 
 _FILE_ERROR_TEXT = (
     ("tipe berkas tidak diizinkan", "File itu tidak bisa dipakai. Pakai foto (JPG/PNG) atau PDF."),
-    ("PDF lebih dari 20 halaman", "PDF-nya kepanjangan (maks 20 halaman). Kirim halaman yang penting saja."),
-    ("gambar melebihi batas piksel", "Fotonya kegedean. Coba foto dengan resolusi lebih kecil."),
-    ("maksimal 8 berkas", "Kebanyakan. Maksimal 8 file — hapus dulu yang tidak perlu."),
-    ("melebihi 25 MB", "Kegedean. Total file maksimal 25 MB — coba foto yang lebih kecil."),
+    ("PDF lebih dari 20 halaman", "PDF maksimal 20 halaman. Kirim halaman yang penting saja."),
+    ("gambar melebihi batas piksel", "Ukuran foto terlalu besar. Pilih foto yang lebih kecil."),
+    ("maksimal 8 berkas", "Maksimal 8 file. Hapus file yang tidak perlu."),
+    ("melebihi 25 MB", "Total file maksimal 25 MB. Pilih file yang lebih kecil."),
 )
 
 
@@ -669,6 +677,21 @@ def readiness_page(case_id: str, request: Request):
     )
 
 
+@web.post("/cases/{case_id}/continue")
+def continue_case(case_id: str, request: Request):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    if case.state == State.REVIEW_REQUIRED:
+        _svc(request)["inspect"].validate_case_facts(case_id)
+        case = CaseRepository(request.state.db).get(case_id)
+    if case.state == State.READY_FOR_ACTION:
+        _svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+        case = CaseRepository(request.state.db).get(case_id)
+    if case.state == State.REVIEW_REQUIRED:
+        return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+    destination = "result" if case.route.value == "PRE_INCIDENT_CHECK" else "readiness"
+    return RedirectResponse(f"/cases/{case_id}/{destination}", status_code=303)
+
+
 @web.get("/cases/{case_id}/result")
 def result(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
@@ -677,12 +700,40 @@ def result(case_id: str, request: Request):
     if case.route.value != "PRE_INCIDENT_CHECK":
         return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
     actions = ActionRepository(request.state.db).list_for_case(case_id)
+    indicator_copy = {
+        "struktur_url": "Link tidak lengkap.",
+        "kredensial_di_url": "Link berisi nama pengguna atau kata sandi.",
+        "punycode": "Nama situs memakai tulisan yang dapat menyamarkan alamat.",
+        "alamat_lokal": "Link menuju alamat perangkat atau jaringan lokal.",
+        "port_tidak_valid": "Link memakai alamat yang tidak bisa dibaca.",
+        "port_tidak_lazim": "Link memakai alamat yang tidak biasa.",
+        "subdomain_berlebih": "Alamat situs sangat panjang dan bertingkat.",
+        "menyerupai_resmi": "Alamat terlihat resmi, tetapi bukan alamat resmi yang kami kenal.",
+        "bukan_domain_resmi": "Alamat memuat nama lembaga, tetapi bukan domain resminya.",
+    }
+    url_indicators: list[str] = []
+    for item in EvidenceRepository(request.state.db).list_for_case(case_id):
+        if item.kind.value != "URL" and item.mime != "text/uri-list":
+            continue
+        raw = request.app.state.container.storage.read_bytes(case_id, item.storage_key).decode("utf-8")
+        found, _ = analyze_url(raw)
+        for indicator in found:
+            text = indicator_copy.get(indicator.name, indicator.finding)
+            if text not in url_indicators:
+                url_indicators.append(text)
     digest = ""
     try:
         _, digest = _svc(request)["approval"].current_snapshot(case_id)
     except Exception:
         digest = ""
-    return _case_page(request, "result.html", case, actions=actions, snapshot_hash=digest)
+    return _case_page(
+        request,
+        "result.html",
+        case,
+        actions=actions,
+        snapshot_hash=digest,
+        url_indicators=url_indicators,
+    )
 
 
 @web.get("/cases/{case_id}/approval")
@@ -782,7 +833,6 @@ def download_pack(case_id: str, request: Request):
 def artifacts_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     items = ArtifactRepository(request.state.db).list_for_case(case_id)
-    url = request.app.state.container.settings.official_iasc_url
     pub = [artifact_public(a) for a in items]
     summary = next(
         (
@@ -803,8 +853,6 @@ def artifacts_page(case_id: str, request: Request):
         summary=summary,
         rest=rest,
         pack=pack,
-        official_url=url,
-        domain="iasc.ojk.go.id",
     )
 
 

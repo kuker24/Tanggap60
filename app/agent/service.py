@@ -432,7 +432,7 @@ def _followup_plan(
             return _tx_action_plan(
                 unit, fresh, ui,
                 status_text="Tersimpan. Lanjut ke transaksi berikut.",
-                callout_title="Pastikan nominal",
+                callout_title="Pastikan jumlah uang",
                 callout_text="Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
             )
     if target == "next-best-action":
@@ -511,7 +511,7 @@ def _plan_for(
                     "type": "CALLOUT",
                     "target": "review-facts",
                     "title": "Pilih yang benar",
-                    "message": "Saya menemukan data yang berbeda. Saya tidak akan menebak — pilih yang sesuai bukti.",
+                    "message": "Saya menemukan data yang berbeda. Saya tidak menebak. Pilih yang sesuai bukti.",
                 },
                 {"type": "WAIT_FOR_USER"},
             ],
@@ -531,7 +531,7 @@ def _plan_for(
                     {
                         "type": "CALLOUT",
                         "target": f"transaction-{uid}-amount",
-                        "title": "Pastikan nominal",
+                        "title": "Pastikan jumlah uang",
                         "message": "Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
                     },
                     {"type": "WAIT_FOR_USER"},
@@ -579,7 +579,7 @@ def _handle_greeting(intent: Intent, context: dict[str, Any], runner: _Runner, u
     units = context["units"]
     if not units and context["evidence_count"] == 0:
         return (
-            "Saya bisa mendampingi Anda. Kirim bukti yang ada — foto transfer, chat, atau link.",
+            "Saya bisa membantu. Kirim foto transfer, chat, atau link yang ada.",
             _guide("upload-evidence", "Kirim bukti di sini", set(context["unit_ids"])),
             None,
         )
@@ -587,7 +587,7 @@ def _handle_greeting(intent: Intent, context: dict[str, Any], runner: _Runner, u
     blocking = [c for c in context["conflicts_open"] if c["severity"] == "BLOCKING"]
     if blocking:
         return (
-            "Saya menemukan data yang saling bertentangan. Saya tidak akan menebak — pilih yang benar dulu.",
+            "Saya menemukan data yang berbeda. Saya tidak menebak. Pilih yang benar dulu.",
             _guide("review-facts", "Selesaikan di sini", set(context["unit_ids"])),
             None,
         )
@@ -613,18 +613,18 @@ def _next_action_text(context: dict[str, Any], observation: dict[str, Any] | Non
     unit = next((u for u in context["units"] if u["unit_id"] == target), None)
     who = f" {_unit_label(unit)}." if unit else "."
     mapping = {
-        "CONTACT_BANK_PJP": f"Ada transaksi yang banknya sudah siap{who} Hubungi bank lewat situs resmi sekarang. Tidak perlu menunggu transaksi lain.",
-        "PREPARE_IASC_UNIT": f"Ada transaksi yang siap dilaporkan{who} Siapkan datanya, lalu buka situs resmi IASC.",
-        "RESOLVE_CONFLICT": "Ada data yang saling bertentangan. Pilih yang benar supaya paketnya akurat — saya tandai bagian itu.",
-        "RESOLVE_UNIT_MAPPING": f"Ada transaksi yang belum terpasang{who} Pilih pasangan jumlah uang, rekening, dan waktu yang benar.",
-        "CONFIRM_TRANSACTION_AMOUNT": f"Jumlah uang {who} belum jelas. Konfirmasi nominal yang sesuai bukti.",
-        "CONFIRM_TRANSACTION_TIME": f"Waktu transfer {who} belum jelas. Konfirmasi waktunya.",
-        "CONFIRM_DESTINATION": f"Rekening tujuan {who} belum jelas. Konfirmasi rekeningnya.",
+        "CONTACT_BANK_PJP": f"Hubungi bank sekarang untuk transaksi ini{who} Gunakan nomor dari aplikasi, kartu, atau situs resmi.",
+        "PREPARE_IASC_UNIT": f"Data transaksi ini sudah tersedia{who} Siapkan dokumennya lalu buka situs IASC.",
+        "RESOLVE_CONFLICT": "Ada data yang berbeda. Pilih yang sesuai bukti.",
+        "RESOLVE_UNIT_MAPPING": f"Transaksi ini belum jelas{who} Cocokkan jumlah uang, rekening, dan waktu.",
+        "CONFIRM_TRANSACTION_AMOUNT": f"Jumlah uang untuk transaksi ini belum jelas{who} Pilih yang sesuai bukti.",
+        "CONFIRM_TRANSACTION_TIME": f"Waktu transfer belum jelas{who} Pilih waktunya.",
+        "CONFIRM_DESTINATION": f"Rekening tujuan belum jelas{who} Pilih rekeningnya.",
         "ADD_TRANSFER_EVIDENCE": "Tambah bukti transfer yang memuat jumlah uang, rekening, dan waktu.",
-        "PREPARE_POLICE_INCIDENT": "Setelah urusan bank, siapkan kronologi untuk situs resmi kepolisian.",
-        "APPROVE_READY_UNIT": "Ada transaksi menunggu persetujuan Anda untuk dibuatkan paket terverifikasi.",
-        "DOWNLOAD_VERIFIED_PACK": "Semua unit sudah diproses. Unduh paket terverifikasi lalu lakukan handoff manual.",
-        "OPEN_IASC_HANDOFF": "Buka situs resmi IASC dan isi datanya sendiri. Saya sudah menyiapkan ringkasannya.",
+        "PREPARE_POLICE_INCIDENT": "Setelah menghubungi bank, siapkan cerita kejadian untuk polisi.",
+        "APPROVE_READY_UNIT": "Data sudah tersedia. Periksa lalu buat dokumen.",
+        "DOWNLOAD_VERIFIED_PACK": "Dokumen sudah siap. Unduh dan periksa isinya.",
+        "OPEN_IASC_HANDOFF": "Buka situs resmi IASC. Isi dan kirim laporannya sendiri.",
         "RECORD_RECEIPT": "Catat nomor laporan resmi bila sudah ada.",
     }
     return mapping.get(str(code or ""), action.get("reason") or "Mari periksa kondisi kasus Anda langkah demi langkah.")
@@ -640,7 +640,7 @@ def _guide_for_action(context: dict[str, Any], observation: dict[str, Any] | Non
     mapping = {
         "RESOLVE_CONFLICT": ("review-facts", "Selesaikan di sini"),
         "RESOLVE_UNIT_MAPPING": ("confirm-mapping", "Pasangkan di sini"),
-        "APPROVE_READY_UNIT": ("approve-package", "Buat paket di sini"),
+        "APPROVE_READY_UNIT": ("approve-package", "Buat dokumen di sini"),
         "DOWNLOAD_VERIFIED_PACK": ("approve-package", "Unduh di sini"),
         "OPEN_IASC_HANDOFF": ("official-handoff", "Buka situs resmi"),
         "ADD_TRANSFER_EVIDENCE": ("upload-evidence", "Tambah bukti di sini"),
@@ -659,7 +659,7 @@ def _handle_ask_next(intent: Intent, context: dict[str, Any], runner: _Runner, u
 def _handle_needed_evidence(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     unit_ids = set(context["unit_ids"])
     return (
-        "Foto transfer, cuplikan chat, atau link toko. Yang memuat jumlah uang, rekening tujuan, dan waktu paling berguna. Jangan kirim password, OTP, atau KTP.",
+        "Kirim foto transfer atau chat yang memuat jumlah uang dan rekening. Jangan kirim OTP, PIN, kata sandi, atau KTP.",
         _guide("upload-evidence", "Kirim bukti di sini", unit_ids),
         None,
     )
@@ -668,8 +668,8 @@ def _handle_needed_evidence(intent: Intent, context: dict[str, Any], runner: _Ru
 def _handle_explain_upload(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     unit_ids = set(context["unit_ids"])
     return (
-        "Ketuk kotak unggah, pilih foto JPG/PNG atau PDF. Maksimal 8 file, total 25 MB. Setelah itu tekan Periksa bukti.",
-        _guide("upload-evidence", "Unggah di sini", unit_ids),
+        "Ketuk kotak foto. Pilih JPG, PNG, atau PDF. Setelah itu tekan Kirim bukti.",
+        _guide("upload-evidence", "Kirim di sini", unit_ids),
         None,
     )
 
@@ -679,7 +679,7 @@ def _handle_missing(intent: Intent, context: dict[str, Any], runner: _Runner, ui
     blocking = [c for c in context["conflicts_open"] if c["severity"] == "BLOCKING"]
     if blocking:
         return (
-            "Ada data yang saling bertentangan dan memblokir proses. Pilih dulu yang benar — saya tandai.",
+            "Ada data yang berbeda. Pilih yang sesuai bukti.",
             _guide("review-facts", "Selesaikan di sini", unit_ids),
             None,
         )
@@ -703,7 +703,7 @@ def _handle_missing(intent: Intent, context: dict[str, Any], runner: _Runner, ui
         detail = ", ".join(missing)
         suffix = {"amount": "amount", "destination": "destination", "datetime": "datetime"}[field[missing[0]]]
         return (
-            f"Transaksi {first['index']} belum lengkap: {detail} belum terisi. Saya tandai bagian itu.",
+            f"Transaksi {first['index']} belum lengkap. Isi {detail}.",
             _guide(f"transaction-{first['unit_id']}-{suffix}", "Lengkapi di sini", unit_ids),
             None,
         )
@@ -720,7 +720,7 @@ def _handle_problem(intent: Intent, context: dict[str, Any], runner: _Runner, ui
     ambiguous = [u for u in context["units"] if u["mapping_status"] == "AMBIGUOUS"]
     if blocking:
         return (
-            "Saya menemukan data yang saling bertentangan dan memblokir proses. Saya tidak akan menebak — pilih yang benar.",
+            "Saya menemukan data yang berbeda. Saya tidak menebak. Pilih yang benar.",
             _guide("review-facts", "Selesaikan di sini", unit_ids),
             None,
         )
@@ -732,7 +732,7 @@ def _handle_problem(intent: Intent, context: dict[str, Any], runner: _Runner, ui
             None,
         )
     return (
-        "Tidak ada yang bermasalah. Semua data yang ada sudah jelas.",
+        "Tidak ada data yang saling bertentangan. Sekarang cek apakah datanya sudah lengkap.",
         _guide("next-best-action", "Lihat tindakan utama", unit_ids),
         None,
     )
@@ -770,8 +770,8 @@ def _handle_readiness(intent: Intent, context: dict[str, Any], runner: _Runner, 
     overall = obs.get("overall_status") if obs else context["readiness_overall"]
     if overall == "READY":
         return (
-            "Semuanya siap. Tinggal persetujuan Anda untuk dibuatkan paket.",
-            _guide("approve-package", "Buat paket di sini", set(context["unit_ids"])),
+            "Data minimum sudah tersedia. Lembaga resmi belum memeriksanya.",
+            _guide("approve-package", "Buat dokumen di sini", set(context["unit_ids"])),
             None,
         )
     return _handle_missing(intent, context, runner, ui)
@@ -779,14 +779,14 @@ def _handle_readiness(intent: Intent, context: dict[str, Any], runner: _Runner, 
 
 def _handle_package(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     if context["approval_present"]:
-        count = len(context["artifacts"])
+        count = sum(1 for item in context["artifacts"] if item.get("verify") == "PASS")
         return (
-            f"Paket berisi data yang sudah Anda setujui ({count} artefak terverifikasi). Dokumen belum dikirim ke mana pun.",
-            _guide("approve-package", "Lihat paket", set(context["unit_ids"])),
+            f"Ada {count} file yang selesai diperiksa. Dokumen belum dikirim ke mana pun.",
+            _guide("approve-package", "Lihat dokumen", set(context["unit_ids"])),
             None,
         )
     return (
-        "Yang akan dikirim hanya data yang sudah Anda setujui. Saat ini belum ada persetujuan — tidak ada yang dikirim.",
+        "Belum ada dokumen yang dibuat. Tidak ada yang dikirim.",
         _guide("approve-package", "Periksa persetujuan", set(context["unit_ids"])),
         None,
     )
@@ -794,24 +794,24 @@ def _handle_package(intent: Intent, context: dict[str, Any], runner: _Runner, ui
 
 def _handle_prepare(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     ws = prepare_workspace(runner.db, context["case"]["case_id"])
-    count = ws["confirmed_transactions"]
+    count = ws["complete_transactions"]
     if count == 0:
         return (
-            "Belum ada transaksi terkonfirmasi untuk disiapkan. Selesaikan konfirmasi dulu — saya tandai.",
+            "Belum ada transaksi yang siap disalin. Pastikan datanya dulu.",
             _guide_for_action(context),
             None,
         )
     return (
-        f"Saya siapkan {count} transaksi terkonfirmasi ke ruang persiapan. Identitas korban tetap Anda isi sendiri.",
-        _guide("workspace-open", "Buka ruang persiapan", set(context["unit_ids"])),
+        f"Ada {count} transaksi yang siap disalin. Identitas tetap Anda isi sendiri.",
+        _guide("workspace-open", "Buka data untuk disalin", set(context["unit_ids"])),
         None,
     )
 
 
 def _handle_workspace(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     return (
-        "Ruang persiapan adalah simulasi formulir — bukan situs resmi. Data terkonfirmasi terisi otomatis, sisanya Anda isi sendiri.",
-        _guide("workspace-open", "Buka ruang persiapan", set(context["unit_ids"])),
+        "Ini ruang persiapan, bukan situs resmi. Salin hanya data yang sudah Anda cek.",
+        _guide("workspace-open", "Buka data untuk disalin", set(context["unit_ids"])),
         None,
     )
 
@@ -824,7 +824,7 @@ def _handle_official(intent: Intent, context: dict[str, Any], runner: _Runner, u
     url = validate_url(configured) or "https://iasc.ojk.go.id/"
     proposal = _propose(context, "OPEN_OFFICIAL", {"url": url}, {"url": url}, runner)
     return (
-        "Saya siapkan tautan situs resmi IASC. Buka sendiri dan isi datanya — saya tidak akan mengirim apa pun.",
+        "Situs resmi IASC akan dibuka di tab baru. Anda sendiri yang mengisi dan mengirim laporan.",
         _guide("official-handoff", "Buka situs resmi", set(context["unit_ids"])),
         proposal,
     )
@@ -869,13 +869,13 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
             matches.append(unit)
     if not matches:
         return (
-            f"Saya tidak menemukan transaksi {text_amount} yang perlu dikonfirmasi. Coba sebutkan nominal persis seperti di bukti.",
+            f"Saya tidak menemukan transaksi {text_amount} yang perlu dicek. Tulis jumlahnya seperti di bukti.",
             _guide("transaction-list", "Lihat semua transaksi", unit_ids),
             None,
         )
     if len(matches) > 1:
         return (
-            f"Ada {len(matches)} transaksi yang cocok dengan {text_amount}. Saya tidak akan menebak — pilih yang benar.",
+            f"Ada {len(matches)} transaksi dengan jumlah {text_amount}. Pilih yang sesuai bukti.",
             _guide("transaction-list", "Pilih transaksinya", unit_ids),
             None,
         )
@@ -883,7 +883,7 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
     blocked = _blocking_fact_ids(context) & set(unit["fact_ids"])
     if blocked:
         return (
-            "Ada data transaksi ini yang masih bentrok. Pilih dulu yang benar — setelah itu baru kita pasangkan.",
+            "Ada data transaksi yang berbeda. Pilih yang benar lebih dulu.",
             _guide("review-facts", "Selesaikan di sini", unit_ids),
             None,
         )
@@ -897,8 +897,7 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
         dest_pick = [c for c in dest_cands if _dest_hint_matches(c["value"], user_text)]
     if len(dest_pick) != 1 or not amount_hits:
         return (
-            f"{text_amount} cocok, tetapi masih ada beberapa kemungkinan pasangan. Saya tidak akan menebak — "
-            "sebutkan rekeningnya juga, atau pilih langsung di kartu.",
+            f"Ada beberapa transaksi dengan jumlah {text_amount}. Sebutkan rekeningnya atau pilih di layar.",
             _guide(f"transaction-{unit['unit_id']}", "Pilih pasangannya", unit_ids),
             None,
         )
@@ -922,7 +921,7 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
         ui,
         status_text="Saya menyiapkan pilihannya.",
         callout_title="Periksa draf AI",
-        callout_text=f"Saya memilih {text_amount} sebagai draf. Belum disimpan — pastikan dulu.",
+        callout_text=f"Saya memilih {text_amount} sebagai draf. Belum disimpan. Pastikan dulu.",
         prefill={"field": "amount", "fact_id": amount_fact["fact_id"], "label": text_amount},
     )
     if any(s.get("type") == "SET_DRAFT" for s in ui["_inline_plan"]):
@@ -935,8 +934,7 @@ def _handle_confirm_value(intent: Intent, context: dict[str, Any], runner: _Runn
             "voice_note": f"{text_amount} ke {mask_account(dest_label)}. Benar?",
         }
     return (
-        f"Untuk memastikan: {text_amount} adalah nominal Transaksi {unit['index']} ke rekening {escape(dest_label)}? "
-        "Sebelum saya menyimpan perubahan ini, pastikan datanya benar.",
+        f"{text_amount} dikirim ke rekening {escape(dest_label)}. Simpan pilihan ini?",
         _guide(f"transaction-{unit['unit_id']}", "Periksa pasangannya", unit_ids),
         proposal,
     )
@@ -1078,14 +1076,14 @@ def _handle_assist(intent: Intent, context: dict[str, Any], runner: _Runner, ui:
                 {"type": "SPOTLIGHT", "target": "review-facts"},
                 {
                     "type": "CALLOUT", "target": "review-facts", "title": "Pilih yang benar",
-                    "message": "Saya menemukan data yang berbeda. Saya tidak akan menebak — pilih yang sesuai bukti.",
+                    "message": "Saya menemukan data yang berbeda. Saya tidak menebak. Pilih yang sesuai bukti.",
                 },
                 {"type": "WAIT_FOR_USER"},
             ],
             unit_ids,
         )
         return (
-            "Baik. Saya periksa kasus Anda. Saya menemukan data yang saling bertentangan — pilih yang benar dulu.",
+            "Saya menemukan data yang berbeda. Pilih yang benar dulu.",
             _guide("review-facts", "Selesaikan di sini", unit_ids),
             None,
         )
@@ -1095,12 +1093,12 @@ def _handle_assist(intent: Intent, context: dict[str, Any], runner: _Runner, ui:
         ui["_inline_plan"] = _tx_action_plan(
             unit, context, ui,
             status_text="Baik. Saya periksa kasus Anda.",
-            callout_title="Pastikan nominal",
+            callout_title="Pastikan jumlah uang",
             callout_text="Pilih pasangan jumlah, rekening, dan waktu yang benar. Saya tidak akan menebak.",
         )
         ui["_control"] = {"voice_note": "Saya membuka transaksi yang perlu diperiksa."}
         return (
-            f"Baik. Saya periksa kasus Anda. {_unit_label(unit)} perlu dikonfirmasi — saya bukakan sekarang.",
+            f"{_unit_label(unit)} perlu dicek. Saya buka sekarang.",
             _guide(f"transaction-{unit['unit_id']}", "Periksa transaksi ini", unit_ids),
             None,
         )
@@ -1113,14 +1111,14 @@ def _handle_assist(intent: Intent, context: dict[str, Any], runner: _Runner, ui:
                 {"type": "SPOTLIGHT", "target": "upload-evidence"},
                 {
                     "type": "CALLOUT", "target": "upload-evidence", "title": "Kirim bukti dulu",
-                    "message": "Foto transfer, chat, atau link — saya susun setelah bukti masuk.",
+                    "message": "Kirim foto transfer, chat, atau link. Saya baca setelah bukti masuk.",
                 },
                 {"type": "WAIT_FOR_USER"},
             ],
             unit_ids,
         )
         return (
-            "Baik. Kirim bukti yang ada dulu — foto transfer, chat, atau link. Saya susun setelah bukti masuk.",
+            "Kirim foto transfer, chat, atau link yang ada. Saya baca setelah bukti masuk.",
             _guide("upload-evidence", "Kirim bukti di sini", unit_ids),
             None,
         )
@@ -1147,11 +1145,11 @@ def _handle_open_tx(intent: Intent, context: dict[str, Any], runner: _Runner, ui
         unit, context, ui,
         status_text="Membuka transaksi yang perlu diperiksa…",
         callout_title=_unit_label(unit),
-        callout_text="Transaksi sudah terbuka. Sebutkan nominalnya bila perlu dipastikan.",
+        callout_text="Transaksi sudah terbuka. Sebutkan jumlah uangnya bila perlu dicek.",
     )
     ui["_control"] = {"voice_note": "Transaksi sudah terbuka."}
     return (
-        f"{_unit_label(unit)} saya bukakan. Sebutkan nominalnya bila perlu dipastikan.",
+        f"{_unit_label(unit)} saya buka. Sebutkan jumlah uangnya bila perlu dicek.",
         _guide(f"transaction-{unit['unit_id']}", "Lihat transaksi ini", unit_ids),
         None,
     )
@@ -1240,7 +1238,7 @@ def _handle_resume(intent: Intent, context: dict[str, Any], runner: _Runner, ui:
         )
         detail = ", ".join(f"{k}: {v}" for k, v in (reproposed.summary or {}).items())
         return (
-            f"Masih menunggu keputusan Anda — {detail}. Ucapkan “Iya” untuk menyimpan, atau “Tidak” untuk membatalkan.",
+            f"Masih menunggu keputusan Anda. {detail}. Pilih Simpan atau Batal.",
             _guide("confirm-mapping", "Konfirmasi di sini", set(context["unit_ids"])),
             reproposed,
         )

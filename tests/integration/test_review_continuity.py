@@ -24,7 +24,7 @@ def test_review_reload_keeps_checked_facts_editable_and_refreshes_version(client
     assert len(candidates) > 1
     version = client.get(f"/api/v1/cases/{case_id}").json()["version"]
     page = client.get(f"/cases/{case_id}/review").text
-    assert f"{len(candidates)} data lagi perlu diperiksa." in page
+    assert f"1 dari {len(candidates)} data yang belum dicek" in page
     for index, fact in enumerate(candidates):
         payload = {"action": "confirm", "expected_version": version}
         if index == 0:
@@ -42,15 +42,15 @@ def test_review_reload_keeps_checked_facts_editable_and_refreshes_version(client
             assert ">Ubah</button>" in card[1]
             assert f'id="input-{checked["fact_id"]}"' in card[1]
         remaining = len(candidates) - index - 1
-        assert (f"{remaining} data lagi perlu diperiksa." if remaining else "Semua data sudah diperiksa.") in page
+        assert (f"1 dari {remaining} data yang belum dicek" if remaining else "Semua data sudah Anda cek.") in page
     assert 'id="review-summary"' in page
 
 
 def test_review_empty_copy(client: TestClient):
     case_id = create_case(client)
     page = client.get(f"/cases/{case_id}/review").text
-    assert "Belum ada data untuk diperiksa" in page
-    assert "bukan hasil pembacaan foto" in page
+    assert "Belum ada data" in page
+    assert "Tulis data sendiri" in page
     assert "OCR" not in page
     assert "Simpan pasangan" not in page
 

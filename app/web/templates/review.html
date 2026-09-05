@@ -10,10 +10,13 @@
     {% if ns.first is none %}{% set ns.first = fact.fact_id %}{% endif %}
   {% endif %}
 {% endfor %}
-<h1>Pastikan datanya benar</h1>
-<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Periksa data di bawah. Betulkan yang salah.{% elif facts %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
-{% if not has_blocking and facts %}
-<p class="muted small" id="review-remaining" role="status">{% if ns.count %}{{ ns.count }} data lagi perlu diperiksa.{% else %}Semua data sudah diperiksa.{% endif %} Data yang sudah dicek tetap bisa diubah.</p>
+{% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
+{% set checked = namespace(count=0) %}
+{% for fact in facts %}{% if fact.review_status != "CANDIDATE" %}{% set checked.count = checked.count + 1 %}{% endif %}{% endfor %}
+<h1>Pastikan data ini</h1>
+<p class="lede" id="coach-lede">{% if case.ask_loss_question %}Jawab satu pertanyaan ini.{% elif blocking_conflicts %}Ada data yang berbeda. Pilih yang sesuai bukti.{% elif pairing_units %}Cocokkan transaksi ini dengan buktinya.{% elif ns.count %}Cek satu data. Lalu lanjut ke data berikutnya.{% elif facts %}Semua data sudah Anda cek.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
+{% if not case.ask_loss_question and not blocking_conflicts and not pairing_units and ns.count %}
+<p class="review-count" id="review-remaining" role="status">1 dari {{ ns.count }} data yang belum dicek</p>
 {% endif %}
 <div class="notice warn" id="review-stale" role="alert" hidden>
   <p>Data berubah di tempat lain. Muat data terbaru sebelum menyimpan lagi. Tulisan yang belum disimpan akan hilang saat dimuat ulang.</p>
@@ -25,7 +28,7 @@
 {% elif notice == "pairing-gagal" %}
 <p class="notice warn" role="alert">Belum tersimpan. Pilih rekening dan jumlah uangnya, lalu tekan Simpan.</p>
 {% elif notice == "pairing-basi" %}
-<p class="notice warn" role="alert">Data berubah sejak terakhir Anda memeriksa. Halaman sudah dimuat ulang — periksa lagi lalu simpan.</p>
+<p class="notice warn" role="alert">Data berubah sejak terakhir Anda memeriksa. Halaman sudah dimuat ulang. Periksa lagi lalu simpan.</p>
 {% elif notice == "manual-ok" %}
 <p class="notice ok" role="status">Catatan Anda tersimpan. Bukan hasil pembacaan foto.</p>
 {% elif notice == "manual-gagal" %}
@@ -33,42 +36,36 @@
 {% endif %}
 
 {% if case.ask_loss_question %}
-<article class="card block">
-  <h3>Uangnya sudah terkirim?</h3>
-  <p class="muted small">Ada jumlah uang di bukti. Kami tidak akan mengubah alur sebelum Anda menjawab.</p>
+<section class="decision-panel">
+  <h2>Uangnya sudah terkirim?</h2>
+  <p>Kami perlu tahu sebelum memberi langkah berikutnya.</p>
   <form method="post" action="/cases/{{ case.case_id }}/condition" class="actions">
     <button class="btn ember" name="declared_condition" value="AFTER_LOSS" type="submit">Sudah terkirim</button>
     <button class="btn ghost" name="declared_condition" value="BEFORE_LOSS" type="submit">Belum terkirim</button>
   </form>
-</article>
-{% endif %}
-
-{% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
-{% if blocking_conflicts %}
-  {% for conflict in blocking_conflicts %}
-  <article class="card block" data-guide-id="review-facts">
-    <h3>Ada yang tidak cocok</h3>
-    <p class="muted small">Pilih yang benar supaya paketnya akurat. Kami tidak akan menebak.</p>
+  </section>
+{% elif blocking_conflicts %}
+  {% set conflict = blocking_conflicts[0] %}
+  <section class="decision-panel" data-guide-id="review-facts">
+    <h2>Mana yang benar?</h2>
+    <p>Kami menemukan dua data yang berbeda. Kami tidak menebak.</p>
     <form class="stack" onsubmit="return resolveConflict(event, '{{ conflict.conflict_id }}')">
       <fieldset>
-        <legend class="muted small">Pilih satu yang benar</legend>
+        <legend class="sr">Pilih data yang benar</legend>
         {% for fid in conflict.fact_ids %}
         {% set fact = facts_by_id.get(fid) %}
         <button class="btn ghost stack-left" name="resolution_fact_id" value="{{ fid }}">
-          <span><b>Pakai {{ fact.raw_value if fact else "yang ini" }}</b><br><span class="muted small">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") if fact else "bukti" }}</span></span>
+          <span><b>{{ fact.raw_value if fact else "Pilih yang ini" }}</b><br><span class="muted small">Dari {{ evidence_names.get(fact.source_evidence_id, "bukti Anda") if fact else "bukti" }}</span></span>
         </button>
         {% endfor %}
       </fieldset>
     </form>
-  </article>
-  {% endfor %}
-{% endif %}
-
-{% if pairing_units %}
-  {% for unit in pairing_units %}
+  </section>
+{% elif pairing_units %}
+  {% set unit = pairing_units[0] %}
   <section class="pair-group" data-guide-id="confirm-mapping" data-guide-alt="transaction-{{ unit.unit_id }}" aria-labelledby="pair-{{ unit.unit_id }}-title">
-    <h3 id="pair-{{ unit.unit_id }}-title">Transaksi ini belum jelas</h3>
-    <p class="muted small">Pilih yang sesuai bukti. Kalau ragu, pilih “Tidak ada di pilihan ini”.</p>
+    <h2 id="pair-{{ unit.unit_id }}-title">Cocokkan transaksi</h2>
+    <p>Pilih jawaban yang sama dengan bukti Anda.</p>
     <form method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
       <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
       <input type="hidden" name="expected_version" value="{{ case.version }}">
@@ -79,7 +76,7 @@
       <input type="hidden" name="dest_id_{{ i }}" value="{{ dest.id }}">
       <fieldset class="q" data-guide-id="transaction-{{ unit.unit_id }}-amount">
         <legend>Jumlah uang mana yang dikirim ke {{ dest.label }}?</legend>
-        <p class="q-hint">Sumber: {{ evidence_names.get(dest.src, "bukti Anda") }}</p>
+        <p class="q-hint">Dari {{ evidence_names.get(dest.src, "bukti Anda") }}</p>
         {% for item in unit.amounts %}
         <label class="radio">
           <input type="radio" name="amount_for_{{ i }}" value="{{ item.id }}" required>
@@ -88,13 +85,13 @@
         {% endfor %}
         <label class="radio none">
           <input type="radio" name="amount_for_{{ i }}" value="">
-          <span class="opt-body">Tidak ada di pilihan ini<small>Kosongkan dulu, bisa dilengkapi nanti.</small></span>
+          <span class="opt-body">Tidak ada<small>Bisa diisi nanti.</small></span>
         </label>
       </fieldset>
       {% if unit.times %}
       <fieldset class="q" data-guide-id="transaction-{{ unit.unit_id }}-datetime">
         <legend>Kapan dikirim ke {{ dest.label }}?</legend>
-        <p class="q-hint">Satu jawaban saja.</p>
+        <p class="q-hint">Pilih satu.</p>
         {% for item in unit.times %}
         <label class="radio">
           <input type="radio" name="time_for_{{ i }}" value="{{ item.id }}">
@@ -103,7 +100,7 @@
         {% endfor %}
         <label class="radio none">
           <input type="radio" name="time_for_{{ i }}" value="" checked>
-          <span class="opt-body">Saya tidak ingat pasti<small>Bisa dilengkapi nanti.</small></span>
+          <span class="opt-body">Saya tidak ingat<small>Bisa diisi nanti.</small></span>
         </label>
       </fieldset>
       {% endif %}
@@ -136,57 +133,52 @@
       </article>
       {% endfor %}
       {% endif %}
-      <div class="sticky-cta"><button class="btn ember" type="submit">Simpan</button></div>
+      <div class="sticky-cta"><button class="btn ember" type="submit">Simpan pilihan</button></div>
     </form>
   </section>
-  {% endfor %}
-{% endif %}
-
-{% if not has_blocking %}
+{% else %}
 <div class="fact-grid" id="fact-grid" data-guide-id="review-facts">
+{% if ns.count %}
 {% for fact in facts %}
-<article class="fact{% if fact.review_status == 'CANDIDATE' %} is-need{% else %} is-quiet{% endif %}" data-fact="{{ fact.fact_id }}">
-  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CORRECTED" %} · Anda ubah{% endif %}</p>
+{% if fact.fact_id == ns.first %}
+<article class="fact is-need is-on" data-fact="{{ fact.fact_id }}">
+  <p class="muted small">{{ fact.type | human("fact") }}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
   {% if fact.source_locator == "USER_ENTERED" %}
-  <p class="src">Ditulis Anda — bukan hasil pembacaan foto</p>
+  <p class="src">Ditulis Anda. Bukan hasil pembacaan foto.</p>
   {% else %}
   <p class="src">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") }}
     {% if fact.source_evidence_id and fact.source_evidence_id != "user-entered" %}
-    · <a class="link" href="/cases/{{ case.case_id }}/evidence/{{ fact.source_evidence_id }}/preview" target="_blank" rel="noopener">Lihat bukti</a>
+    · <a class="link" href="/cases/{{ case.case_id }}/evidence/{{ fact.source_evidence_id }}/preview" target="_blank" rel="noopener">Lihat bukti (tab baru)</a>
     {% endif %}
   </p>
   {% endif %}
-  {% if fact.review_status == "CANDIDATE" %}
   <div class="fact-actions">
-    <button class="btn ember" data-action="confirm" aria-describedby="review-remaining" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
-    <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Kurang tepat</button>
+    <button class="btn ember" data-action="confirm" aria-describedby="review-remaining" onclick="return patchFact(event, '{{ fact.fact_id }}')">Ya, benar</button>
+    <button class="btn ghost" data-action="correct" data-edit-trigger="{{ fact.fact_id }}" onclick="return openCorrect('{{ fact.fact_id }}')">Perbaiki</button>
   </div>
-  {% elif fact.review_status in ["CONFIRMED", "CORRECTED"] %}
-  <div class="fact-actions">
-    <button class="btn ghost" type="button" onclick="return openCorrect('{{ fact.fact_id }}')">Ubah</button>
-  </div>
-  {% endif %}
   <div class="correct-box" id="correct-{{ fact.fact_id }}">
     <label for="input-{{ fact.fact_id }}">Yang benar</label>
     <input id="input-{{ fact.fact_id }}" type="text" placeholder="Contoh: Rp2.750.000 atau BCA 1234567890">
     <div class="actions">
       <button class="btn ember" type="button" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
-      <button class="btn-text" type="button" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan data saya ›</button>
-      <button class="btn-text" type="button" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal ›</button>
+      <button class="btn-text" type="button" data-action="reject" onclick="return patchFact(event, '{{ fact.fact_id }}')">Bukan data kasus saya</button>
+      <button class="btn-text" type="button" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal</button>
     </div>
   </div>
 </article>
-{% else %}
+{% endif %}
+{% endfor %}
+{% elif not facts %}
 <article class="empty">
-  <h3>Belum ada data untuk diperiksa</h3>
-  <p>Kirim foto transfer, chat, atau link. Jika foto tidak terbaca, isi data sendiri. Data ini dicatat sebagai tulisan Anda, bukan hasil pembacaan foto.</p>
+  <h2>Belum ada data</h2>
+  <p>Kirim bukti lagi. Anda juga bisa menulis datanya sendiri.</p>
   <div class="actions">
-    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a>
+    <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a>
   </div>
   <form method="post" action="/cases/{{ case.case_id }}/facts/manual" class="stack" style="margin-top:16px">
     <input type="hidden" name="expected_version" value="{{ case.version }}">
-    <label for="manual-type">Tambah data manual</label>
+    <label for="manual-type">Tulis data sendiri</label>
     <select id="manual-type" name="fact_type">
       <option value="AMOUNT">Jumlah uang</option>
       <option value="ACCOUNT">Rekening</option>
@@ -194,16 +186,43 @@
     </select>
     <label for="manual-value">Nilai</label>
     <input id="manual-value" name="value" type="text" required placeholder="Contoh: Rp2.750.000">
-    <button class="btn ghost" type="submit">Simpan catatan</button>
+    <button class="btn ghost" type="submit">Simpan data</button>
   </form>
 </article>
-{% endfor %}
+{% endif %}
 </div>
 
-{% if ns.count == 0 and facts %}
-<div class="actions">
-  <a class="btn ember" id="review-summary" href="/cases/{{ case.case_id }}/readiness">Lihat ringkasan</a>
+{% if checked.count %}
+<details class="reviewed-data">
+  <summary>Data yang sudah dicek ({{ checked.count }})</summary>
+  <div class="reviewed-list">
+  {% for fact in facts %}
+  {% if fact.review_status != "CANDIDATE" %}
+  <article class="fact is-quiet" data-fact="{{ fact.fact_id }}">
+    <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CORRECTED" %} · sudah diperbaiki{% endif %}</p>
+    <p><strong class="value">{{ fact.raw_value }}</strong></p>
+    {% if fact.review_status in ["CONFIRMED", "CORRECTED"] %}
+    <button class="btn-text" type="button" data-edit-trigger="{{ fact.fact_id }}" onclick="return openCorrect('{{ fact.fact_id }}')">Ubah</button>
+    <div class="correct-box" id="correct-{{ fact.fact_id }}">
+      <label for="input-{{ fact.fact_id }}">Yang benar</label>
+      <input id="input-{{ fact.fact_id }}" type="text" value="{{ fact.raw_value }}">
+      <div class="actions">
+        <button class="btn ember" type="button" onclick="return submitCorrect('{{ fact.fact_id }}')">Simpan</button>
+        <button class="btn-text" type="button" onclick="return closeCorrect('{{ fact.fact_id }}')">Batal</button>
+      </div>
+    </div>
+    {% endif %}
+  </article>
+  {% endif %}
+  {% endfor %}
   </div>
+</details>
+{% endif %}
+
+{% if ns.count == 0 and facts %}
+<form class="actions" method="post" action="/cases/{{ case.case_id }}/continue">
+  <button class="btn ember" id="review-summary" type="submit">Lihat langkah berikutnya</button>
+</form>
 {% endif %}
 {% endif %}
 
@@ -269,8 +288,9 @@ async function patchFact(ev, id){
   }
   return false;
 }
-function openCorrect(id){ document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
-function closeCorrect(id){ document.getElementById("correct-"+id).classList.remove("open"); return false; }
+const correctOpeners = {};
+function openCorrect(id){ correctOpeners[id] = document.activeElement; document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
+function closeCorrect(id){ document.getElementById("correct-"+id).classList.remove("open"); const opener = correctOpeners[id] || document.querySelector('[data-edit-trigger="'+id+'"]'); if(opener && opener.focus) opener.focus(); return false; }
 async function submitCorrect(id){
   if(reviewSaving) return false;
   const v=document.getElementById("input-"+id).value.trim();

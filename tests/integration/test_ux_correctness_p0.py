@@ -152,7 +152,7 @@ def test_web_artifacts_page_renders_after_approval(client: TestClient, ocr: Scri
     assert ok.status_code == 200
     page = client.get(f"/cases/{case_id}/artifacts")
     assert page.status_code == 200
-    assert "Paket Anda siap dibawa" in page.text
+    assert "Dokumen Anda siap" in page.text
     assert "Buka situs IASC" in page.text
 
 
@@ -181,8 +181,8 @@ def test_dashboard_evidence_path_and_informed_bypass(client: TestClient, ocr: Sc
     assert mapped.status_code == 200
     page = client.get(f"/cases/{case_id}/readiness")
     assert page.status_code == 200
-    assert "Yang perlu Anda lakukan" in page.text
-    assert "Periksa bukti" in page.text
+    assert "Lakukan ini sekarang" in page.text
+    assert "Tambah bukti" in page.text
     assert "Lanjut ke paket" not in page.text
     assert "Lanjut dulu" not in page.text
     import re

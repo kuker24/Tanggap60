@@ -2,28 +2,28 @@
 {% block body_mod %}is-landing{% endblock %}
 {% block color_scheme %}light{% endblock %}
 {% block theme_color %}#faf7f1{% endblock %}
-{% block title %}Ketipu online? Susun buktinya di sini — Tanggap60{% endblock %}
+{% block title %}Curiga kena tipu online? — Tanggap60{% endblock %}
 {% block content %}
 <section class="land-hero">
   <div class="land-hero-inner">
     <div class="land-hero-copy">
-      <h1>Curiga penipuan atau sudah terlanjur transfer?</h1>
-      <p class="lede">Kirim foto, chat, atau tautan. Kami bantu periksa informasi dan siapkan langkah berikutnya.</p>
+      <h1>Curiga kena tipu online?</h1>
+      <p class="lede">Pilih kondisi Anda.</p>
       <form class="choices land-choices" method="post" action="/start" aria-label="Pilih kondisi">
         <input type="hidden" name="mode" value="DEMO">
         <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-          <b>Sudah kirim uang</b>
-          <span class="desc">Sudah transfer dan sekarang curiga. Kami bantu susun buktinya.</span>
+          <b>Sudah transfer</b>
+          <span class="desc">Hubungi bank sekarang. Lalu rapikan bukti di sini.</span>
         </button>
         <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-          <b>Belum kirim uang</b>
-          <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
+          <b>Belum transfer</b>
+          <span class="desc">Jangan transfer dulu. Kirim chat atau link untuk diperiksa.</span>
         </button>
       </form>
       <ul class="land-trust" aria-label="Janji utama">
-        <li>Tidak mengirim laporan.</li>
-        <li>Kami tidak akan menebak.</li>
-        <li>Data demo otomatis dihapus setelah 60 menit.</li>
+        <li>Tidak meminta OTP atau kata sandi.</li>
+        <li>Tidak mengirim laporan untuk Anda.</li>
+        <li>Kasus tidak bisa dibuka setelah 60 menit.</li>
       </ul>
     </div>
   </div>
@@ -31,128 +31,55 @@
 
 <section class="land-how" aria-labelledby="how-title">
   <div class="land-section-inner narrow">
-    <h2 id="how-title">Dari bukti ke paket, empat langkah</h2>
+    <h2 id="how-title">Cara kerjanya</h2>
     <ol class="land-steps">
       <li>
-        <h3>Bukti</h3>
-        <p>Kirim foto, chat, atau tautan yang ingin diperiksa.</p>
+        <h3>Kirim bukti</h3>
+        <p>Kirim foto transfer, chat, atau link.</p>
       </li>
       <li>
-        <h3>Periksa</h3>
-        <p>Kami baca bukti dan tandai informasi yang berbeda atau belum jelas.</p>
+        <h3>Cek data</h3>
+        <p>Kami baca bukti. Anda cek hasilnya.</p>
       </li>
       <li>
-        <h3>Konfirmasi</h3>
-        <p>Anda periksa datanya, perbaiki yang keliru, lalu buat paket.</p>
-      </li>
-      <li>
-        <h3>Bertindak</h3>
-        <p>Ikuti langkah sesuai kondisi Anda. Jika paket siap, unduh dan bawa sendiri ke situs resmi.</p>
+        <h3>Lihat langkah</h3>
+        <p>Kami tunjukkan apa yang perlu Anda lakukan.</p>
       </li>
     </ol>
-    <div class="land-story" id="land-story">
-      <h3 class="land-story-title">Contoh</h3>
+    <div class="land-story">
+      <h3 class="land-story-title">Kalau data berbeda</h3>
       <div class="land-mock">
-        <p class="land-mock-title">Dua bukti, dua angka</p>
+        <p class="land-mock-title">Dua bukti menunjukkan jumlah yang berbeda.</p>
         <div class="land-mock-row is-ok">
           <span class="land-mock-amt">Rp2.750.000</span>
-          <span class="land-mock-tag" data-messy="Dari struk" data-told="Lengkap">Lengkap</span>
+          <span class="land-mock-tag">Dari struk</span>
         </div>
         <div class="land-mock-row is-wait">
           <span class="land-mock-amt">Rp2.500.000</span>
-          <span class="land-mock-tag" data-messy="Dari chat" data-told="Perlu konfirmasi">Perlu konfirmasi</span>
+          <span class="land-mock-tag">Dari chat</span>
         </div>
-        <p class="land-mock-callout">Kami tidak akan menebak.</p>
+        <p class="land-mock-callout">Kami tanya Anda. Kami tidak menebak.</p>
       </div>
     </div>
-    <p class="land-how-note">Keputusan resmi tetap di bank, IASC, atau polisi.</p>
-  </div>
-</section>
-<script>
-(function(){
-  var story = document.getElementById("land-story");
-  if (!story) return;
-  var tags = story.querySelectorAll(".land-mock-tag");
-  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  function told(){
-    story.classList.remove("is-live");
-    story.classList.add("is-told");
-    for (var i = 0; i < tags.length; i++) {
-      var next = tags[i].getAttribute("data-told");
-      if (next) tags[i].textContent = next;
-    }
-  }
-  if (reduce || !("IntersectionObserver" in window)) { told(); return; }
-  story.classList.add("is-live");
-  for (var j = 0; j < tags.length; j++) {
-    var messy = tags[j].getAttribute("data-messy");
-    if (messy) tags[j].textContent = messy;
-  }
-  var io = new IntersectionObserver(function(entries){
-    for (var k = 0; k < entries.length; k++) {
-      if (entries[k].isIntersecting && entries[k].intersectionRatio >= 0.35) {
-        told();
-        io.disconnect();
-        return;
-      }
-    }
-  }, {threshold: [0.15]});
-  io.observe(story);
-})();
-</script>
-
-<section class="land-proof" aria-labelledby="proof-title">
-  <div class="land-section-inner">
-    <h2 id="proof-title">Yang kami lakukan, dan yang tidak</h2>
-    <ul class="land-proof-list">
-      <li class="is-no"><span class="land-mark" aria-hidden="true">×</span><span><b>Tidak mengirim laporan.</b> Anda yang bawa paketnya ke situs resmi bank, IASC, atau polisi.</span></li>
-        <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Setiap data ada sumbernya.</b> Kalau jumlah uang di chat dan struk tidak sama, kami tahan dulu sampai Anda pilih yang benar. Kalau kami tidak yakin, kami bertanya. Tidak menebak.</span></li>
-        <li class="is-yes"><span class="land-mark" aria-hidden="true">✓</span><span><b>Paket bisa dicek apakah filenya berubah.</b> Ada kode cek di dalamnya. Itu tidak membuktikan isi screenshot benar, hanya bahwa arsip tidak diubah setelah dibuat. Status resmi tetap dari lembaga yang berwenang, bukan dari kami.</span></li>
-    </ul>
+    <p class="land-how-note">Keputusan resmi tetap dari bank, IASC, atau polisi.</p>
   </div>
 </section>
 
 <section class="land-faq" aria-labelledby="faq-title">
   <div class="land-section-inner narrow">
-    <h2 id="faq-title">Pertanyaan yang sering muncul</h2>
+    <h2 id="faq-title">Yang perlu Anda tahu</h2>
     <details>
-      <summary>Apakah laporan saya langsung terkirim ke bank atau polisi?</summary>
-      <p>Tidak. Tanggap60 hanya menyusun. Yang mengirim tetap Anda, di situs resmi mereka.</p>
+      <summary>Apakah laporan langsung terkirim?</summary>
+      <p>Tidak. Tanggap60 hanya menyiapkan data. Anda sendiri yang mengirim laporan.</p>
     </details>
     <details>
       <summary>Apakah uang saya pasti kembali?</summary>
-      <p>Tidak ada yang bisa memastikan itu. Yang bisa kami bantu: bukti Anda rapi sehingga mudah diproses bank atau polisi.</p>
+      <p>Tidak ada yang bisa memastikan uang kembali. Tanggap60 membantu merapikan bukti.</p>
     </details>
     <details>
-      <summary>Apa isi paketnya?</summary>
-      <p>ZIP mengumpulkan bukti, cerita, dan ringkasan data Anda dalam satu file. Di dalamnya juga ada kode untuk cek apakah file berubah setelah paket dibuat.</p>
-      <p>Di HP, buka hasil unduhan lewat aplikasi File atau Files. Ketuk file ZIP, lalu pilih Ekstrak jika diminta. Jika hanya ingin membaca ringkasan, pilih "Unduh ringkasan PDF" di halaman paket. PDF lebih mudah dibuka tanpa mengekstrak ZIP.</p>
+      <summary>Berapa lama kasus bisa dibuka?</summary>
+      <p>Kasus tidak bisa dibuka setelah 60 menit. Data lama dihapus sistem secara berkala. Anda juga bisa menghapusnya sendiri.</p>
     </details>
-    <details>
-      <summary>Apa itu IASC?</summary>
-      <p>IASC adalah situs resmi OJK untuk melaporkan penipuan di jasa keuangan. Lapornya di situs iasc.ojk.go.id, bukan di sini.</p>
-    </details>
-    <details>
-      <summary>Berapa lama data saya disimpan?</summary>
-      <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari Kelola data di setiap halaman kasus.</p>
-    </details>
-  </div>
-</section>
-
-<section class="land-cta" aria-labelledby="cta-title">
-  <div class="land-section-inner">
-    <h2 id="cta-title">Mulai dari kondisi Anda</h2>
-    <form class="choices land-choices" method="post" action="/start" aria-label="Mulai kasus">
-      <input type="hidden" name="mode" value="DEMO">
-        <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-          <b>Sudah kirim uang</b>
-          <span class="desc">Sudah transfer dan sekarang curiga. Kami bantu susun buktinya.</span>
-        </button>
-        <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-          <b>Belum kirim uang</b>
-          <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
-        </button>
-    </form>
   </div>
 </section>
 {% endblock %}

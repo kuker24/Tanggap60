@@ -13,7 +13,7 @@ class CaseStorage:
         self.root = root.resolve()
         self.quota_bytes = quota_bytes
         self.root.mkdir(parents=True, exist_ok=True)
-        os.chmod(self.root, 0o700)
+        os.chmod(self.root, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- owner-only directory
 
     def case_dir(self, case_id: str) -> Path:
         if "/" in case_id or ".." in case_id or case_id.startswith("."):
@@ -26,7 +26,7 @@ class CaseStorage:
     def ensure_case_dir(self, case_id: str) -> Path:
         path = self.case_dir(case_id)
         path.mkdir(parents=True, exist_ok=True)
-        os.chmod(path, 0o700)
+        os.chmod(path, 0o700)  # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions -- owner-only directory
         return path
 
     def new_key(self) -> str:

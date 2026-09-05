@@ -48,8 +48,11 @@ def test_production_cookie_is_secure(tmp_path: Path) -> None:
 def test_agent_and_receipt_clear_browser_storage() -> None:
     root = Path(__file__).resolve().parents[2]
     agent = (root / "app/web/static/agent.js").read_text(encoding="utf-8")
-    receipt = (root / "app/web/templates/receipt.html").read_text(encoding="utf-8")
+    app = (root / "app/web/static/app.js").read_text(encoding="utf-8")
+    base = (root / "app/web/templates/base.html").read_text(encoding="utf-8")
     assert "sessionStorage.removeItem(HIST_KEY)" in agent
     assert "sessionStorage.removeItem(PLAN_KEY)" in agent
-    assert "t60agent:" in receipt
-    assert "sessionStorage.removeItem" in receipt
+    assert "window.t60Purge" in app
+    assert 'sessionStorage.removeItem("t60agent:" + id)' in app
+    assert 'sessionStorage.removeItem("t60plan:" + id)' in app
+    assert 'id="purge-browser-form"' in base

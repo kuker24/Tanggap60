@@ -3,24 +3,24 @@
 {% block title %}Nomor laporan — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
-<h1>Sudah mendapat nomor laporan atau tiket?</h1>
-  <p class="lede">Nomor dari bank, IASC, atau polisi setelah Anda melapor. Yang tercatat di sini hanya nomor yang disamarkan. Belum diverifikasi oleh situs resmi.</p>
+<h1>Sudah mendapat nomor laporan?</h1>
+<p class="lede">Masukkan nomor dari bank, IASC, atau polisi.</p>
 
 {% if receipt %}
-<div class="card">
-  <h3>Sudah tercatat</h3>
+<section class="decision-panel">
+  <h2>Nomor sudah dicatat</h2>
   <p class="ticket-value">{{ receipt.ticket_value_masked }}</p>
-  <p class="muted small">Ini catatan lokal yang disamarkan, bukan pelacak resmi. Tanggap60 hanya mencatat nomor yang Anda masukkan. Belum diverifikasi oleh situs resmi.</p>
+  <p class="muted small">Ini catatan lokal, bukan pelacak resmi. Tanggap60 tidak memeriksa nomor ini ke lembaga penerbit.</p>
   <form id="rcpt-fix" class="stack" novalidate>
     <label for="ticket-fix">Ubah catatan nomor</label>
     <input id="ticket-fix" name="ticket_text" type="text" placeholder="Nomor baru" autocomplete="off" aria-describedby="rcpt-fix-alert">
     <p id="rcpt-fix-alert" role="status" aria-live="polite"></p>
     <div class="actions">
       <button class="btn ghost" type="submit">Simpan perubahan</button>
-      <a class="btn ember" href="/cases/{{ case.case_id }}/artifacts">Kembali ke paket</a>
+      <a class="btn ember" href="/cases/{{ case.case_id }}/artifacts">Kembali ke dokumen</a>
     </div>
   </form>
-</div>
+</section>
 <script>
 document.getElementById("rcpt-fix").addEventListener("submit", async (ev) => {
   ev.preventDefault();
@@ -47,14 +47,14 @@ document.getElementById("rcpt-fix").addEventListener("submit", async (ev) => {
 });
 </script>
 {% else %}
-<form id="rcpt" class="card" data-guide-id="receipt-form" novalidate>
+<form id="rcpt" class="decision-panel" data-guide-id="receipt-form" novalidate>
   <label for="ticket">Nomor laporan</label>
   <input id="ticket" name="ticket_text" type="text" placeholder="Contoh: LP/123/III/2026 atau IASC-456789" autocomplete="off" aria-describedby="ticket-help">
   <p class="help" id="ticket-help">Biasanya ada di struk, SMS, atau email balasan setelah Anda melapor.</p>
   <div id="rcpt-alert"></div>
   <div class="actions">
     <button class="btn ember" type="submit">Catat nomor</button>
-    <a class="btn-text" href="/cases/{{ case.case_id }}/artifacts">Lewati ›</a>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/artifacts">Lewati</a>
   </div>
 </form>
 <script>
@@ -80,51 +80,4 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
 });
 </script>
 {% endif %}
-
-<details>
-  <summary>Belum melapor? Cara membawa dokumen</summary>
-  <ol class="plan">
-    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
-    <li>Buka <a class="link" href="https://iasc.ojk.go.id/" target="_blank" rel="noopener">situs resmi IASC</a>.</li>
-    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a> ke kolom yang sesuai. Isi identitas sendiri dan lampirkan bukti transfer serta bukti pendukung sesuai aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan; ringkasan tidak menggantikan bukti asli.</li>
-  </ol>
-  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima situs resmi. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak untuk membuka isinya. Unggah hanya file yang diminta situs resmi. Tanggap60 tidak mengirim laporan; nomor laporan baru diperoleh setelah Anda melapor sendiri.</p>
-</details>
-
-<div class="card danger-zone">
-  <h3>Hapus semua data kasus ini</h3>
-  <p class="muted small">Foto, data, dan paket di kasus ini dihapus permanen dan tidak bisa dikembalikan. Lakukan ini kalau sudah selesai melapor dan tidak butuh arsipnya.</p>
-  <div id="purge-alert" role="status" aria-live="polite"></div>
-  <form method="post" action="#" onsubmit="return purgeNow(event)">
-    <button class="btn danger" type="submit">Hapus permanen</button>
-  </form>
-</div>
-<script>
-async function purgeNow(ev) {
-  ev.preventDefault();
-  if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
-  const btn = ev.target.querySelector('[type="submit"]');
-  btn.disabled = true;
-  try {
-  const res = await fetch("/api/v1/cases/{{ case.case_id }}", {method:"DELETE", headers:{"Content-Type":"application/json"}, body: JSON.stringify({confirmation:"PURGE"})});
-  if(res.ok){
-    try {
-      const id = "{{ case.case_id }}";
-      sessionStorage.removeItem("t60agent:" + id);
-      sessionStorage.removeItem("t60plan:" + id);
-      sessionStorage.removeItem("t60wait:" + id);
-    } catch (e) {}
-    location.href = "/";
-    return false;
-  }
-  const j = await res.json().catch(()=>({}));
-  window._alert("purge-alert", "error", "Belum terhapus", (j.message || "Gagal menghapus") + ". Coba lagi.");
-  } catch (_) {
-    window._alert("purge-alert", "error", "Koneksi terputus", "Penghapusan belum dapat dipastikan. Periksa koneksi, lalu coba hapus lagi atau muat ulang untuk memeriksa status kasus.");
-  } finally {
-    btn.disabled = false;
-  }
-  return false;
-}
-</script>
 {% endblock %}

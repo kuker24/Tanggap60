@@ -1,96 +1,55 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Yang perlu Anda lakukan — Tanggap60{% endblock %}
+{% block title %}Langkah berikutnya — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
-<h1>Yang perlu Anda lakukan</h1>
-<p class="lede">Satu hal dalam satu waktu. Mulai dari yang paling atas.</p>
-
-{% if next_view %}
-<div class="next-card" id="lakukan" data-guide-id="next-best-action">
-  <h3>Lakukan sekarang: {{ next_view.label }}</h3>
-  {% if next_view.reason %}<p class="muted small">{{ next_view.reason }}</p>{% endif %}
-</div>
-{% endif %}
-
-{% if tx_cards %}
-<h2 id="transaksi" class="muted small" style="margin-top:8px" data-guide-id="transaction-list">Transaksi Anda</h2>
-{% for tx in tx_cards %}
-<article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
-  <div class="tx-top">
-    <h3>Transaksi {{ tx.n }}</h3>
-    {% if not tx.ready %}<p class="tx-when">Perlu dilengkapi</p>{% endif %}
-  </div>
-  {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
-  {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
-  {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
-  {% if tx.missing_review %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_review %}
-    <li>{{ m }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if tx.missing_evidence %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_evidence %}
-    <li>{{ m }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if tx.missing_info %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_info %}
-    <li>{{ m }} (tidak menghentikan — bisa dilengkapi di situs resmi)</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</article>
-{% endfor %}
-{% endif %}
-
 {% if gap_tasks %}
-<div class="gap-tasks" data-guide-id="readiness-summary">
-{% for task in gap_tasks %}
-<article class="card" id="task-{{ task.key }}">
-  <h3>{{ task.title }}</h3>
-  <ul class="gaps">
-    {% for item in task.points %}
-    <li>{{ item }}</li>
-    {% endfor %}
+{% set task = gap_tasks[0] %}
+<h1>Lakukan ini sekarang</h1>
+<section class="next-card" id="lakukan" data-guide-id="next-best-action">
+  <h2>{{ task.title }}</h2>
+  <ul class="simple-list">
+    {% for item in task.points %}<li>{{ item }}</li>{% endfor %}
   </ul>
-  <div class="actions">
-    <a class="{% if loop.first %}btn ember{% else %}btn-text{% endif %}" href="{{ task.href }}">{{ task.cta }}</a>
-  </div>
-</article>
-{% endfor %}
-</div>
+  <a class="btn ember" href="/{{ task.href.lstrip('/') }}">{{ task.cta }}</a>
+</section>
+{% if gap_tasks|length > 1 %}
+<details class="task-details" data-guide-id="readiness-summary">
+  <summary>Lihat langkah setelah ini</summary>
+  {% for later in gap_tasks[1:] %}<p><b>{{ later.title }}</b><br>{{ later.points[0] }}</p>{% endfor %}
+</details>
 {% endif %}
-
-{% if not tx_cards and not gap_tasks %}
-<div class="next-card">
-  <h3>Siap dibawa ke situs resmi</h3>
-  <p class="muted small">Unduh paket, lalu isi laporan di situs mereka.</p>
+{% elif next_view %}
+<h1>Lakukan ini sekarang</h1>
+<section class="next-card" id="lakukan" data-guide-id="next-best-action">
+  <h2>{{ next_view.label }}</h2>
+  {% if next_view.reason %}<p>{{ next_view.reason }}</p>{% endif %}
+  <p class="muted small">Gunakan nomor bank dari aplikasi, kartu, atau situs resminya.</p>
+</section>
+<p class="notice" data-guide-id="official-handoff">Data ini baru diperiksa oleh Tanggap60. Bank, IASC, atau polisi belum memeriksanya.</p>
+<div class="actions">
+  <a class="btn ember" href="/{{ primary.href.lstrip('/') }}">{{ primary.label }}</a>
+  {% if ready_count %}<a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Lihat data untuk disalin</a>{% endif %}
 </div>
+{% else %}
+<h1>Belum ada data</h1>
+<p class="lede">Kirim satu bukti untuk mulai.</p>
+<div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a></div>
 {% endif %}
 
 {% if tx_cards %}
-<div class="next-card" data-guide-id="official-handoff">
-  <h3>Bawa ke situs resmi</h3>
-  <ol class="plan">
-    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
-    <li>Buka situs resmi IASC.</li>
-    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a>, isi identitas sendiri, lalu lampirkan bukti sesuai aturan formulir. Ringkasan tidak menggantikan bukti asli.</li>
-  </ol>
-  <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Tanggap60 tidak mengirim laporan.</p>
-</div>
-{% endif %}
-{% if not gap_tasks %}
-<div class="actions">
-  <a class="btn ember" href="{{ primary.href }}">{{ primary.label }}</a>
-  {% if ready_count %}
-  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
-  {% endif %}
-</div>
+<details class="task-details transaction-details" data-guide-id="transaction-list">
+  <summary>Lihat rincian transaksi ({{ tx_cards|length }})</summary>
+  {% for tx in tx_cards %}
+  <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
+    <div class="tx-top"><h3>Transaksi {{ tx.n }}</h3>{% if not tx.ready %}<span class="tx-when">Belum lengkap</span>{% endif %}</div>
+    {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
+    {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">ke {{ tx.dest }}</p>{% endif %}
+    {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
+    {% set missing = tx.missing_review + tx.missing_evidence + tx.missing_info %}
+    {% if missing %}<ul class="tx-missing">{% for m in missing %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  </article>
+  {% endfor %}
+</details>
 {% endif %}
 {% endblock %}

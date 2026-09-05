@@ -37,6 +37,17 @@ def test_help_panel_focus_and_escape_contract(client: TestClient) -> None:
     assert 'aria-modal") !== "true") return' in js
 
 
+def test_live_guidance_requires_explicit_opt_in(client: TestClient) -> None:
+    case_id = create_case(client)
+    page = client.get(f"/cases/{case_id}/intake").text
+    assert 'id="agent-autopilot" type="checkbox">' in page
+    js = client.get("/static/agent.js").text
+    assert "let guidanceOn = false" in js
+    assert "if (guidanceOn && data.guidance_plan" in js
+    assert "(actions || []).slice(0, 2)" in js
+    assert 'prop.action_type === "OPEN_OFFICIAL"' in js
+
+
 def test_help_composer_targets_and_layout(client: TestClient) -> None:
     css = client.get("/static/agent.css").text
     quick = css.split(".agent-quick button {", 1)[1].split("}", 1)[0]

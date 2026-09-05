@@ -1,38 +1,38 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Paket siap — Tanggap60{% endblock %}
+{% block title %}Dokumen siap — Tanggap60{% endblock %}
+{% block body_attrs %}{% if not artifacts %} data-page="wait" data-wait="pack"{% endif %}{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 {% if artifacts %}
-<h1>Paket Anda siap dibawa</h1>
-<p class="lede">Paket belum dikirim ke mana pun. Anda tetap yang mengirimkannya ke situs resmi.</p>
+<h1>Dokumen Anda siap</h1>
+<p class="lede">Belum dikirim ke mana pun. Periksa sebelum Anda melapor.</p>
 
-<div class="next-card" data-guide-id="official-handoff">
-  <h3>Bawa ke situs resmi</h3>
-  <p class="muted small">Paket ini alat bantu. Laporan dikirim oleh Anda di situs resmi, bukan di sini.</p>
-  <ol class="plan">
-    <li>Unduh ringkasan PDF, lalu buka dan periksa isinya.</li>
-    <li>Buka situs resmi IASC melalui tautan di bawah.</li>
-    <li>Gunakan <a class="link" href="/cases/{{ case.case_id }}/workspace">Data untuk disalin</a> untuk mengisi kolom data dan kronologi. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
-  </ol>
-  <p class="muted small">Satu formulir IASC berfokus pada transaksi dari satu rekening korban ke satu rekening tujuan. Tujuan berbeda mungkin memerlukan laporan terpisah; ikuti petunjuk situs resmi. Periksa semua isian sebelum Anda mengirim laporan sendiri.</p>
+<section class="next-card" data-guide-id="official-handoff">
+  <h2>Unduh dan periksa</h2>
   <div class="actions">
     {% if summary %}
-    <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ summary.artifact_id }}/download">Unduh ringkasan PDF</a>
+    <a class="btn ember" href="/api/v1/cases/{{ case.case_id }}/artifacts/{{ summary.artifact_id }}/download">Unduh {{ summary.type | human("artifact") }} (PDF)</a>
     {% endif %}
-    <a class="btn-text" href="{{ official_url }}" rel="noopener" target="_blank" onclick="fetch('/api/v1/cases/{{ case.case_id }}/handoff/opened',{method:'POST'})">Buka situs IASC ›</a>
+    <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Lihat data untuk disalin</a>
   </div>
-  {% if pack %}
-  <details>
-    <summary>Arsip ZIP (opsional)</summary>
-    <p class="muted small">ZIP hanya arsip untuk Anda, bukan laporan yang otomatis diterima situs resmi. Setelah diunduh, buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Buka file hasil ekstraksi; lampirkan hanya file yang sesuai aturan formulir, bukan langsung mengirim ZIP.</p>
-    <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh arsip lengkap (ZIP)</a>
-  </details>
-  {% endif %}
+</section>
+
+<p class="notice">Tanggap60 menyiapkan data. Anda sendiri yang mengirim laporan.</p>
+<div class="actions">
+  <a class="btn ghost" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank" data-handoff-opened>Buka situs IASC (tab baru)</a>
 </div>
 
+{% if pack %}
+<details class="task-details">
+  <summary>Unduh semua file (opsional)</summary>
+  <p>ZIP adalah arsip untuk Anda. Jangan kirim ZIP kecuali situs resmi memintanya.</p>
+  <a class="btn ghost" href="/cases/{{ case.case_id }}/paket.zip">Unduh ZIP</a>
+</details>
+{% endif %}
+
 <div class="actions">
-  <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan ›</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/receipt">Catat nomor laporan</a>
 </div>
 
 {% if rest %}
@@ -51,16 +51,11 @@
 {% else %}
 <div class="stage-void">
 <div class="wait-ring" aria-hidden="true"></div>
-<h1>Membuat paket</h1>
+<h1>Membuat dokumen</h1>
 <p class="lede status-line" id="state-live" aria-live="polite"><span class="pulse" aria-hidden="true"></span>Sebentar, biasanya 1–2 menit. Halaman pindah sendiri.</p>
 </div>
 <noscript>
   <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/artifacts">Muat ulang halaman ini</a> setelah 1–2 menit.</p>
 </noscript>
-<script>
-  document.body.setAttribute("data-case", "{{ case.case_id }}");
-  document.body.setAttribute("data-page", "wait");
-  document.body.setAttribute("data-wait", "pack");
-</script>
 {% endif %}
 {% endblock %}

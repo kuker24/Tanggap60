@@ -1,26 +1,25 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
 {% block body_mod %}{% if not actions %}is-void{% endif %}{% endblock %}
-{% block title %}Langkah lapor — Tanggap60{% endblock %}
+{% block body_attrs %}{% if not actions %} data-page="wait" data-wait="plan"{% endif %}{% endblock %}
+{% block title %}Jangan transfer dulu — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 {% if actions %}
-<h1>{% if case.route.value == "PRE_INCIDENT_CHECK" %}Yang perlu Anda cek{% else %}Lapor dengan urutan ini{% endif %}</h1>
-<p class="lede">{% if case.route.value == "PRE_INCIDENT_CHECK" %}Ini petunjuk awal, bukan vonis. Pastikan lewat situs resmi.{% else %}Semakin cepat melapor, semakin besar peluang dibantu. Tidak ada yang bisa memastikan uang kembali.{% endif %}</p>
-<ol class="plan" data-guide-id="next-best-action">
-  {% for action in actions %}
-  <li>{{ action.instruction | soften }}</li>
-  {% endfor %}
-</ol>
-{% if case.route.value != "PRE_INCIDENT_CHECK" %}
-<p class="muted small">Setelah paket siap: unduh ringkasan PDF dan periksa isinya, lalu buka situs resmi. Salin data dan kronologi ke kolom yang sesuai; lampirkan bukti transfer serta bukti pendukung menurut aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan. Ringkasan tidak menggantikan bukti asli. Tanggap60 tidak mengirim laporan.</p>
-  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima situs resmi. Untuk membukanya, gunakan aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan situs resmi.</p>
-<div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paket</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
-</div>
-{% endif %}
+<h1>Jangan transfer dulu</h1>
+<p class="lede">Kami hanya memeriksa bentuk link. Kami tidak membuka situsnya.</p>
+<section class="decision-panel" data-guide-id="next-best-action">
+  <h2>Yang terlihat</h2>
+  {% if url_indicators %}
+  <ul class="simple-list">{% for item in url_indicators %}<li>{{ item }}</li>{% endfor %}</ul>
+  {% else %}
+  <p>Tidak ada tanda sederhana dari bentuk link. Ini tidak berarti link aman.</p>
+  {% endif %}
+</section>
+<details class="task-details">
+  <summary>Yang tidak kami periksa</summary>
+  <p>Kami tidak membuka link dan tidak memeriksa laporan orang lain.</p>
+</details>
 {% else %}
 <div class="stage-void">
 <div class="wait-ring" aria-hidden="true"></div>
@@ -30,53 +29,17 @@
 <noscript>
   <p class="notice">JavaScript mati. <a class="link" href="/cases/{{ case.case_id }}/result">Muat ulang halaman ini</a> setelah 1–2 menit.</p>
 </noscript>
-<script>
-  document.body.setAttribute("data-case", "{{ case.case_id }}");
-  document.body.setAttribute("data-page", "wait");
-  document.body.setAttribute("data-wait", "plan");
-</script>
 {% endif %}
 
 {% if case.route.value == "PRE_INCIDENT_CHECK" and actions %}
-<div class="card" id="decision-card">
-  <h3>Pilihan Anda</h3>
-  <p class="muted small">Pilih satu. Tidak ada jawaban yang salah.</p>
+<section class="decision-panel" id="decision-card">
+  <h2>Apa yang akan Anda lakukan?</h2>
   <form class="actions" id="decision">
-    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Saya cek ke situs resmi</button>
-    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Tidak jadi, batalkan ›</button>
-    <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Saya lanjut sendiri ›</button>
+    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kontak resmi</button>
+    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Batal</button>
+    <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Tetap lanjut sendiri</button>
   </form>
   <div id="decision-next" class="notice" role="status" hidden></div>
-</div>
-<script>
-(function(){
-  const NEXT = {
-    VERIFY_VIA_OFFICIAL_CHANNEL: "Hubungi bank atau penyedia layanan terkait melalui aplikasi atau alamat resmi yang Anda cari sendiri, bukan tautan dari chat mencurigakan. IASC menangani laporan penipuan transaksi keuangan, bukan layanan untuk memastikan tawaran atau situs itu sah. Jangan transfer sebelum mendapat kejelasan.",
-    CANCELLED_ACTION: "Oke, tidak ada langkah lanjutan. Mulai lagi kapan saja dari beranda kalau perlu.",
-    PROCEED_BY_USER: "Hati-hati. Jangan transfer dulu sebelum yakin. Kalau nanti ada bukti baru, mulai dari beranda."
-  };
-  document.getElementById("decision").addEventListener("click", async (ev) => {
-    const btn = ev.target.closest("[data-d]");
-    if (!btn || btn.disabled) return;
-    const d = btn.getAttribute("data-d");
-    ev.preventDefault();
-    const buttons = document.querySelectorAll("#decision [data-d]");
-    buttons.forEach(button => { button.disabled = true; });
-    btn.disabled = true;
-    const box = document.getElementById("decision-next");
-    box.hidden = false;
-    box.textContent = "Mencatat pilihan...";
-    try {
-      const res = await fetch("/api/v1/cases/{{ case.case_id }}/decision", {method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({decision:d})});
-      if(res.ok){ box.textContent = "Pilihan tercatat. " + NEXT[d]; }
-      else { box.textContent = "Pilihan belum tercatat. Coba tekan pilihan Anda lagi."; }
-    } catch (_) {
-      box.textContent = "Koneksi terputus. Penyimpanan pilihan belum dapat dipastikan. Periksa koneksi, lalu tekan pilihan Anda lagi.";
-    } finally {
-      buttons.forEach(button => { button.disabled = false; });
-    }
-  });
-})();
-</script>
+</section>
 {% endif %}
 {% endblock %}

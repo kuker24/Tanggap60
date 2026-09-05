@@ -35,8 +35,8 @@ def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict
     case_id = (_CASE_RE.search(path) or [None, None])[1]
     if exc.code == "CASE_EXPIRED":
         return {
-            "title": "Data kasus demo sudah kedaluwarsa",
-            "message": "Demi privasi, data demo disimpan maksimal 60 menit. Anda perlu membuat kasus baru.",
+            "title": "Kasus ini sudah berakhir",
+            "message": "Kasus tidak bisa dibuka lagi setelah 60 menit. Mulai kasus baru jika masih perlu bantuan.",
             "cta_url": "/",
             "cta_label": "Mulai kasus baru",
             "secondary_url": None,
@@ -46,7 +46,7 @@ def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict
     if exc.code in {"NOT_FOUND", "FORBIDDEN"}:
         return {
             "title": "Kasus tidak bisa dibuka",
-            "message": "Kasus ini tidak ada, bukan milik sesi ini, atau sudah dihapus. Kami tidak bisa memastikan data sudah hilang dari semua salinan.",
+            "message": "Kasus mungkin sudah berakhir, sudah dihapus, atau dibuat di perangkat lain.",
             "cta_url": "/",
             "cta_label": "Mulai kasus baru",
             "secondary_url": None,
@@ -102,8 +102,9 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
                 )
             else:
                 response = TEMPLATES.TemplateResponse(
+                    request,
                     "error.html",
-                    {"request": request, "request_id": request_id, **page},
+                    context={"request_id": request_id, **page},
                     status_code=exc.http_status,
                 )
         except Exception:
@@ -114,14 +115,14 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             case_id = (_CASE_RE.search(path) or [None, None])[1]
             if "text/html" in accept and not path.startswith("/api/"):
                 response = TEMPLATES.TemplateResponse(
+                    request,
                     "error.html",
-                    {
-                        "request": request,
+                    context={
                         "request_id": request_id,
                         "title": "Sedang ada gangguan",
-                        "message": "Coba muat ulang. Jika Anda baru mengirim bukti, data yang sudah tersimpan tidak dikirim ke bank atau polisi.",
-                        "cta_url": f"/cases/{case_id}/review" if case_id else "/",
-                        "cta_label": "Isi manual" if case_id else "Ke beranda",
+                        "message": "Halaman belum bisa dibuka. Data yang sudah tersimpan tidak dikirim ke bank atau polisi.",
+                        "cta_url": path,
+                        "cta_label": "Coba lagi" if case_id else "Ke beranda",
                         "secondary_url": "/" if case_id else None,
                         "secondary_label": "Ke beranda" if case_id else "",
                         "detail": f"Kode bantuan: {request_id}",
@@ -189,6 +190,4 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
         }
 
     return app
-
-
 

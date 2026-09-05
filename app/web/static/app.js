@@ -47,8 +47,6 @@
       btn.setAttribute("aria-selected", on ? "true" : "false");
       btn.tabIndex = on ? 0 : -1;
     });
-    const dropEl = document.getElementById("drop");
-    if (dropEl) dropEl.classList.toggle("is-focus", name === "files");
   }
   if (document.getElementById("intake-form")) {
     const formEl = document.getElementById("intake-form");
@@ -109,12 +107,6 @@
         drop.classList.remove("drag");
       })
     );
-    drop.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        filesInput.click();
-      }
-    });
   }
   if (form && submitBtn) {
     form.addEventListener("submit", (e) => {
@@ -123,11 +115,11 @@
       const hasFile = filesInput && filesInput.files && filesInput.files.length;
       if (!hasFile && !String(text).trim() && !String(url).trim()) {
         e.preventDefault();
-        window._toast("Isi dulu salah satu: foto, cerita, atau link.", true);
+        window._toast("Kirim foto, teks chat, atau link.", true);
         return;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = "Mengirim…";
+      submitBtn.textContent = "Mengirim bukti…";
     });
   }
 
@@ -138,13 +130,13 @@
     REVIEW_REQUIRED: "Siap dicek",
     READY_FOR_ACTION: "Menyusun langkah…",
     WAITING_APPROVAL: "Menunggu persetujuan Anda…",
-    GENERATING: "Membuat paket…",
-    VERIFYING: "Memeriksa paket…",
-    HANDOFF_READY: "Paket siap",
-    FAILED_SAFE: "Perlu isi manual. Buka halaman koreksi.",
+    GENERATING: "Membuat dokumen…",
+    VERIFYING: "Memeriksa dokumen…",
+    HANDOFF_READY: "Dokumen siap",
+    FAILED_SAFE: "Bukti belum terbaca. Tulis datanya sendiri.",
   };
-  const FALLBACK = "Masih berjalan. Tunggu di halaman ini — pindah sendiri.";
-  const caseId = document.body.getAttribute("data-case");
+  const FALLBACK = "Masih berjalan. Tunggu di halaman ini. Halaman akan pindah sendiri.";
+  const caseId = document.body.getAttribute("data-case-id");
   const page = document.body.getAttribute("data-page");
   const waitKind = document.body.getAttribute("data-wait");
   let lastState = "";
@@ -174,7 +166,7 @@
         const el = document.createElement("div");
         el.className = "alert warning";
         el.setAttribute("role", "alert");
-        el.innerHTML = "<b>Pemeriksaan terlalu lama</b><p>Status tidak berubah. Muat ulang, atau isi data manual.</p>";
+        el.innerHTML = "<b>Pemeriksaan terlalu lama</b><p>Status tidak berubah. Muat ulang, atau tulis datanya sendiri.</p>";
         const row = document.createElement("div");
         row.className = "actions";
         const reload = document.createElement("button");
@@ -187,7 +179,7 @@
           const manual = document.createElement("a");
           manual.className = "btn ember";
           manual.href = "/cases/" + caseId + "/review";
-          manual.textContent = "Isi manual";
+          manual.textContent = "Tulis data";
           row.appendChild(manual);
         }
         el.appendChild(row);
@@ -223,7 +215,7 @@
     const b = document.createElement("b");
     b.textContent = "Koneksi terputus-putus";
     const p = document.createElement("p");
-    p.textContent = "Halaman tidak bisa mengecek status. Bukti Anda tetap tersimpan — tekan Coba lagi.";
+    p.textContent = "Halaman tidak bisa mengecek status. Bukti Anda tetap tersimpan. Tekan Coba lagi.";
     const row = document.createElement("div");
     row.className = "actions";
     const btn = document.createElement("button");
@@ -367,7 +359,7 @@
     if (ev && ev.preventDefault) ev.preventDefault();
     const id = document.body.getAttribute("data-case-id");
     if (!id) return false;
-    if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
+    if (!confirm("Hapus semua data kasus ini? Foto, data, dan dokumen ikut hilang dan tidak bisa dikembalikan.")) return false;
     let res;
     try {
       res = await fetch("/api/v1/cases/" + id, {
@@ -401,4 +393,56 @@
     }
     return false;
   };
+
+  document.querySelectorAll("form[data-confirm-message]").forEach((resetForm) => {
+    resetForm.addEventListener("submit", (event) => {
+      if (!confirm(resetForm.getAttribute("data-confirm-message"))) event.preventDefault();
+    });
+  });
+
+  const purgeForm = document.getElementById("purge-browser-form");
+  if (purgeForm) purgeForm.addEventListener("submit", window.t60Purge);
+
+  const handoffLink = document.querySelector("[data-handoff-opened]");
+  if (handoffLink && caseId) {
+    handoffLink.addEventListener("click", () => {
+      fetch("/api/v1/cases/" + caseId + "/handoff/opened", { method: "POST", keepalive: true }).catch(() => {});
+    });
+  }
+
+  const decision = document.getElementById("decision");
+  if (decision && caseId) {
+    const nextMessage = {
+      VERIFY_VIA_OFFICIAL_CHANNEL: "Cari nomor atau situs resmi sendiri. Jangan pakai link dari chat yang mencurigakan.",
+      CANCELLED_ACTION: "Pilihan dibatalkan. Anda bisa mulai lagi nanti.",
+      PROCEED_BY_USER: "Jangan transfer sebelum Anda yakin. Tanggap60 tidak menyatakan link ini aman.",
+    };
+    decision.addEventListener("click", async (event) => {
+      const target = event.target;
+      const button = target instanceof Element ? target.closest("[data-d]") : null;
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+      event.preventDefault();
+      const choice = button.getAttribute("data-d");
+      const buttons = document.querySelectorAll("#decision [data-d]");
+      const box = document.getElementById("decision-next");
+      if (!box || !choice) return;
+      buttons.forEach((item) => { item.disabled = true; });
+      box.hidden = false;
+      box.textContent = "Mencatat pilihan...";
+      try {
+        const response = await fetch("/api/v1/cases/" + caseId + "/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: choice }),
+        });
+        box.textContent = response.ok
+          ? "Pilihan tercatat. " + nextMessage[choice]
+          : "Pilihan belum tercatat. Coba tekan pilihan Anda lagi.";
+      } catch (_) {
+        box.textContent = "Koneksi terputus. Penyimpanan pilihan belum dapat dipastikan. Periksa koneksi, lalu tekan pilihan Anda lagi.";
+      } finally {
+        buttons.forEach((item) => { item.disabled = false; });
+      }
+    });
+  }
 })();

@@ -4,66 +4,61 @@
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <section data-guide-id="workspace-open" aria-labelledby="ws-title">
-  <p class="sim-badge" role="note">Ruang persiapan. Bukan situs resmi.</p>
-  <h1 id="ws-title">Data untuk disalin</h1>
-  <p class="lede">Salin kronologi dan data yang sudah Anda konfirmasi. Ini bukan formulir situs resmi.</p>
-  <p id="ws-status" role="status" aria-live="polite">Memuat data untuk disalin...</p>
+  <p class="workspace-boundary" role="note">Ruang persiapan. Bukan situs resmi.</p>
+  <h1 id="ws-title">Salin data ini</h1>
+  <p class="lede">Tempel data ke kolom yang sama di situs resmi IASC.</p>
+  <p id="ws-status" role="status" aria-live="polite">Memuat data...</p>
   <div id="ws-error" class="notice" hidden>
-    <p>Data belum berhasil dimuat. Ini bukan berarti transaksi Anda kosong. Periksa koneksi, lalu coba lagi.</p>
+    <p>Data belum bisa dimuat. Periksa koneksi lalu coba lagi.</p>
     <button id="ws-retry" class="btn ghost" type="button">Coba muat lagi</button>
   </div>
 
-  <div id="ws-log" class="card" aria-live="polite">
-    <h3>Yang Tanggap60 siapkan</h3>
-    <ul id="ws-log-list" class="plan"></ul>
-  </div>
-
   <div id="ws-body" hidden>
-    <h2 class="muted small">Transaksi terkonfirmasi</h2>
+    <section id="ws-ready-block" hidden>
+    <h2>Siap disalin</h2>
     <div id="ws-tx"></div>
+    </section>
 
-    <h2 class="muted small">Kronologi (dari fakta yang ditinjau)</h2>
+    <section id="ws-pending-block" hidden>
+      <h2>Belum siap disalin</h2>
+      <p>Lengkapi data ini sebelum menyalinnya.</p>
+      <div id="ws-pending"></div>
+      <a class="btn ghost" href="/cases/{{ case.case_id }}/review">Pastikan data</a>
+    </section>
+
+    <h2>Cerita kejadian</h2>
     <ol id="ws-chrono" class="plan"></ol>
-    <button id="ws-copy-chrono" class="btn ghost" type="button" disabled>Salin kronologi</button>
+    <button id="ws-copy-chrono" class="btn ghost" type="button" disabled>Salin cerita kejadian</button>
     <p id="ws-copy-status" role="status" aria-live="polite"></p>
     <div id="ws-copy-manual" hidden>
       <label for="ws-copy-text">Teks untuk disalin manual</label>
       <textarea id="ws-copy-text" rows="5" readonly aria-describedby="ws-copy-status"></textarea>
     </div>
 
-    <h2 class="muted small">Bukti terlampir</h2>
-    <ul id="ws-ev" class="gaps"></ul>
+    <details class="task-details">
+      <summary>Lihat bukti dan daftar cek</summary>
+      <h2>Bukti yang tersedia</h2>
+      <ul id="ws-ev" class="gaps"></ul>
+      <h2>Daftar cek</h2>
+      <ul id="ws-check" class="gaps"></ul>
+    </details>
 
-    <h2 class="muted small">Data yang tetap Anda isi sendiri</h2>
-    <div class="card">
-      <p><b>Rekening &amp; bank Anda:</b> <span class="muted">Belum tersedia — isi sendiri</span></p>
-      <p class="muted small">Identitas dan kata sandi tetap Anda isi di situs resmi.</p>
-    </div>
+    <p class="notice">Isi identitas Anda di situs resmi. Jangan pernah membagikan kata sandi, OTP, atau PIN.</p>
 
-    <h2 class="muted small">Daftar periksa</h2>
-    <ul id="ws-check" class="gaps"></ul>
-
-    <div class="next-card" data-guide-id="official-handoff">
-      <h3>Buka situs resmi IASC</h3>
-      <ol class="plan">
-        <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
-        <li>Buka situs resmi IASC melalui tombol di bawah.</li>
-        <li>Salin data dan kronologi ke kolom yang sesuai. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
-      </ol>
-      <p class="muted small">Satu formulir IASC berfokus pada transaksi dari satu rekening korban ke satu rekening tujuan. Tujuan berbeda mungkin memerlukan laporan terpisah; ikuti petunjuk situs resmi.</p>
-      <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir, bukan langsung mengirim ZIP. Tidak ada jaminan arsip diterima oleh situs resmi.</p>
-      <p class="muted small">Isi data diri di situs mereka, bukan di sini. Tanggap60 tidak mengirim laporan.</p>
+    <section class="next-card" data-guide-id="official-handoff">
+      <h2>Buka situs resmi IASC</h2>
+      <p>Periksa lagi semua isian sebelum Anda mengirim laporan.</p>
       <div class="actions">
-        <a class="btn" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Buka situs IASC</a>
-        <a class="btn-text" href="/cases/{{ case.case_id }}/approval">‹ Kembali ke paket</a>
+        <a class="btn" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Buka situs IASC (tab baru)</a>
+        <a class="btn-text" href="/cases/{{ case.case_id }}/artifacts">Kembali ke dokumen</a>
       </div>
-    </div>
+    </section>
   </div>
 
   <div id="ws-empty" class="card" hidden>
-    <h3>Belum ada yang bisa disiapkan</h3>
-    <p class="muted small">Belum ada transaksi terkonfirmasi. Selesaikan konfirmasi dulu.</p>
-    <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Ke halaman konfirmasi</a></div>
+    <h2>Belum ada data untuk disalin</h2>
+    <p>Kirim bukti atau pastikan data lebih dulu.</p>
+    <div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/review">Pastikan data</a></div>
   </div>
 </section>
 <script>
@@ -93,29 +88,27 @@
     document.getElementById("ws-error").hidden = true;
     document.getElementById("ws-empty").hidden = true;
     document.getElementById("ws-body").hidden = true;
-    document.getElementById("ws-log").hidden = true;
-    document.getElementById("ws-status").textContent = "Memuat data untuk disalin...";
-    ["ws-log-list", "ws-tx", "ws-chrono", "ws-ev", "ws-check"].forEach(id => document.getElementById(id).replaceChildren());
+    document.getElementById("ws-status").textContent = "Memuat data...";
+    document.getElementById("ws-ready-block").hidden = true;
+    document.getElementById("ws-pending-block").hidden = true;
+    ["ws-tx", "ws-pending", "ws-chrono", "ws-ev", "ws-check"].forEach(id => document.getElementById(id).replaceChildren());
     try {
     const response = await fetch(`/api/v1/cases/${CASE}/workspace`);
     if (!response.ok) throw new Error("workspace status");
     const ws = await response.json();
     if (!ws.fields || !Array.isArray(ws.fields.transactions)) throw new Error("workspace data");
-    const log = document.getElementById("ws-log-list");
     document.getElementById("ws-status").textContent = "Data selesai dimuat.";
     if(!ws.fields.transactions.length){
-      document.getElementById("ws-log").hidden = true;
       document.getElementById("ws-empty").hidden = false;
       return;
     }
-    document.getElementById("ws-log").hidden = false;
-    (ws.action_log || []).forEach(step => {
-      const li = document.createElement("li");
-      li.textContent = step;
-      log.appendChild(li);
-    });
     document.getElementById("ws-body").hidden = false;
     const txBox = document.getElementById("ws-tx");
+    const pendingBox = document.getElementById("ws-pending");
+    const ready = ws.fields.transactions.filter(t => t.ready_to_copy);
+    const pending = ws.fields.transactions.filter(t => !t.ready_to_copy);
+    document.getElementById("ws-ready-block").hidden = !ready.length;
+    document.getElementById("ws-pending-block").hidden = !pending.length;
     ws.fields.transactions.forEach((t, i) => {
       const el = document.createElement("article");
       el.className = "tx";
@@ -124,13 +117,13 @@
       el.appendChild(h);
       [["Rekening tujuan", t.destination_account], ["Bank tujuan", t.destination_bank],
         ["Nama penerima", t.destination_name], ["Jumlah uang", t.amount],
-       ["Tanggal", t.date], ["Waktu", t.time]].forEach(([k, v]) => {
+        ["Tanggal", t.date], ["Waktu", t.time]].forEach(([k, v]) => {
         const p = document.createElement("p");
         p.className = "tx-when";
         const value = v == null ? "Belum tersedia" : String(v);
         p.textContent = k + ": " + value;
         el.appendChild(p);
-        if (value && !value.startsWith("Belum ")) {
+        if (t.ready_to_copy && value && !value.startsWith("Belum ")) {
           const button = document.createElement("button");
           button.type = "button";
           button.className = "btn-text";
@@ -140,7 +133,7 @@
           el.appendChild(button);
         }
       });
-      txBox.appendChild(el);
+      (t.ready_to_copy ? txBox : pendingBox).appendChild(el);
     });
     const ch = document.getElementById("ws-chrono");
     (ws.fields.chronology || []).forEach(line => {
@@ -151,7 +144,7 @@
     const chronology = (ws.fields.chronology || []).join("\n");
     const copyChronology = document.getElementById("ws-copy-chrono");
     copyChronology.disabled = !chronology;
-    copyChronology.onclick = () => copyText(chronology, "Kronologi");
+    copyChronology.onclick = () => copyText(chronology, "Cerita kejadian");
     const ev = document.getElementById("ws-ev");
     (ws.fields.evidence_refs || []).forEach(name => {
       const li = document.createElement("li");
@@ -161,12 +154,11 @@
     const ck = document.getElementById("ws-check");
     (ws.fields.checklist || []).forEach(item => {
       const li = document.createElement("li");
-      li.textContent = (item.done ? "✓ " : "○ ") + item.item + (item.detail ? " — " + item.detail : "");
+      li.textContent = (item.done ? "✓ " : "○ ") + item.item + (item.detail ? ": " + item.detail : "");
       ck.appendChild(li);
     });
     } catch (_) {
       document.getElementById("ws-body").hidden = true;
-      document.getElementById("ws-log").hidden = true;
       document.getElementById("ws-status").textContent = "Data gagal dimuat. Coba muat lagi.";
       document.getElementById("ws-error").hidden = false;
     } finally {

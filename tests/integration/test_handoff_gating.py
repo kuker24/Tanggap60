@@ -44,18 +44,18 @@ def test_case_approval_rejects_ambiguous(client: TestClient, ocr: ScriptedOcr) -
     )
     assert denied.status_code == 400
     page = client.get(f"/cases/{case_id}/approval")
-    assert "Belum bisa dibuat" in page.text
+    assert "Dokumen belum bisa dibuat" in page.text
     assert 'id="go"' not in page.text
     review = client.get(f"/cases/{case_id}/review")
-    assert ">Simpan</button>" in review.text
+    assert ">Simpan pilihan</button>" in review.text
 
 
 def test_review_pairing_one_decision_per_card(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = _ambiguous_case(client, ocr)
     page = client.get(f"/cases/{case_id}/review")
-    assert "Transaksi ini belum jelas" in page.text
+    assert "Cocokkan transaksi" in page.text
     assert "Jumlah uang mana yang dikirim ke" in page.text
-    assert "Tidak ada di pilihan ini" in page.text
+    assert "Tidak ada" in page.text
     assert "pair-card" not in page.text
     assert "milik pelaku" not in page.text
 

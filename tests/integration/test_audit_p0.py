@@ -29,18 +29,18 @@ def test_before_loss_chat_amount_stays_preincident(client: TestClient, ocr: Scri
     assert "Uangnya sudah terkirim?" in review.text
 
 
-def test_same_amount_two_sources_both_visible(client: TestClient, ocr: ScriptedOcr) -> None:
+def test_review_shows_only_one_pending_fact(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = create_case(client)
     upload_text_png(client, ocr, case_id, "a.png", "Transfer Rp1.000.000 Ke: DEMO-DEST-A 4 Januari 2024 09:10 WIB")
     upload_text_png(client, ocr, case_id, "b.png", "Transfer Rp1.000.000 Ke: DEMO-DEST-B 5 Januari 2024 10:10 WIB")
     client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "dup-amt"})
     facts = client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"]
-    amounts = [f for f in facts if f["type"] == "AMOUNT"]
-    assert len(amounts) >= 2
+    candidates = [f for f in facts if f["review_status"] == "CANDIDATE"]
+    assert len(candidates) >= 2
     page = client.get(f"/cases/{case_id}/review")
     assert page.status_code == 200
-    for fact in amounts:
-        assert fact["fact_id"] in page.text
+    assert sum(fact["fact_id"] in page.text for fact in candidates) == 1
+    assert f"1 dari {len(candidates)} data yang belum dicek" in page.text
 
 
 def test_add_chat_after_review_does_not_500(client: TestClient, ocr: ScriptedOcr) -> None:
@@ -92,7 +92,7 @@ def test_kelola_data_and_intake_copy(client: TestClient) -> None:
     page = client.get(f"/cases/{case_id}/intake")
     assert page.status_code == 200
     assert "Kelola data" in page.text
-    assert "Isi salah satu untuk mulai" in page.text
+    assert "Satu bukti saja cukup untuk mulai" in page.text
     assert "(boleh kosong)" not in page.text
 
 
@@ -103,8 +103,28 @@ def test_review_cta_lihat_ringkasan(client: TestClient, ocr: ScriptedOcr) -> Non
     confirm_critical(client, case_id)
     page = client.get(f"/cases/{case_id}/review")
     assert page.status_code == 200
-    assert "Lihat ringkasan" in page.text
-    assert "Bantu saya" in page.text
+    assert "Lihat langkah berikutnya" in page.text
+    assert "Butuh bantuan?" in page.text
+
+
+def test_review_continue_builds_preincident_result(client: TestClient) -> None:
+    created = client.post("/api/v1/cases", json={"mode": "DEMO", "declared_condition": "BEFORE_LOSS"})
+    case_id = created.json()["case_id"]
+    client.post(f"/api/v1/cases/{case_id}/evidence/text", json={"url": "https://iasc.ojk.go.id.evil.example/a"})
+    client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "web-continue-pre"})
+    fact = client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"][0]
+    version = client.get(f"/api/v1/cases/{case_id}").json()["version"]
+    confirmed = client.patch(
+        f"/api/v1/cases/{case_id}/facts/{fact['fact_id']}",
+        json={"action": "confirm", "expected_version": version},
+    )
+    assert confirmed.status_code == 200
+    continued = client.post(f"/cases/{case_id}/continue", follow_redirects=False)
+    assert continued.status_code == 303
+    assert continued.headers["location"] == f"/cases/{case_id}/result"
+    result = client.get(continued.headers["location"])
+    assert result.status_code == 200
+    assert "Kami hanya memeriksa bentuk link" in result.text
 
 
 def test_help_button_is_in_header(client: TestClient) -> None:
@@ -113,9 +133,10 @@ def test_help_button_is_in_header(client: TestClient) -> None:
     assert html.index('id="agent-fab"') < html.index('id="main"')
     assert html.index('id="main"') < html.index('id="agent-panel"')
     assert "top-actions" in html
-    assert "Pendamping Tanggap60" in html
+    assert "Bantuan Tanggap60" in html
     assert 'aria-expanded="false"' in html
-    assert "Panduan langsung" not in html
+    assert "Panduan langsung" in html
+    assert 'id="agent-autopilot" type="checkbox">' in html
 
 
 def test_ocr_does_not_hold_sqlite_write_lock(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
@@ -152,14 +173,16 @@ def test_before_loss_intake_defaults_to_chat_tab(client: TestClient) -> None:
     assert 'data-default-tab="text"' in page.text
 
 
-def test_review_lists_all_candidates(client: TestClient, ocr: ScriptedOcr) -> None:
+def test_review_lists_one_candidate_at_a_time(client: TestClient, ocr: ScriptedOcr) -> None:
     case_id = create_case(client)
     upload_text_png(client, ocr, case_id, "t.png", TRANSFER)
     client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "all-facts"})
     page = client.get(f"/cases/{case_id}/review")
     assert page.status_code == 200
-    assert "Data 1 dari" not in page.text
-    assert "iasc.ojk.go.id" in page.text
+    facts = client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"]
+    candidates = [f for f in facts if f["review_status"] == "CANDIDATE"]
+    assert sum(f["fact_id"] in page.text for f in candidates) == 1
+    assert f"1 dari {len(candidates)} data yang belum dicek" in page.text
 
 
 def test_foreign_case_html_does_not_claim_deleted(client: TestClient) -> None:
@@ -169,7 +192,8 @@ def test_foreign_case_html_does_not_claim_deleted(client: TestClient) -> None:
     assert page.status_code in {403, 404}
     assert "Kasus tidak bisa dibuka" in page.text
     assert "Data kasus demo sudah" not in page.text
-    assert "tidak bisa memastikan" in page.text
+    assert "dibuat di perangkat lain" in page.text
+    assert "data sudah hilang" not in page.text
 
 
 def test_recover_stale_fails_after_attempt_budget(tmp_env) -> None:

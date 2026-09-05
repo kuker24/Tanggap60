@@ -330,10 +330,10 @@ def test_core_ui_works_without_chat(client: TestClient, ocr: ScriptedOcr) -> Non
     case_id = _agent_case(client, ocr)
     page = client.get(f"/cases/{case_id}/review")
     assert page.status_code == 200
-    assert "Bantu saya" in page.text
+    assert "Butuh bantuan?" in page.text
     ws = client.get(f"/cases/{case_id}/workspace")
     assert ws.status_code == 200
-    assert "Yang Tanggap60 siapkan" in ws.text
+    assert "Salin data ini" in ws.text
 
 
 def test_new_case_help_chips_before_evidence(client: TestClient) -> None:
@@ -344,7 +344,7 @@ def test_new_case_help_chips_before_evidence(client: TestClient) -> None:
     assert "Cara kirim bukti" in body["quick_actions"]
     assert "Tunjukkan yang kurang" not in body["quick_actions"]
     how = _ask(client, case_id, "Cara mengunggah")
-    assert "Periksa bukti" in how["message"]
+    assert "Ketuk kotak foto" in how["message"]
 
 
 def test_help_chips_after_run_include_missing(client: TestClient, ocr: ScriptedOcr) -> None:
@@ -496,4 +496,3 @@ def test_plan_next_action_and_legacy_fallback(client: TestClient, ocr: ScriptedO
     assert new_body["guidance"] is not None
     assert new_body["guidance"]["target"] == "upload-evidence"
     assert new_body["guidance_plan"] is None
-
