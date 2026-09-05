@@ -42,7 +42,11 @@ def test_review_reload_keeps_checked_facts_editable_and_refreshes_version(client
             assert ">Ubah</button>" in card[1]
             assert f'id="input-{checked["fact_id"]}"' in card[1]
         remaining = len(candidates) - index - 1
-        assert (f"1 dari {remaining} data yang belum dicek" if remaining else "Semua data sudah Anda cek.") in page
+        assert (
+            f"1 dari {remaining} data yang belum dicek"
+            if remaining
+            else "Semua data yang ditemukan sudah Anda cek."
+        ) in page
     assert 'id="review-summary"' in page
 
 

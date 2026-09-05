@@ -16,6 +16,8 @@
 
 {% if notice == "kosong" %}
 <p class="notice warn" role="alert">Belum ada bukti. Kirim foto, teks chat, atau link.</p>
+{% elif notice == "butuh-transaksi" %}
+<p class="notice warn" role="status">Bukti awal sudah tersimpan. Untuk menyiapkan langkah laporan, kirim bukti transfer atau teks chat yang memuat jumlah dan rekening.</p>
 {% elif notice == "file-gagal" %}
 <p class="notice warn" role="alert">{{ notice_text or "File itu tidak bisa dipakai. Coba foto atau PDF lain." }} <a class="link" href="/cases/{{ case.case_id }}/intake">Coba lagi</a></p>
 {% endif %}

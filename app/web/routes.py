@@ -47,6 +47,12 @@ def _svc(request: Request) -> dict:
     return services_from(request.state.db, request.app.state.container)
 
 
+def _needs_incident_evidence(case, facts) -> bool:
+    return case.route.value == "POST_INCIDENT_RESPONSE" and not any(
+        fact.criticality.value == "CRITICAL" and fact.review_status.value != "REJECTED" for fact in facts
+    )
+
+
 def _progress(db, case) -> dict:
     evidence = EvidenceRepository(db).list_for_case(case.case_id)
     facts = FactRepository(db).list_for_case(case.case_id)
@@ -100,7 +106,13 @@ def _primary_cta(
     return {"label": "Pastikan data", "href": f"/cases/{case_id}/review"}
 
 
-def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has_evidence: bool = False) -> list[dict]:
+def _gap_tasks(
+    case_id: str,
+    units_report: dict | None,
+    has_ambiguous: bool,
+    has_evidence: bool = False,
+    has_pending_review: bool = False,
+) -> list[dict]:
     units = (units_report or {}).get("units") or []
     if not units:
         if not has_evidence:
@@ -113,13 +125,23 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
                     "cta": "Tambah bukti",
                 }
             ]
+        if has_pending_review:
+            return [
+                {
+                    "key": "konfirm",
+                    "title": "Pastikan data",
+                    "points": ["Ada data yang perlu Anda cek sebelum membuat dokumen."],
+                    "href": f"/cases/{case_id}/review",
+                    "cta": "Pastikan data",
+                }
+            ]
         return [
             {
-                "key": "konfirm",
-                "title": "Pastikan data",
-                "points": ["Ada data yang perlu Anda cek sebelum membuat dokumen."],
-                "href": f"/cases/{case_id}/review",
-                "cta": "Pastikan data",
+                "key": "bukti",
+                "title": "Tambah bukti transaksi",
+                "points": ["Bukti awal sudah tersimpan. Sekarang kirim bukti transfer atau teks chat."],
+                "href": f"/cases/{case_id}/intake?notice=butuh-transaksi",
+                "cta": "Tambah bukti",
             }
         ]
 
@@ -471,6 +493,7 @@ def processing(case_id: str, request: Request):
 def review(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     facts = FactRepository(request.state.db).list_for_case(case_id)
+    needs_incident_evidence = _needs_incident_evidence(case, facts)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
     facts_pub = [fact_public(f) for f in facts]
@@ -502,6 +525,7 @@ def review(case_id: str, request: Request):
         notice=request.query_params.get("notice", ""),
         pairing_key=new_id("pair"),
         evidence_kinds={e.evidence_id: e.kind.value for e in evidence},
+        needs_incident_evidence=needs_incident_evidence,
     )
 
 
@@ -660,7 +684,13 @@ def readiness_page(case_id: str, request: Request):
         "readiness.html",
         case,
         next_view=next_view,
-        gap_tasks=_gap_tasks(case_id, units_report, has_ambiguous, has_evidence=bool(evidence)),
+        gap_tasks=_gap_tasks(
+            case_id,
+            units_report,
+            has_ambiguous,
+            has_evidence=bool(evidence),
+            has_pending_review=any(f.review_status.value == "CANDIDATE" for f in facts),
+        ),
         tx_cards=tx_cards,
         has_blocking=has_blocking,
         needs_evidence=needs_evidence,
@@ -680,6 +710,9 @@ def readiness_page(case_id: str, request: Request):
 @web.post("/cases/{case_id}/continue")
 def continue_case(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    facts = FactRepository(request.state.db).list_for_case(case_id)
+    if case.state == State.REVIEW_REQUIRED and _needs_incident_evidence(case, facts):
+        return RedirectResponse(f"/cases/{case_id}/intake?notice=butuh-transaksi", status_code=303)
     if case.state == State.REVIEW_REQUIRED:
         _svc(request)["inspect"].validate_case_facts(case_id)
         case = CaseRepository(request.state.db).get(case_id)

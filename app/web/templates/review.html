@@ -14,7 +14,7 @@
 {% set checked = namespace(count=0) %}
 {% for fact in facts %}{% if fact.review_status != "CANDIDATE" %}{% set checked.count = checked.count + 1 %}{% endif %}{% endfor %}
 <h1>Pastikan data ini</h1>
-<p class="lede" id="coach-lede">{% if case.ask_loss_question %}Jawab satu pertanyaan ini.{% elif blocking_conflicts %}Ada data yang berbeda. Pilih yang sesuai bukti.{% elif pairing_units %}Cocokkan transaksi ini dengan buktinya.{% elif ns.count %}Cek satu data. Lalu lanjut ke data berikutnya.{% elif facts %}Semua data sudah Anda cek.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
+<p class="lede" id="coach-lede">{% if case.ask_loss_question %}Jawab satu pertanyaan ini.{% elif blocking_conflicts %}Ada data yang berbeda. Pilih yang sesuai bukti.{% elif pairing_units %}Cocokkan transaksi ini dengan buktinya.{% elif ns.count %}Cek satu data. Lalu lanjut ke data berikutnya.{% elif needs_incident_evidence %}Data yang ditemukan sudah Anda cek. Sekarang tambahkan bukti transfer atau chat.{% elif facts %}Semua data yang ditemukan sudah Anda cek.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
 {% if not case.ask_loss_question and not blocking_conflicts and not pairing_units and ns.count %}
 <p class="review-count" id="review-remaining" role="status">1 dari {{ ns.count }} data yang belum dicek</p>
 {% endif %}
@@ -220,9 +220,15 @@
 {% endif %}
 
 {% if ns.count == 0 and facts %}
+{% if needs_incident_evidence %}
+<div class="actions">
+  <a class="btn ember" href="/cases/{{ case.case_id }}/intake?notice=butuh-transaksi">Tambah bukti transaksi</a>
+</div>
+{% else %}
 <form class="actions" method="post" action="/cases/{{ case.case_id }}/continue">
   <button class="btn ember" id="review-summary" type="submit">Lihat langkah berikutnya</button>
 </form>
+{% endif %}
 {% endif %}
 {% endif %}
 
