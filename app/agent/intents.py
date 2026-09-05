@@ -42,6 +42,8 @@ _INTENT_RULES: tuple[tuple[str, re.Pattern[str]], ...] = (
     ("STOP_ALL", re.compile(r"(?i)\b(hentikan( ai| panduannya?)?|stop( ai)?|berhenti( total| semuanya| saja)?|batalkan (semua|panduan|pemandu|nya semua)|matikan (ai|panduan|pemandu))\b")),
     ("RESUME", re.compile(r"(?i)^(lanjut(kan|lah)?|terus(kan|lah)?|ayo lanjut|mulai lagi|jalan lagi)\b")),
     ("GREETING", re.compile(r"(?i)^(halo|hai|hi|pagi|siang|sore|malam|assalamu|permisi|tes|test|halo+)\b")),
+    ("ASK_NEEDED_EVIDENCE", re.compile(r"(?i)\b(bukti apa yang (dibutuhkan|perlu|harus)|bukti (apa|mana) yang (dibutuhkan|perlu)|apa (saja |aja )?bukti yang (dibutuhkan|perlu))\b")),
+    ("EXPLAIN_UPLOAD", re.compile(r"(?i)\b(cara (meng)?unggah|cara (kirim|upload|unggah)(kan)? (bukti|foto|file)|bagaimana (cara )?(meng)?unggah)\b")),
     ("ASK_NEXT", re.compile(r"(?i)\b(harus (ngapain|apa)|lakukan sekarang|langkah (selanjutnya|berikutnya)|apa yang (harus|sebaiknya|perlu) (saya |aku )?(lakukan|kerjakan)|tindakan (selanjutnya|berikutnya)|next|gimana (lagi|selanjutnya))\b")),
     ("SHOW_MISSING", re.compile(r"(?i)\b(tunjukin|tunjukkan|tampilkan|mana )?.*\b(kurang|belum (lengkap|isi|diisi|ada)|hilang|masih perlu|perlu dilengkapi|apa saja yang kurang)\b")),
     ("SHOW_PROBLEM", re.compile(r"(?i)\b(mana )?.*\b(bermasalah|bentrok|konflik|ambigu|belum jelas|perlu dipastikan|perlu dikonfirmasi|ditandai|tandai)\b")),

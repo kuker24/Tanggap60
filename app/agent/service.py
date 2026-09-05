@@ -65,6 +65,8 @@ _INTENT_CANDIDATE_TOOLS: dict[str, tuple[str, ...]] = {
     "ASSIST_FULL": ("recommend_next_action", "compile_reporting_units"),
     "OPEN_TX": ("compile_reporting_units",),
     "SHOW_EVIDENCE": ("compile_reporting_units",),
+    "ASK_NEEDED_EVIDENCE": (),
+    "EXPLAIN_UPLOAD": (),
     # Kontrol lokal murni (pause/resume/stop/voice-decide): konteks sudah
     # dibangun di handle_message; tanpa eksekusi tool tambahan.
     "CONFIRM_YES": (),
@@ -654,6 +656,24 @@ def _handle_ask_next(intent: Intent, context: dict[str, Any], runner: _Runner, u
     return (_next_action_text(context, obs), _guide_for_action(context, obs), None)
 
 
+def _handle_needed_evidence(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    unit_ids = set(context["unit_ids"])
+    return (
+        "Foto transfer, cuplikan chat, atau link toko. Yang memuat jumlah uang, rekening tujuan, dan waktu paling berguna. Jangan kirim password, OTP, atau KTP.",
+        _guide("upload-evidence", "Kirim bukti di sini", unit_ids),
+        None,
+    )
+
+
+def _handle_explain_upload(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
+    unit_ids = set(context["unit_ids"])
+    return (
+        "Ketuk kotak unggah, pilih foto JPG/PNG atau PDF. Maksimal 8 file, total 25 MB. Setelah itu tekan Periksa bukti.",
+        _guide("upload-evidence", "Unggah di sini", unit_ids),
+        None,
+    )
+
+
 def _handle_missing(intent: Intent, context: dict[str, Any], runner: _Runner, ui: dict[str, Any]) -> tuple:
     unit_ids = set(context["unit_ids"])
     blocking = [c for c in context["conflicts_open"] if c["severity"] == "BLOCKING"]
@@ -1238,6 +1258,8 @@ def _handle_unknown(intent: Intent, context: dict[str, Any], runner: _Runner, ui
 _HANDLERS = {
     "GREETING": _handle_greeting,
     "ASK_NEXT": _handle_ask_next,
+    "ASK_NEEDED_EVIDENCE": _handle_needed_evidence,
+    "EXPLAIN_UPLOAD": _handle_explain_upload,
     "SHOW_MISSING": _handle_missing,
     "SHOW_PROBLEM": _handle_problem,
     "CONFUSED": _handle_confused,

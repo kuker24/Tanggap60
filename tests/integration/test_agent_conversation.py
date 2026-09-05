@@ -336,6 +336,25 @@ def test_core_ui_works_without_chat(client: TestClient, ocr: ScriptedOcr) -> Non
     assert "Yang Tanggap60 siapkan" in ws.text
 
 
+def test_new_case_help_chips_before_evidence(client: TestClient) -> None:
+    case_id = create_case(client)
+    body = _ask(client, case_id, "Bukti apa yang dibutuhkan?")
+    assert "unggah" in body["message"].lower() or "foto" in body["message"].lower()
+    assert "Bukti apa yang dibutuhkan?" in body["quick_actions"]
+    assert "Cara mengunggah" in body["quick_actions"]
+    assert "Tunjukkan yang kurang" not in body["quick_actions"]
+    how = _ask(client, case_id, "Cara mengunggah")
+    assert "Periksa bukti" in how["message"]
+
+
+def test_help_chips_after_run_include_missing(client: TestClient, ocr: ScriptedOcr) -> None:
+    case_id = create_case(client)
+    upload_text_png(client, ocr, case_id, "t.png", TWO_TX_AMBIGUOUS)
+    client.post(f"/api/v1/cases/{case_id}/runs", headers={"Idempotency-Key": "chip-run"})
+    body = _ask(client, case_id, "Saya harus apa?")
+    assert "Tunjukkan yang kurang" in body["quick_actions"]
+
+
 def test_new_case_uses_local_guide_without_tools(client: TestClient) -> None:
     """State NEW tidak boleh mencatat fake tool execution (bukti agentic jujur)."""
     case_id = create_case(client)

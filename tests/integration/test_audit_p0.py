@@ -111,7 +111,11 @@ def test_help_button_is_in_header(client: TestClient) -> None:
     case_id = create_case(client)
     html = client.get(f"/cases/{case_id}/intake").text
     assert html.index('id="agent-fab"') < html.index('id="main"')
+    assert html.index('id="main"') < html.index('id="agent-panel"')
     assert "top-actions" in html
+    assert "Pendamping Tanggap60" in html
+    assert 'aria-expanded="false"' in html
+    assert "Panduan langsung" not in html
 
 
 def test_ocr_does_not_hold_sqlite_write_lock(client: TestClient, ocr: ScriptedOcr, tmp_env) -> None:
