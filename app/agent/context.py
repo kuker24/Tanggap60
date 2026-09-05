@@ -26,7 +26,7 @@ from app.services.reporting_units import compile_reporting_units
 _CANDIDATE_TYPES = {FactType.AMOUNT, FactType.ACCOUNT, FactType.PJP, FactType.DATETIME}
 
 _QUICK_BY_STATE: dict[str, list[str]] = {
-    "NEW": ["Bukti apa yang dibutuhkan?", "Cara mengunggah"],
+    "NEW": ["Bukti apa yang dibutuhkan?", "Cara kirim bukti"],
     "INGESTING": ["Saya harus apa?", "Tunjukkan yang kurang"],
     "EXTRACTING": ["Saya harus apa?", "Tunjukkan yang kurang"],
     "REVIEW_REQUIRED": ["Saya harus apa?", "Tunjukkan yang kurang", "Bantu konfirmasi transaksi"],
@@ -43,7 +43,7 @@ _QUICK_BY_STATE: dict[str, list[str]] = {
 
 def _quick_actions(state: str, evidence_count: int) -> list[str]:
     if state == "NEW" or evidence_count == 0:
-        return ["Bukti apa yang dibutuhkan?", "Cara mengunggah"]
+        return ["Bukti apa yang dibutuhkan?", "Cara kirim bukti"]
     return list(_QUICK_BY_STATE.get(state, ["Saya harus apa?"]))
 
 

@@ -67,8 +67,8 @@
 {% if pairing_units %}
   {% for unit in pairing_units %}
   <section class="pair-group" data-guide-id="confirm-mapping" data-guide-alt="transaction-{{ unit.unit_id }}" aria-labelledby="pair-{{ unit.unit_id }}-title">
-    <h3 id="pair-{{ unit.unit_id }}-title">Kami belum yakin — dan kami tidak akan menebak</h3>
-    <p class="muted small">Jawab satu pertanyaan dalam satu kartu. Kalau ragu, pilih “Tidak ada di pilihan ini” atau kosongkan.</p>
+    <h3 id="pair-{{ unit.unit_id }}-title">Transaksi ini belum jelas</h3>
+    <p class="muted small">Pilih yang sesuai bukti. Kalau ragu, pilih “Tidak ada di pilihan ini”.</p>
     <form method="post" action="/cases/{{ case.case_id }}/pairing/{{ unit.unit_id }}">
       <input type="hidden" name="evidence_id" value="{{ unit.evidence_id }}">
       <input type="hidden" name="expected_version" value="{{ case.version }}">
@@ -145,8 +145,8 @@
 {% if not has_blocking %}
 <div class="fact-grid" id="fact-grid" data-guide-id="review-facts">
 {% for fact in facts %}
-<article class="fact" data-fact="{{ fact.fact_id }}">
-  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" %} · sudah dicek{% elif fact.review_status == "CORRECTED" %} · Dikoreksi Anda{% endif %}</p>
+<article class="fact{% if fact.review_status == 'CANDIDATE' %} is-need{% else %} is-quiet{% endif %}" data-fact="{{ fact.fact_id }}">
+  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CORRECTED" %} · Anda ubah{% endif %}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
   {% if fact.source_locator == "USER_ENTERED" %}
   <p class="src">Ditulis Anda — bukan hasil pembacaan foto</p>
@@ -205,7 +205,6 @@
   <a class="btn ember" id="review-summary" href="/cases/{{ case.case_id }}/readiness">Lihat ringkasan</a>
   </div>
 {% endif %}
-<p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 {% endif %}
 
 <script>

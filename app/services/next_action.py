@@ -224,16 +224,16 @@ def recommend_next_action(
         target = sorted(complete_units, key=lambda u: u.unit_id)[0]
         return NextBestAction(
             code=NextActionCode.APPROVE_READY_UNIT,
-            label="Setujui transaksi yang sudah siap",
-            reason="Ada transaksi menunggu persetujuan untuk dibuatkan paket terverifikasi.",
+            label="Buat paket untuk transaksi yang sudah siap",
+            reason="Ada transaksi yang sudah bisa dibuatkan paket.",
             target_unit_id=target.unit_id,
             priority=8,
         )
 
     return NextBestAction(
         code=NextActionCode.DOWNLOAD_VERIFIED_PACK,
-        label="Unduh paket terverifikasi",
-        reason="Semua unit sudah diproses — unduh ZIP dan lakukan handoff manual.",
+            label="Unduh paket",
+            reason="Unduh paket, lalu bawa sendiri ke situs resmi.",
         priority=9,
     )
 

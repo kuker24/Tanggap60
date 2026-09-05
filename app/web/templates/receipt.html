@@ -4,13 +4,13 @@
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <h1>Sudah mendapat nomor laporan atau tiket?</h1>
-  <p class="lede">Nomor yang dikasih bank, IASC, atau polisi setelah Anda melapor. Yang tercatat di kasus ini hanya nomor yang disamarkan. Status resmi tetap lihat di situs mereka.</p>
+  <p class="lede">Nomor dari bank, IASC, atau polisi setelah Anda melapor. Yang tercatat di sini hanya nomor yang disamarkan. Belum diverifikasi oleh situs resmi.</p>
 
 {% if receipt %}
 <div class="card">
   <h3>Sudah tercatat</h3>
   <p class="ticket-value">{{ receipt.ticket_value_masked }}</p>
-  <p class="muted small">Ini catatan lokal yang disamarkan, bukan pelacak resmi. Status resmi tetap di situs mereka.</p>
+  <p class="muted small">Ini catatan lokal yang disamarkan, bukan pelacak resmi. Tanggap60 hanya mencatat nomor yang Anda masukkan. Belum diverifikasi oleh situs resmi.</p>
   <form id="rcpt-fix" class="stack" novalidate>
     <label for="ticket-fix">Ubah catatan nomor</label>
     <input id="ticket-fix" name="ticket_text" type="text" placeholder="Nomor baru" autocomplete="off" aria-describedby="rcpt-fix-alert">
@@ -88,7 +88,7 @@ document.getElementById("rcpt").addEventListener("submit", async (ev) => {
     <li>Buka <a class="link" href="https://iasc.ojk.go.id/" target="_blank" rel="noopener">situs resmi IASC</a>.</li>
     <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a> ke kolom yang sesuai. Isi identitas sendiri dan lampirkan bukti transfer serta bukti pendukung sesuai aturan formulir. Lampirkan PDF hanya jika jenis dan ukuran file diizinkan; ringkasan tidak menggantikan bukti asli.</li>
   </ol>
-  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima kanal resmi. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak untuk membuka isinya. Unggah hanya file yang diminta situs resmi. Tanggap60 tidak mengirim laporan; nomor laporan baru diperoleh setelah Anda melapor sendiri.</p>
+  <p class="muted small">ZIP hanya arsip opsional, bukan jaminan diterima situs resmi. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak untuk membuka isinya. Unggah hanya file yang diminta situs resmi. Tanggap60 tidak mengirim laporan; nomor laporan baru diperoleh setelah Anda melapor sendiri.</p>
 </details>
 
 <div class="card danger-zone">

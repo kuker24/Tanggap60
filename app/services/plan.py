@@ -56,7 +56,7 @@ def build_post_actions(case_id: str, facts: list[FactRecord]) -> list[ActionReco
             priority=ActionPriority.NEXT,
             channel=ActionChannel.POLICE,
             instruction=(
-                "Siapkan kronologi untuk Laporan Polisi. Pengiriman dilakukan oleh Anda di kanal resmi kepolisian."
+                "Siapkan kronologi untuk Laporan Polisi. Pengiriman dilakukan oleh Anda di situs resmi kepolisian."
             ),
             status=ActionStatus.TODO,
             requires_external_user_action=True,
@@ -88,7 +88,7 @@ def build_pre_actions(case_id: str) -> list[ActionRecord]:
             priority=ActionPriority.NOW,
             channel=ActionChannel.MANUAL_VERIFY,
             instruction=(
-                "Jangan kirim dana atau data OTP. Verifikasi lewat kanal resmi yang Anda kenali sendiri."
+                "Jangan kirim dana atau data OTP. Verifikasi lewat situs resmi yang Anda kenali sendiri."
             ),
             status=ActionStatus.TODO,
             requires_external_user_action=True,

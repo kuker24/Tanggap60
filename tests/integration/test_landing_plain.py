@@ -16,9 +16,12 @@ def test_landing_has_four_meaningful_ordered_steps(client: TestClient) -> None:
     for item, heading in zip(items, ["Bukti", "Periksa", "Konfirmasi", "Bertindak"], strict=True):
         assert f"<h3>{heading}</h3>" in item
         assert re.search(r"<p>[^<]+</p>", item)
-    assert "setujui sebelum paket dibuat" in items[2]
+    assert "lalu buat paket" in items[2]
     assert "Jika paket siap" in items[3]
-    assert "bawa sendiri ke kanal resmi" in items[3]
+    assert "bawa sendiri ke situs resmi" in items[3]
+    assert 'id="land-story"' in page.text
+    assert "Kami tidak akan menebak." in page.text
+    assert 'data-messy="Dari struk"' in page.text
 
 
 def test_landing_is_plain_and_preserves_limits(client: TestClient) -> None:

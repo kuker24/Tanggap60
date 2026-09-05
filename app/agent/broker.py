@@ -230,7 +230,7 @@ RED_MESSAGES: dict[str, str] = {
     "OTP": "Bagian ini meminta kode OTP. Demi keamanan, saya berhenti di sini. Silakan isi sendiri kode yang masuk ke ponsel Anda, lalu beri tahu saya jika sudah selesai.",
     "CREDENTIAL": "Saya tidak boleh menyentuh kata sandi, PIN, atau data login apa pun. Silakan isi sendiri di tempatnya, lalu beri tahu saya langkah berikutnya.",
     "CAPTCHA": "Verifikasi captcha harus Anda selesaikan sendiri. Saya tunggu — beri tahu saya jika sudah selesai.",
-    "BANK_ACTION": "Saya tidak boleh menjalankan transaksi bank untuk Anda. Saya hanya menandai data yang perlu Anda bawa ke kanal resmi.",
+    "BANK_ACTION": "Saya tidak boleh menjalankan transaksi bank untuk Anda. Saya hanya menandai data yang perlu Anda bawa ke situs resmi.",
     "AUTO_SUBMIT": "Dokumen belum dikirim ke mana pun, dan saya tidak akan mengirimkannya. Pengiriman laporan resmi tetap Anda lakukan sendiri lewat portal resmi.",
     "LEGAL_VERDICT": "Saya tidak boleh menetapkan siapa pelaku atau menyatakan seseorang bersalah. Saya hanya menyusun fakta dari bukti yang Anda kirim.",
     "EXTERNAL_SCRAPE": "Saya hanya boleh membuka portal resmi yang sudah diizinkan. Saya tidak mengambil data dari situs lain.",

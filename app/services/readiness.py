@@ -54,7 +54,7 @@ STATUS_LABELS = {
     "NEEDS_ACTION": "Masih perlu diperbaiki",
     "BLOCKED": "Terblokir oleh konflik bukti",
 }
-EXTERNAL_LABEL = "Siapkan langsung di kanal resmi"
+EXTERNAL_LABEL = "Siapkan langsung di situs resmi"
 
 GLOBAL_CHECKS = (
     {

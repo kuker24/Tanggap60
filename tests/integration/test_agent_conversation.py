@@ -341,7 +341,7 @@ def test_new_case_help_chips_before_evidence(client: TestClient) -> None:
     body = _ask(client, case_id, "Bukti apa yang dibutuhkan?")
     assert "unggah" in body["message"].lower() or "foto" in body["message"].lower()
     assert "Bukti apa yang dibutuhkan?" in body["quick_actions"]
-    assert "Cara mengunggah" in body["quick_actions"]
+    assert "Cara kirim bukti" in body["quick_actions"]
     assert "Tunjukkan yang kurang" not in body["quick_actions"]
     how = _ask(client, case_id, "Cara mengunggah")
     assert "Periksa bukti" in how["message"]

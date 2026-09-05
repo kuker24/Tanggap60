@@ -4,9 +4,9 @@
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 <section data-guide-id="workspace-open" aria-labelledby="ws-title">
-  <p class="sim-badge" role="note">SALIN DATA — BUKAN PORTAL RESMI</p>
+  <p class="sim-badge" role="note">Ruang persiapan. Bukan portal resmi.</p>
   <h1 id="ws-title">Data untuk disalin</h1>
-  <p class="lede">Salin kronologi dan data yang sudah Anda konfirmasi. Ini bukan formulir portal resmi.</p>
+  <p class="lede">Salin kronologi dan data yang sudah Anda konfirmasi. Ini bukan formulir situs resmi.</p>
   <p id="ws-status" role="status" aria-live="polite">Memuat data untuk disalin...</p>
   <div id="ws-error" class="notice" hidden>
     <p>Data belum berhasil dimuat. Ini bukan berarti transaksi Anda kosong. Periksa koneksi, lalu coba lagi.</p>
@@ -37,7 +37,7 @@
     <h2 class="muted small">Data yang tetap Anda isi sendiri</h2>
     <div class="card">
       <p><b>Rekening &amp; bank Anda:</b> <span class="muted">Belum tersedia — isi sendiri</span></p>
-      <p class="muted small">AI tidak menyentuh identitas dan kredensial Anda.</p>
+      <p class="muted small">Identitas dan kata sandi tetap Anda isi di situs resmi.</p>
     </div>
 
     <h2 class="muted small">Daftar periksa</h2>
@@ -51,7 +51,7 @@
         <li>Salin data dan kronologi ke kolom yang sesuai. Isi identitas sendiri, lalu lampirkan bukti transfer dan bukti pendukung sesuai jenis serta ukuran file yang diminta formulir. Lampirkan PDF hanya jika formulir mengizinkannya; ringkasan tidak menggantikan bukti asli.</li>
       </ol>
       <p class="muted small">Satu formulir IASC berfokus pada transaksi dari satu rekening korban ke satu rekening tujuan. Tujuan berbeda mungkin memerlukan laporan terpisah; ikuti petunjuk situs resmi.</p>
-      <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir, bukan langsung mengunggah ZIP. Tidak ada jaminan arsip diterima oleh kanal resmi.</p>
+      <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Gunakan file di dalamnya sesuai aturan formulir, bukan langsung mengunggah ZIP. Tidak ada jaminan arsip diterima oleh situs resmi.</p>
       <p class="muted small">Isi data diri di situs mereka, bukan di sini. Tanggap60 tidak mengirim laporan.</p>
       <div class="actions">
         <a class="btn" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Buka situs IASC</a>
@@ -123,7 +123,7 @@
       h.textContent = "Transaksi " + (i + 1);
       el.appendChild(h);
       [["Rekening tujuan", t.destination_account], ["Bank tujuan", t.destination_bank],
-       ["Nama penerima", t.destination_name], ["Nominal", t.amount],
+        ["Nama penerima", t.destination_name], ["Jumlah uang", t.amount],
        ["Tanggal", t.date], ["Waktu", t.time]].forEach(([k, v]) => {
         const p = document.createElement("p");
         p.className = "tx-when";
@@ -133,7 +133,7 @@
         if (value && !value.startsWith("Belum ")) {
           const button = document.createElement("button");
           button.type = "button";
-          button.className = "btn ghost";
+          button.className = "btn-text";
           button.textContent = "Salin " + k.toLowerCase();
           button.setAttribute("aria-label", button.textContent + ", transaksi " + (i + 1));
           button.addEventListener("click", () => copyText(value, k));
