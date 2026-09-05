@@ -14,9 +14,9 @@
 </ol>
 {% if case.route.value != "PRE_INCIDENT_CHECK" %}
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Buat paketnya</a>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/approval">Setujui dan buat paket</a>
   <a class="btn-text" href="/cases/{{ case.case_id }}/readiness">‹ Cek kelengkapan lagi</a>
-  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Ruang persiapan ›</a>
+  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
 </div>
 {% endif %}
 {% else %}

@@ -44,8 +44,10 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
                 dest_name = fact.raw_value
             if ftype == "PJP" and fact.review_status.value in {"CONFIRMED", "CORRECTED"}:
                 dest_bank = fact.normalized_value or fact.raw_value
+        from app.domain.policies import format_when
+
         when = unit["transferred_at"] or ""
-        date, _, time = when.partition(" ")
+        date, time = format_when(when)
         dest = _dest_raw(facts, unit, mask=mask_destination)
         amount = unit["amount_text"] if unit.get("amount") is not None else UNCONFIRMED
         transactions.append(

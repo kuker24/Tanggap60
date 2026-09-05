@@ -28,25 +28,43 @@ def loop() -> None:
     container = build_container()
     recover(container)
     while True:
+        job_id = None
+        case_id = None
+        run_id = None
         session = container.sessions()
         try:
-            queue = JobQueue(session)
-            job = queue.claim_next()
+            job = JobQueue(session).claim_next()
             if job is None:
                 session.commit()
                 time.sleep(0.5)
                 continue
+            job_id = job.job_id
+            case_id = job.case_id
+            run_id = job.run_id
+            session.commit()
+        except Exception:
+            session.rollback()
+            LOGGER.exception("job claim failed")
+            time.sleep(0.5)
+            continue
+        finally:
+            session.close()
+
+        if not job_id or not case_id or not run_id:
+            continue
+        session = container.sessions()
+        try:
             guard_resources(container.settings, str(container.storage.root))
             orch = services_from(session, container)["orchestrator"]
-            result = orch.run_until_pause(job.case_id, job.run_id)
-            queue.finish(job.job_id, result, result.get("status") == "OK")
+            result = orch.run_until_pause(case_id, run_id)
+            JobQueue(session).finish(job_id, result, result.get("status") == "OK")
             session.commit()
         except Exception as exc:
             session.rollback()
             LOGGER.exception("job failed")
             try:
                 session2 = container.sessions()
-                JobQueue(session2).finish(job.job_id, {"error": type(exc).__name__}, False)  # type: ignore[name-defined]
+                JobQueue(session2).finish(job_id, {"error": type(exc).__name__}, False)
                 session2.commit()
                 session2.close()
             except Exception:

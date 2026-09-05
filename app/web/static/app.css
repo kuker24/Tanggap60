@@ -46,8 +46,13 @@ input,textarea,select{caret-color:var(--ink)}
 
 .top{position:sticky;top:0;z-index:30;background:rgba(250,247,241,.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
 .top-inner{max-width:var(--max);margin:0 auto;padding:16px 20px;display:flex;gap:16px;align-items:center}
-.top-reset{margin-left:auto;flex:0 0 auto}
+.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+.top-reset{margin-left:0;flex:0 0 auto}
 .top-reset .btn-text{white-space:nowrap}
+@media (max-width:360px){
+  .top-inner{gap:8px;padding:12px 12px}
+  .brand-copy strong{font-size:12px}
+}
 .brand{min-width:0}
 @media (max-width:640px){.top-inner{padding:14px 16px}}
 .top .stepper{max-width:var(--max);margin:0 auto;padding:0 20px 14px;justify-content:center}

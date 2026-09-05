@@ -32,12 +32,13 @@ class ReceiptService:
         ocr_text: str | None,
         evidence_id: str | None,
         user_confirms_unreadable: bool = False,
+        replace: bool = False,
     ) -> ReceiptRecord:
         case = self.cases.get_owned(case_id, session_id)
         if case.state not in {State.HANDOFF_READY, State.RECEIPT_RECORDED}:
             raise ValidationFailed("receipt hanya setelah handoff siap")
         existing = self.receipts.get_for_case(case_id)
-        if existing is not None:
+        if existing is not None and not replace:
             return existing
         source = ReceiptSource.USER_INPUT
         if ticket_text and ocr_text:
@@ -61,6 +62,8 @@ class ReceiptService:
                 match = LocalMatchStatus.MATCH
             else:
                 match = LocalMatchStatus.MISMATCH
+        if existing is not None and replace:
+            self.receipts.delete_for_case(case_id)
         record = ReceiptRecord(
             receipt_id=new_id("rcpt"),
             case_id=case_id,

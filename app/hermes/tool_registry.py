@@ -231,6 +231,7 @@ def _receipt(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
         args.get("ocr_text"),
         args.get("evidence_id"),
         bool(args.get("user_confirms_unreadable", False)),
+        replace=bool(args.get("replace", False)),
     )
     return {
         "format_status": record.format_status.value,
@@ -242,7 +243,7 @@ def _receipt(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
 def _purge(args: dict[str, Any], ctx: ToolContext) -> dict[str, Any]:
     from app.services.purge import PurgeService
 
-    service = PurgeService(ctx.inspect.session, ctx.inspect.cases, ctx.inspect.storage)
+    service = PurgeService(ctx.inspect.session, ctx.inspect.cases, ctx.inspect.storage, ctx.inspect.ocr)
     return service.purge(str(args["case_id"]), str(args["session_id"]), str(args.get("confirmation", "")))
 
 

@@ -7,12 +7,9 @@ from app.services.ids import new_id
 
 
 def infer_loss(facts: list[FactRecord]) -> bool:
-    amounts = [
-        f
-        for f in facts
-        if f.type == FactType.AMOUNT and f.review_status != ReviewStatus.REJECTED
-    ]
-    return bool(amounts)
+    return any(
+        f.type == FactType.AMOUNT and f.review_status != ReviewStatus.REJECTED for f in facts
+    )
 
 
 def apply_route(condition: DeclaredCondition, facts: list[FactRecord]) -> tuple[Route, str, float, bool]:

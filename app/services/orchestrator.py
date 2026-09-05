@@ -209,6 +209,7 @@ class Orchestrator:
                 hermes_sequence_ms=hermes_sequence_ms,
                 ocr_total_ms=ocr_ms if ocr_ms else None,
             )
+            self.session.commit()
             if self._should_pause(self.case_repo.get(case_id).state, trace):
                 break
         return {

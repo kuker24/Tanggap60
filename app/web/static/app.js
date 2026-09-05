@@ -12,12 +12,25 @@
     if (!fileList) return;
     fileList.innerHTML = "";
     if (!list || !list.length) return;
-    Array.from(list).forEach((f) => {
+    Array.from(list).forEach((f, i) => {
       const el = document.createElement("div");
       el.className = "file-chip";
       el.innerHTML = "<span><b>" + escapeHtml(f.name) + "</b></span><span class='meta'>" + (f.size / 1024).toFixed(1) + " KB</span>";
+      const rm = document.createElement("button");
+      rm.type = "button";
+      rm.className = "btn-text";
+      rm.textContent = "Hapus ›";
+      rm.addEventListener("click", () => removePending(i));
+      el.appendChild(rm);
       fileList.appendChild(el);
     });
+  }
+  function removePending(index) {
+    if (!filesInput || !filesInput.files) return;
+    const dt = new DataTransfer();
+    Array.from(filesInput.files).forEach((f, i) => { if (i !== index) dt.items.add(f); });
+    filesInput.files = dt.files;
+    renderFiles(filesInput.files);
   }
   function showTab(name) {
     const steps = document.querySelectorAll(".coach-step");
@@ -37,7 +50,8 @@
     if (dropEl) dropEl.classList.toggle("is-focus", name === "files");
   }
   if (document.getElementById("intake-form")) {
-    showTab("files");
+    const formEl = document.getElementById("intake-form");
+    showTab((formEl && formEl.getAttribute("data-default-tab")) || "files");
     document.querySelectorAll(".intake-tabs [role='tab']").forEach((btn) => {
       btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab")));
     });
@@ -48,9 +62,6 @@
       showTab("files");
       if (filesInput) filesInput.click();
     });
-  }
-  if (document.querySelector("#fact-grid .fact.is-on")) {
-    document.body.classList.add("coach-enabled");
   }
   if (filesInput) filesInput.addEventListener("change", () => {
     renderFiles(filesInput.files);
@@ -140,7 +151,37 @@
   }
   function poll(fn, ms) {
     let timer = 0;
-    const start = () => { if (!timer) timer = setInterval(() => { if (!document.hidden) fn(); }, ms); };
+    const began = Date.now();
+    const start = () => { if (!timer) timer = setInterval(() => {
+      if (Date.now() - began > 180000) {
+        stop();
+        const host = waitAlertHost();
+        host.innerHTML = "";
+        const el = document.createElement("div");
+        el.className = "alert warning";
+        el.setAttribute("role", "alert");
+        el.innerHTML = "<b>Pemeriksaan terlalu lama</b><p>Status tidak berubah. Muat ulang, atau isi data manual.</p>";
+        const row = document.createElement("div");
+        row.className = "actions";
+        const reload = document.createElement("button");
+        reload.className = "btn ghost";
+        reload.type = "button";
+        reload.textContent = "Muat ulang";
+        reload.addEventListener("click", () => location.reload());
+        row.appendChild(reload);
+        if (caseId) {
+          const manual = document.createElement("a");
+          manual.className = "btn ember";
+          manual.href = "/cases/" + caseId + "/review";
+          manual.textContent = "Isi manual";
+          row.appendChild(manual);
+        }
+        el.appendChild(row);
+        host.appendChild(el);
+        return;
+      }
+      if (!document.hidden) fn();
+    }, ms); };
     const stop = () => { if (timer) { clearInterval(timer); timer = 0; } };
     document.addEventListener("visibilitychange", () => { if (document.hidden) stop(); else { fn(); start(); } });
     fn();
@@ -305,4 +346,42 @@
       }
     });
   }
+  window.t60Purge = async function (ev) {
+    if (ev && ev.preventDefault) ev.preventDefault();
+    const id = document.body.getAttribute("data-case-id");
+    if (!id) return false;
+    if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
+    let res;
+    try {
+      res = await fetch("/api/v1/cases/" + id, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmation: "PURGE" }),
+      });
+    } catch (_) {
+      const t = document.getElementById("toast");
+      if (t) {
+        t.textContent = "Koneksi terputus. Coba lagi.";
+        t.classList.add("show");
+        setTimeout(() => t.classList.remove("show"), 4000);
+      }
+      return false;
+    }
+    if (res.ok) {
+      try {
+        sessionStorage.removeItem("t60agent:" + id);
+        sessionStorage.removeItem("t60plan:" + id);
+        sessionStorage.removeItem("t60wait:" + id);
+      } catch (e) {}
+      location.href = "/";
+      return false;
+    }
+    const t = document.getElementById("toast");
+    if (t) {
+      t.textContent = "Belum terhapus. Coba lagi.";
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 4000);
+    }
+    return false;
+  };
 })();

@@ -11,7 +11,7 @@
   {% endif %}
 {% endfor %}
 <h1>Pastikan datanya benar</h1>
-<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Data 1 dari {{ ns.count }}. Ini benar?{% elif facts %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
+<p class="lede" id="coach-lede">{% if has_blocking %}Ada data yang beda. Pilih yang benar.{% elif ns.count %}Periksa data di bawah. Betulkan yang salah.{% elif facts %}Semua sudah dicek. Kalau ada yang keliru, betulkan.{% else %}Belum ada data. Kirim bukti dulu.{% endif %}</p>
 
 {% if notice == "pairing-ok" %}
 <p class="notice ok" role="status">Pasangan tersimpan. Lanjut ke data berikutnya.</p>
@@ -19,6 +19,21 @@
 <p class="notice warn" role="alert">Belum tersimpan. Pasangkan dulu rekening dan jumlah uangnya, lalu tekan Simpan pasangan.</p>
 {% elif notice == "pairing-basi" %}
 <p class="notice warn" role="alert">Data berubah sejak terakhir Anda memeriksa. Halaman sudah dimuat ulang — periksa lagi lalu simpan.</p>
+{% elif notice == "manual-ok" %}
+<p class="notice ok" role="status">Catatan Anda tersimpan. Bukan hasil pembacaan foto.</p>
+{% elif notice == "manual-gagal" %}
+<p class="notice warn" role="alert">Catatan belum tersimpan. Periksa formatnya lalu coba lagi.</p>
+{% endif %}
+
+{% if case.ask_loss_question %}
+<article class="card block">
+  <h3>Uangnya sudah terkirim?</h3>
+  <p class="muted small">Ada jumlah uang di bukti. Kami tidak akan mengubah alur sebelum Anda menjawab.</p>
+  <form method="post" action="/cases/{{ case.case_id }}/condition" class="actions">
+    <button class="btn ember" name="declared_condition" value="AFTER_LOSS" type="submit">Sudah terkirim</button>
+    <button class="btn ghost" name="declared_condition" value="BEFORE_LOSS" type="submit">Belum terkirim</button>
+  </form>
+</article>
 {% endif %}
 
 {% set blocking_conflicts = conflicts|selectattr("severity","equalto","BLOCKING")|selectattr("status","equalto","OPEN")|list %}
@@ -120,39 +135,29 @@
   {% endfor %}
 {% endif %}
 
-{% if summaries %}
-<section aria-labelledby="tx-done-title">
-  <h2 id="tx-done-title" class="muted small" style="margin-top:28px">Transaksi yang sudah jelas</h2>
-  {% for tx in summaries %}
-  <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
-    <div class="tx-top">
-      <h3>Transaksi {{ tx.n }} ✓</h3>
-      {% if tx.status == "COMPLETE" %}
-      <span class="badge ok">Data lengkap</span>
-      {% else %}
-      <span class="badge info">Belum lengkap</span>
-      {% endif %}
-    </div>
-    {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
-    {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
-    {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
-    {% if tx.src %}<p class="tx-when">dari {{ tx.src }}</p>{% endif %}
-  </article>
-  {% endfor %}
-</section>
-{% endif %}
-
 {% if not has_blocking %}
 <div class="fact-grid" id="fact-grid" data-guide-id="review-facts">
 {% for fact in facts %}
-<article class="fact{% if ns.first == fact.fact_id %} is-on{% endif %}" data-fact="{{ fact.fact_id }}">
-  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" or fact.review_status == "CORRECTED" %} · sudah dicek{% endif %}</p>
+<article class="fact" data-fact="{{ fact.fact_id }}">
+  <p class="muted small">{{ fact.type | human("fact") }}{% if fact.review_status == "CONFIRMED" %} · sudah dicek{% elif fact.review_status == "CORRECTED" %} · Dikoreksi Anda{% endif %}</p>
   <p><strong class="value">{{ fact.raw_value }}</strong></p>
-  <p class="src">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") }}</p>
+  {% if fact.source_locator == "USER_ENTERED" %}
+  <p class="src">Ditulis Anda — bukan hasil pembacaan foto</p>
+  {% else %}
+  <p class="src">dari {{ evidence_names.get(fact.source_evidence_id, "cerita Anda") }}
+    {% if fact.source_evidence_id and fact.source_evidence_id != "user-entered" %}
+    · <a class="link" href="/cases/{{ case.case_id }}/evidence/{{ fact.source_evidence_id }}/preview" target="_blank" rel="noopener">Lihat bukti</a>
+    {% endif %}
+  </p>
+  {% endif %}
   {% if fact.review_status == "CANDIDATE" %}
   <div class="fact-actions">
     <button class="btn ember" data-action="confirm" onclick="return patchFact(event, '{{ fact.fact_id }}')">Benar</button>
     <button class="btn ghost" data-action="correct" onclick="return openCorrect('{{ fact.fact_id }}')">Kurang tepat</button>
+  </div>
+  {% elif fact.review_status in ["CONFIRMED", "CORRECTED"] %}
+  <div class="fact-actions">
+    <button class="btn ghost" type="button" onclick="return openCorrect('{{ fact.fact_id }}')">Ubah</button>
   </div>
   {% endif %}
   <div class="correct-box" id="correct-{{ fact.fact_id }}">
@@ -168,19 +173,32 @@
 {% else %}
 <article class="empty">
   <h3>Belum ada transaksi untuk diperiksa</h3>
-  <p>Kirim foto transfer, chat, atau link dulu. Tanpa bukti, belum ada data yang bisa dikonfirmasi.</p>
+  <p>Kirim foto transfer, chat, atau link dulu. Atau isi manual jika foto tidak terbaca. Data manual bukan hasil OCR.</p>
   <div class="actions">
     <a class="btn ember" href="/cases/{{ case.case_id }}/intake">Periksa bukti</a>
   </div>
+  <form method="post" action="/cases/{{ case.case_id }}/facts/manual" class="stack" style="margin-top:16px">
+    <input type="hidden" name="expected_version" value="{{ case.version }}">
+    <label for="manual-type">Tambah data manual</label>
+    <select id="manual-type" name="fact_type">
+      <option value="AMOUNT">Jumlah uang</option>
+      <option value="ACCOUNT">Rekening</option>
+      <option value="DATETIME">Waktu</option>
+    </select>
+    <label for="manual-value">Nilai</label>
+    <input id="manual-value" name="value" type="text" required placeholder="Contoh: Rp2.750.000">
+    <button class="btn ghost" type="submit">Simpan catatan</button>
+  </form>
 </article>
 {% endfor %}
 </div>
 
 {% if ns.count == 0 and facts %}
 <div class="actions">
-  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Buat dokumen</a>
-</div>
+  <a class="btn ember" href="/cases/{{ case.case_id }}/readiness">Lihat ringkasan</a>
+  </div>
 {% endif %}
+<p class="muted small">Bantuan resmi IASC: <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">iasc.ojk.go.id</a> — tidak perlu menunggu paket selesai.</p>
 {% endif %}
 
 <script>
@@ -192,8 +210,15 @@ async function patchFact(ev, id){
   const btn = ev.currentTarget || ev.submitter;
   const action = btn.getAttribute("data-action");
   if(action==="correct"){ openCorrect(id); return false; }
-  const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, expected_version: VERSION}) });
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); } else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan. Coba lagi.", true); }
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action, expected_version: VERSION}) });
+    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 500); }
+    else { const e=await res.json().catch(()=>({})); toast(e.message||e.detail||"Gagal menyimpan. Coba lagi.", true); btn.disabled = false; }
+  } catch (_) {
+    toast("Koneksi terputus. Pilihan masih di layar — coba lagi.", true);
+    btn.disabled = false;
+  }
   return false;
 }
 function openCorrect(id){ document.getElementById("correct-"+id).classList.add("open"); document.getElementById("input-"+id).focus(); return false; }
@@ -201,15 +226,26 @@ function closeCorrect(id){ document.getElementById("correct-"+id).classList.remo
 async function submitCorrect(id){
   const v=document.getElementById("input-"+id).value.trim();
   if(!v){ toast("Tulis dulu yang benar, contoh: Rp2.750.000", true); return false; }
-  const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
+  try {
+    const res = await fetch(`/api/v1/cases/${CASE}/facts/${id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body: JSON.stringify({action:"correct", value: v, expected_version: VERSION}) });
+    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
+  } catch (_) {
+    toast("Koneksi terputus. Tulisan masih di layar — coba simpan lagi.", true);
+  }
   return false;
 }
 async function resolveConflict(ev, id){
   ev.preventDefault();
   const fid = ev.submitter.value;
-  const res = await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({resolution_fact_id: fid, expected_version: VERSION})});
-  if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); }
+  const btn = ev.submitter;
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch(`/api/v1/cases/${CASE}/conflicts/${id}/resolve`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({resolution_fact_id: fid, expected_version: VERSION})});
+    if(res.ok){ toast("Tersimpan"); setTimeout(()=>location.reload(), 600); } else { const e=await res.json().catch(()=>({})); toast(e.message||"Gagal menyimpan. Coba lagi.", true); if (btn) btn.disabled = false; }
+  } catch (_) {
+    toast("Koneksi terputus. Pilihan masih di layar — coba lagi.", true);
+    if (btn) btn.disabled = false;
+  }
   return false;
 }
 </script>

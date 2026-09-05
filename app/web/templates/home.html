@@ -7,17 +7,17 @@
 <section class="land-hero">
   <div class="land-hero-inner">
     <div class="land-hero-copy">
-      <p class="land-eyebrow"><span aria-hidden="true">✦</span> AI Rescue Agent</p>
-      <h1>Bukti berantakan. Kami bantu tentukan apa yang harus dilakukan sekarang.</h1>
-      <p class="lede">Kirim bukti yang ada — foto, chat, atau link. Tanggap60 menyusunnya jadi transaksi, meminta Anda mengonfirmasi kalau ada yang tidak pasti, lalu menyiapkan langkah dan dokumen untuk dibawa ke bank, IASC, atau polisi. IASC adalah kanal resmi OJK untuk melapor penipuan. Kami tidak mengirim apa pun — Anda yang bawa sendiri.</p>
+      <p class="land-eyebrow"><span aria-hidden="true">✦</span> Tanggap60</p>
+      <h1>Curiga penipuan atau sudah terlanjur transfer?</h1>
+      <p class="lede">Kirim foto, chat, atau tautan. Kami bantu periksa informasi dan siapkan langkah berikutnya.</p>
       <form class="choices land-choices" method="post" action="/start" aria-label="Pilih kondisi">
         <input type="hidden" name="mode" value="DEMO">
         <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-          <b>Saya sudah kirim uang</b>
-          <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
+          <b>Sudah kirim uang</b>
+          <span class="desc">Sudah transfer dan sekarang curiga. Kami bantu susun buktinya.</span>
         </button>
         <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-          <b>Saya baru curiga, belum kirim uang</b>
+          <b>Belum kirim uang</b>
           <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
         </button>
       </form>
@@ -29,7 +29,7 @@
     </div>
     <div class="land-hero-visual" aria-hidden="true">
       <div class="land-mock">
-        <p class="land-mock-title">2 transaksi dari bukti Anda</p>
+        <p class="land-mock-title">Contoh hasil — 2 transaksi</p>
         <div class="land-mock-row is-ok">
           <span class="land-mock-amt">Rp2.750.000</span>
           <span class="land-mock-tag">Lengkap</span>
@@ -48,8 +48,8 @@
 <section class="c1-wrap" aria-labelledby="c1-title">
   <div class="c1-container">
     <p class="c1-badge">Cara kerja</p>
-    <h2 class="c1-title" id="c1-title">Dari bukti ke paket, tiga langkah ini</h2>
-    <p class="c1-subtitle">Yang Anda kirim tetap milik Anda.<br>Keputusan resmi tetap di bank, IASC, atau polisi.</p>
+    <h2 class="c1-title" id="c1-title">Dari bukti ke paket, empat langkah</h2>
+    <p class="c1-subtitle">Kirim bukti, kami baca, Anda konfirmasi, lalu bawa paketnya.<br>Keputusan resmi tetap di bank, IASC, atau polisi.</p>
     <div class="c1-grid">
       <article class="c1-card c1-card-1">
         <span class="c1-num" aria-hidden="true">1</span>
@@ -65,7 +65,7 @@
         <div class="c1-api-visual">
           <img class="c1-network-img" src="/static/landing/network.svg?v={{ asset_v }}" width="480" height="180" alt="">
         </div>
-        <h3>2. Kami baca isinya</h3>
+        <h3>2. Kami baca, Anda konfirmasi</h3>
       </article>
       <article class="c1-card c1-card-3">
         <span class="c1-num" aria-hidden="true">3</span>
@@ -113,7 +113,7 @@
     </details>
     <details>
       <summary>Berapa lama data saya disimpan?</summary>
-      <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari halaman paket setelah selesai melapor.</p>
+      <p>Data demo otomatis dihapus setelah 60 menit. Hapus manual kapan saja dari Kelola data di setiap halaman kasus.</p>
     </details>
   </div>
 </section>
@@ -123,14 +123,14 @@
     <h2 id="cta-title">Mulai dari kondisi Anda</h2>
     <form class="choices land-choices" method="post" action="/start" aria-label="Mulai kasus">
       <input type="hidden" name="mode" value="DEMO">
-      <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
-        <b>Saya sudah kirim uang</b>
-        <span class="desc">Sudah transfer atau bayar ke penipu. Kami bantu susun buktinya.</span>
-      </button>
-      <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
-        <b>Saya baru curiga, belum kirim uang</b>
-        <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
-      </button>
+        <button class="choice primary" name="declared_condition" value="AFTER_LOSS" type="submit">
+          <b>Sudah kirim uang</b>
+          <span class="desc">Sudah transfer dan sekarang curiga. Kami bantu susun buktinya.</span>
+        </button>
+        <button class="choice" name="declared_condition" value="BEFORE_LOSS" type="submit">
+          <b>Belum kirim uang</b>
+          <span class="desc">Cek dulu tanda-tandanya. Ini petunjuk awal, bukan vonis aman atau bahaya.</span>
+        </button>
     </form>
   </div>
 </section>

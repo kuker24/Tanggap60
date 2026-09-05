@@ -101,6 +101,9 @@ def delete_case(case_id: str, request: Request, payload: dict[str, str] | None =
         "purge_case",
         {"confirmation": confirmation, "user_initiated": True, "session_id": sid(request)},
     )
+    clearer = getattr(getattr(request.app.state.container, "ocr", None), "clear_cache", None)
+    if callable(clearer):
+        clearer()
     return JSONResponse(
         {"status": str(result.get("status") or "PURGED"), "case_id": case_id, "tool_name": "purge_case"},
         headers={"Clear-Site-Data": '"storage"'},
@@ -116,8 +119,10 @@ async def upload_evidence(
     intake = svc(request)["intake"]
     saved = []
     if files:
+        from app.services.intake import read_upload_limited
+
         for upload in files:
-            data = await upload.read()
+            data = await read_upload_limited(upload, request.app.state.container.settings.max_upload_bytes)
             record = intake.upload_bytes(case_id, sid(request), upload.filename or "upload.bin", data)
             saved.append(evidence_public(record))
     return {"evidence": saved}
@@ -206,6 +211,7 @@ def start_run(
         kind="orchestrate",
         idempotency_key=_scoped_key(case_id, idempotency_key or run_id),
     )
+    request.state.db.commit()
     if settings.sync_jobs:
         result = svc(request)["orchestrator"].run_until_pause(case_id, run_id)
         queue.finish(job_id, result, result.get("status") == "OK")
@@ -578,6 +584,13 @@ def download_artifact(case_id: str, artifact_id: str, request: Request) -> Respo
         from app.domain.errors import ArtifactVerifyFailed
 
         raise ArtifactVerifyFailed("artefak belum lulus verifikasi")
+    from app.infrastructure.repositories import ApprovalRepository
+
+    active = [a for a in ApprovalRepository(request.state.db).list_for_case(case_id) if a.revoked_at is None]
+    if not active or item.source_snapshot_hash not in {a.snapshot_hash for a in active}:
+        from app.domain.errors import ArtifactVerifyFailed
+
+        raise ArtifactVerifyFailed("paket tidak berlaku")
     data = request.app.state.container.storage.read_bytes(case_id, item.storage_key)
     from app.domain.errors import ArtifactVerifyFailed
     from app.domain.policies import sha256_bytes
@@ -666,6 +679,7 @@ def post_receipt(
             "ocr_text": payload.get("ocr_text"),
             "evidence_id": payload.get("evidence_id"),
             "user_confirms_unreadable": bool(payload.get("user_confirms_unreadable", False)),
+            "replace": bool(payload.get("replace", False)),
             "session_id": sid(request),
         },
     )

@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.exc import OperationalError
 
@@ -33,10 +33,20 @@ def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict
         return None
     path = str(request.url.path)
     case_id = (_CASE_RE.search(path) or [None, None])[1]
-    if exc.code in {"CASE_EXPIRED", "NOT_FOUND", "FORBIDDEN"}:
+    if exc.code == "CASE_EXPIRED":
         return {
-            "title": "Data kasus demo sudah dihapus",
+            "title": "Data kasus demo sudah kedaluwarsa",
             "message": "Demi privasi, data demo disimpan maksimal 60 menit. Anda perlu membuat kasus baru.",
+            "cta_url": "/",
+            "cta_label": "Mulai kasus baru",
+            "secondary_url": None,
+            "secondary_label": "",
+            "detail": f"Kode bantuan: {request_id}",
+        }
+    if exc.code in {"NOT_FOUND", "FORBIDDEN"}:
+        return {
+            "title": "Kasus tidak bisa dibuka",
+            "message": "Kasus ini tidak ada, bukan milik sesi ini, atau sudah dihapus. Kami tidak bisa memastikan data sudah hilang dari semua salinan.",
             "cta_url": "/",
             "cta_label": "Mulai kasus baru",
             "secondary_url": None,
@@ -100,9 +110,22 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             db.rollback()
             LOGGER.exception("unhandled", extra={"request_id": request_id})
             accept = request.headers.get("accept", "")
-            if "text/html" in accept and not str(request.url.path).startswith("/api/"):
-                response = HTMLResponse(
-                    "<!doctype html><html lang='id'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'><meta name='color-scheme' content='dark'><title>Terjadi gangguan</title></head><body style=\"font-family:Inter,system-ui,sans-serif;background:#000;color:#fff;max-width:40rem;margin:3rem auto;padding:0 1.25rem;line-height:1.5\"><h1 style=\"font-weight:600\">Sedang ada gangguan</h1><p>Coba muat ulang halaman ini. Data Anda belum terkirim ke bank atau polisi.</p><p><a href='/' style=\"color:#0088ff\">Kembali ke beranda</a></p></body></html>",
+            path = str(request.url.path)
+            case_id = (_CASE_RE.search(path) or [None, None])[1]
+            if "text/html" in accept and not path.startswith("/api/"):
+                response = TEMPLATES.TemplateResponse(
+                    "error.html",
+                    {
+                        "request": request,
+                        "request_id": request_id,
+                        "title": "Sedang ada gangguan",
+                        "message": "Coba muat ulang. Jika Anda baru mengirim bukti, data yang sudah tersimpan tidak dikirim ke bank atau polisi.",
+                        "cta_url": f"/cases/{case_id}/review" if case_id else "/",
+                        "cta_label": "Isi manual" if case_id else "Ke beranda",
+                        "secondary_url": "/" if case_id else None,
+                        "secondary_label": "Ke beranda" if case_id else "",
+                        "detail": f"Kode bantuan: {request_id}",
+                    },
                     status_code=500,
                 )
             else:

@@ -92,12 +92,9 @@ class ApprovalService:
             mappings = UnitMappingRepository(self.session).list_for_case(case_id)
             decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
             units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-            # only use 2.2 for multi-unit or incomplete/ambiguous; keep single complete as 2.1 for backward compat
-            should_use_22 = bool(units) and (len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units))
-            if not should_use_22:
+            if not units:
                 units_snapshot = None
                 next_action_payload = None
-                units = []
             else:
                 from app.services.readiness import assess_units as _assess_units
 

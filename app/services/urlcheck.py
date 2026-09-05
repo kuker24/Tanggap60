@@ -49,8 +49,13 @@ def analyze_url(raw: str) -> tuple[list[UrlIndicator], bool]:
                 checked,
             )
         )
-    if parsed.port and parsed.port not in {80, 443}:
-        indicators.append(UrlIndicator("port_tidak_lazim", f"Port {parsed.port} tidak lazim", "urlparse", checked))
+    try:
+        port = parsed.port
+    except ValueError:
+        indicators.append(UrlIndicator("port_tidak_valid", "Port URL tidak valid", "urlparse", checked))
+        return indicators, fetched
+    if port and port not in {80, 443}:
+        indicators.append(UrlIndicator("port_tidak_lazim", f"Port {port} tidak lazim", "urlparse", checked))
     labels = [part for part in host.split(".") if part]
     if len(labels) >= 5:
         indicators.append(

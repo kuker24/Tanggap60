@@ -82,7 +82,7 @@ def services_from(session: Session, container: AppContainer) -> dict[str, object
     approval = ApprovalService(session, cases)
     artifacts = ArtifactService(session, container.settings, container.storage, approval)
     receipt = ReceiptService(session, cases, container.storage)
-    purge = PurgeService(session, cases, container.storage)
+    purge = PurgeService(session, cases, container.storage, container.ocr)
     review = ReviewService(session, cases, approval)
     verifier = VerifierService(session, container.storage)
     ctx = ToolContext(inspect, artifacts, approval, receipt, container.settings.official_iasc_url)

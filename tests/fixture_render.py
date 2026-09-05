@@ -36,6 +36,17 @@ def image_only_pdf(png: bytes) -> bytes:
     return buf.getvalue()
 
 
+def mixed_text_and_image_pdf(png: bytes, text_page: str) -> bytes:
+    buf = BytesIO()
+    pdf = canvas.Canvas(buf, pagesize=A4)
+    pdf.setFont("Helvetica", 16)
+    pdf.drawString(72, 720, text_page)
+    pdf.showPage()
+    pdf.drawImage(ImageReader(BytesIO(png)), 72, 600, width=400, height=120)
+    pdf.save()
+    return buf.getvalue()
+
+
 def invoice_pdf() -> bytes:
     buf = BytesIO()
     pdf = canvas.Canvas(buf, pagesize=A4)

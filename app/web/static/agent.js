@@ -24,6 +24,9 @@
   let speakOn = false;
   let greeted = false;
   let inFlight = false;
+  const GUIDANCE_OFF = true;
+  let fetchCtl = null;
+  let gen = 0;
 
   function showToast(text) {
     toast.textContent = text;
@@ -85,7 +88,7 @@
 
   function renderQuick(actions) {
     quick.innerHTML = "";
-    (actions || []).slice(0, 4).forEach(label => {
+    (actions || []).slice(0, 3).forEach(label => {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = label;
@@ -117,17 +120,24 @@
     setStatus("Membaca kondisi kasus…");
     setHud("Membaca kondisi kasus…", "working");
     renderQuick([]);
+    gen += 1;
+    const myGen = gen;
+    if (fetchCtl) fetchCtl.abort();
+    fetchCtl = new AbortController();
     try {
       const res = await fetch(`/api/v1/cases/${CASE}/agent/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: fetchCtl.signal,
         body: JSON.stringify({
           text,
           ui_state: { current_page: currentPage(), pending_action: pendingAction, voice: viaVoice },
         }),
       });
+      if (myGen !== gen) return;
       if (!res.ok) throw new Error("http-" + res.status);
       const data = await res.json();
+      if (myGen !== gen) return;
       greeted = true;
       pendingAction = data.proposed_action || null;
       setStatus("Siap membantu");
@@ -152,10 +162,10 @@
         window.open(data.open_url, "_blank", "noopener");
         return;
       }
-      if (data.guidance_plan && data.guidance_plan.length) {
+      if (!GUIDANCE_OFF && data.guidance_plan && data.guidance_plan.length) {
         setHud("Menyiapkan panduan…", "working");
         if (!RT.run(data.guidance_plan)) setHud(null);
-      } else if (data.guidance) {
+      } else if (!GUIDANCE_OFF && data.guidance) {
         setHud(null);
         guide(data.guidance);
       } else {
@@ -276,6 +286,7 @@
     document.body.appendChild(hudEl);
   }
   function setHud(text, mode) {
+    if (GUIDANCE_OFF) return;
     ensureHud();
     if (hudTimer) { clearTimeout(hudTimer); hudTimer = 0; }
     if (!text) { hudEl.hidden = true; return; }
@@ -612,6 +623,8 @@
     emit("t60:draft-updated", { rolled_back: true });
   }
   function stopAll() {
+    gen += 1;
+    if (fetchCtl) fetchCtl.abort();
     RT.cancel(false);
     rollbackDrafts();
     try {
@@ -626,7 +639,7 @@
     if (!panel.hidden) {
       panel.hidden = true;
       fab.setAttribute("aria-expanded", "false");
-      showToast("Lihat yang ditunjukkan — ketuk Tanya AI untuk kembali.");
+      showToast("Lihat yang ditunjukkan — ketuk Bantu saya untuk kembali.");
     }
   }
   function saveContinuation(steps) {
@@ -831,26 +844,34 @@
   });
 
   async function silentFollowUp(text) {
+    if (GUIDANCE_OFF) return;
     if (inFlight) return;
     inFlight = true;
     setHud("Membaca kondisi kasus…", "working");
+    gen += 1;
+    const myGen = gen;
+    if (fetchCtl) fetchCtl.abort();
+    fetchCtl = new AbortController();
     try {
       const res = await fetch(`/api/v1/cases/${CASE}/agent/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: fetchCtl.signal,
         body: JSON.stringify({ text, ui_state: { current_page: currentPage(), pending_action: pendingAction } }),
       });
+      if (myGen !== gen) return;
       if (!res.ok) throw new Error("http-" + res.status);
       const data = await res.json();
+      if (myGen !== gen) return;
       greeted = true;
       pendingAction = data.proposed_action || null;
       setStatus("Siap membantu");
       addMsg("ai", data.message, data.tools_used, true);
       renderQuick(data.quick_actions);
       if (data.proposed_action) renderProposal(data.proposed_action);
-      if (data.guidance_plan && data.guidance_plan.length) {
+      if (!GUIDANCE_OFF && data.guidance_plan && data.guidance_plan.length) {
         if (!RT.run(data.guidance_plan)) setHud(null);
-      } else if (data.guidance) {
+      } else if (!GUIDANCE_OFF && data.guidance) {
         guide(data.guidance);
         setHud(null);
       } else {
@@ -865,6 +886,7 @@
 
   /* Lanjutan otomatis: sambung plan lintas halaman / lanjut setelah aksi user. */
   (function autoResume() {
+    if (GUIDANCE_OFF) return;
     const cont = loadContinuation();
     if (cont) { clearContinuation(); setTimeout(() => RT.run(cont, 0), 600); return; }
     if (takeWaiting()) { setTimeout(() => silentFollowUp("Lanjut."), 600); return; }
@@ -982,7 +1004,7 @@
       window.speechSynthesis.speak(u);
     } catch (e) {}
   }
-  speakBtn.addEventListener("click", () => {
+  if (speakBtn) speakBtn.addEventListener("click", () => {
     speakOn = !speakOn;
     speakBtn.setAttribute("aria-pressed", speakOn ? "true" : "false");
     speakBtn.textContent = speakOn ? "🔊" : "🔈";

@@ -19,8 +19,8 @@ def test_agent_tools_catalog(client: TestClient) -> None:
 def test_home_buttons(client: TestClient) -> None:
     page = client.get("/")
     assert page.status_code == 200
-    assert "Saya baru curiga, belum kirim uang" in page.text
-    assert "Saya sudah kirim uang" in page.text
+    assert "Belum kirim uang" in page.text
+    assert "Sudah kirim uang" in page.text
 
 
 def test_favicon(client: TestClient) -> None:

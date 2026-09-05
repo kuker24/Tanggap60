@@ -100,37 +100,19 @@ class ArtifactService:
                 mappings = UnitMappingRepository(self.session).list_for_case(case_id)
                 decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
                 units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-                # Use 2.2 only for multi-unit or ambiguous cases; keep single complete unit as 2.1 for backward compat
-                if len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units):
-                    use_units = bool(units)
-                    if use_units:
-                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
-                        next_act = recommend_next_action(
-                            case_id=case_id,
-                            units=units,
-                            conflicts=raw_conflicts,
-                            readiness_by_unit=units_report.get("readiness_by_unit"),
-                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
-                        )
-                        next_action_payload = next_action_to_dict(next_act)
-                elif len(units) == 1 and units[0].mapping_status == "COMPLETE":
-                    # single complete unit stays 2.1
-                    use_units = False
-                    units = []
-                else:
-                    use_units = bool(units)
-                    if use_units:
-                        units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
-                        next_act = recommend_next_action(
-                            case_id=case_id,
-                            units=units,
-                            conflicts=raw_conflicts,
-                            readiness_by_unit=units_report.get("readiness_by_unit"),
-                            incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
-                        )
-                        next_action_payload = next_action_to_dict(next_act)
-            except Exception:
-                use_units = False
+                use_units = bool(units)
+                if use_units:
+                    units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
+                    next_act = recommend_next_action(
+                        case_id=case_id,
+                        units=units,
+                        conflicts=raw_conflicts,
+                        readiness_by_unit=units_report.get("readiness_by_unit"),
+                        incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
+                    )
+                    next_action_payload = next_action_to_dict(next_act)
+            except Exception as exc:
+                raise ArtifactVerifyFailed("pemeriksaan unit gagal") from exc
         if case.route == Route.PRE_INCIDENT_CHECK:
             built.append(self._store_pdf(case_id, ArtifactType.VERIFICATION_BRIEF, self._brief_lines(case_id, snapshot_hash), generated_at, snapshot_hash))
         elif use_units:
@@ -239,6 +221,13 @@ class ArtifactService:
         checklist = self._checklist_text(case_id)
         built.append(self._store_bytes(case_id, ArtifactType.CHECKLIST, checklist.encode(), "text/markdown", snapshot_hash, "handoff.md"))
         file_map = {str(a.verify_details.get("filename", a.type.value.lower())): (a.storage_key, a.sha256) for a in built}
+        for item in self.evidence.list_for_case(case_id):
+            try:
+                data = self.storage.read_bytes(case_id, item.storage_key)
+            except Exception:
+                continue
+            safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in item.original_name_display) or item.evidence_id
+            file_map[f"bukti/{item.evidence_id}-{safe}"] = (item.storage_key, sha256_bytes(data))
         manifest_lines = [f"{sha}  {name}" for name, (_key, sha) in sorted(file_map.items())]
         manifest_body = "\n".join(manifest_lines) + "\n"
         built.append(self._store_bytes(case_id, ArtifactType.MANIFEST, manifest_body.encode(), "text/plain", snapshot_hash, "manifest.sha256"))
@@ -427,8 +416,7 @@ class ArtifactService:
             mappings = UnitMappingRepository(self.session).list_for_case(case_id)
             decs = [{"evidence_id": m.target_evidence_id, "unit_id": m.unit_id, "pairings": m.chosen_pairings} for m in mappings]
             units = compile_reporting_units(case_id, raw_facts, raw_evidence, decs if decs else None)
-            should_use_22 = bool(units) and (len(units) > 1 or any(getattr(u, "mapping_status", None) != "COMPLETE" for u in units))
-            if should_use_22 and case.route == Route.POST_INCIDENT_RESPONSE:
+            if units and case.route == Route.POST_INCIDENT_RESPONSE:
                 schema_version = "2.2"
                 units_report = assess_units(case_id=case_id, units=units, facts=raw_facts, evidence=raw_evidence, conflicts=raw_conflicts, route=case.route)
                 reporting_units_payload = [unit_to_dict(u) for u in units]
@@ -446,8 +434,10 @@ class ArtifactService:
                     incident_police_ready=(units_report.get("incident_police", {}).get("status") == "READY"),
                 )
                 next_best_action_payload = next_action_to_dict(nxt)
-        except Exception:
-            pass
+        except ArtifactVerifyFailed:
+            raise
+        except Exception as exc:
+            raise ArtifactVerifyFailed("case json unit gagal") from exc
         base = {
             "schema_version": schema_version,
             "case_id": case.case_id,
@@ -555,6 +545,15 @@ class ArtifactService:
             for artifact in artifacts:
                 name = str(artifact.verify_details.get("filename", artifact.artifact_id))
                 data = self.storage.read_bytes(case_id, artifact.storage_key)
+                info = zipfile.ZipInfo(name, date_time=ZIP_DATE)
+                archive.writestr(info, data)
+            for item in self.evidence.list_for_case(case_id):
+                safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in item.original_name_display) or item.evidence_id
+                name = f"bukti/{item.evidence_id}-{safe}"
+                try:
+                    data = self.storage.read_bytes(case_id, item.storage_key)
+                except Exception:
+                    continue
                 info = zipfile.ZipInfo(name, date_time=ZIP_DATE)
                 archive.writestr(info, data)
         return buffer.getvalue()
