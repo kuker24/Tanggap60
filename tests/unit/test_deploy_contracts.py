@@ -34,3 +34,5 @@ def test_hermes_cli_credentials_remain_accessible_to_worker() -> None:
     assert "state.db auth.json" in acl
     assert "u:tanggap60:rw-" in acl
     assert "sudo -u tanggap60" in smoke
+    assert "./scripts/fix_hermes_acl.sh" in smoke
+    assert "sudo -u hermes" not in smoke

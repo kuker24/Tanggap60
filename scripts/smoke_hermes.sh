@@ -9,9 +9,14 @@ if [[ -f /etc/tanggap60/tanggap60.env ]]; then
   set +a
 fi
 if [[ -x /home/hermes/.local/bin/hermes ]]; then
-  sudo -u hermes -H env HOME=/home/hermes HERMES_HOME=/home/hermes/.hermes \
-    PATH=/home/hermes/.local/bin:/usr/bin:/bin \
+  if [[ "$(id -u)" -eq 0 ]] && id tanggap60 >/dev/null 2>&1; then
+    ./scripts/fix_hermes_acl.sh
+    sudo -u tanggap60 -H env HOME=/home/hermes HERMES_HOME=/home/hermes/.hermes \
+      PATH=/home/hermes/.local/bin:/usr/bin:/bin \
+      /home/hermes/.local/bin/hermes --version
+  else
     /home/hermes/.local/bin/hermes --version
+  fi
 fi
 if id tanggap60 >/dev/null 2>&1 && [[ -n "${HERMES_BIN:-}" ]]; then
   sudo -u tanggap60 -H env \
