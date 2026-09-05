@@ -60,14 +60,21 @@ def test_review_continuity_javascript(client: TestClient, scenario: str):
     node = shutil.which("node")
     if not node:
         pytest.skip("Node.js is required to execute the inline review JavaScript without a browser")
+    version = subprocess.run([node, "--version"], text=True, capture_output=True, timeout=15)
+    try:
+        major = int(version.stdout.strip().lstrip("v").split(".", 1)[0])
+    except (ValueError, IndexError):
+        major = 0
+    if major < 8:
+        pytest.skip("Node.js 8+ is required for the review JavaScript harness")
     case_id = create_case(client)
     page = client.get(f"/cases/{case_id}/review").text
     script = next(script for script in re.findall(r"<script>(.*?)</script>", page, re.S) if "const VERSION" in script)
     # Execute the actual rendered script with a small DOM/storage double, not a user's browser.
     harness = r"""
-const assert = require('node:assert/strict');
-const vm = require('node:vm');
-const {script, scenario} = JSON.parse(require('node:fs').readFileSync(0, 'utf8'));
+const assert = require('assert');
+const vm = require('vm');
+const {script, scenario} = JSON.parse(require('fs').readFileSync(0, 'utf8'));
 const storage = new Map();
 let reloads = 0, focused = null, centered = null, scroll = null, requests = [];
 let pendingIds = ['a', 'b', 'c'];
@@ -80,9 +87,9 @@ const button = id => ({
   id, disabled: false, value: id,
   getAttribute: () => scenario === 'reject' ? 'reject' : 'confirm',
   closest: () => ({dataset: {fact: id}}),
-  focus(options){ assert.equal(options.preventScroll, true); focused = id; },
+  focus(options){ assert.strictEqual(options.preventScroll, true); focused = id; },
   getBoundingClientRect: () => ({top: scenario === 'reject' ? 1000 : 200, bottom: scenario === 'reject' ? 1044 : 244}),
-  scrollIntoView(options){ assert.equal(options.behavior, 'instant'); centered = id; }
+  scrollIntoView(options){ assert.strictEqual(options.behavior, 'instant'); centered = id; }
 });
 const context = vm.createContext({
   console, Date, JSON, Array, Number,
@@ -94,8 +101,8 @@ const context = vm.createContext({
   location: {reload(){ reloads++; }},
   window: {
     scrollY: 420, innerHeight: 800,
-    addEventListener(event, callback){ assert.equal(event, 'load'); onload = callback; },
-    scrollTo(options){ scroll = options.top; assert.equal(options.behavior, 'instant'); }
+    addEventListener(event, callback){ assert.strictEqual(event, 'load'); onload = callback; },
+    scrollTo(options){ scroll = options.top; assert.strictEqual(options.behavior, 'instant'); }
   },
   document: {
     querySelectorAll(selector){
@@ -119,46 +126,46 @@ const context = vm.createContext({
 });
 vm.runInContext(script, context);
 (async () => {
-  if(scenario === 'initial'){ onload(); assert.equal(focused, null); assert.equal(scroll, null); return; }
+  if(scenario === 'initial'){ onload(); assert.strictEqual(focused, null); assert.strictEqual(scroll, null); return; }
   const event = {preventDefault(){}, currentTarget: button('b'), submitter: button('b')};
   context.event = event;
   const action = scenario === 'correct' ? "submitCorrect('b')" : scenario === 'conflict' ? "resolveConflict(event, 'conflict')" : "patchFact(event, 'b')";
   const saving = vm.runInContext(action, context);
   await vm.runInContext("patchFact(event, 'a')", context);
-  assert.equal(requests.length, 1, 'no overlapping writes with the same version');
+  assert.strictEqual(requests.length, 1, 'no overlapping writes with the same version');
   await saving;
-  assert.equal(typeof requests[0].body.expected_version, 'number');
+  assert.strictEqual(typeof requests[0].body.expected_version, 'number');
   if(scenario === 'stale' || scenario === 'offline'){
-    assert.equal(reloads, 0);
-    assert.equal(storage.size, 0);
-    assert.equal(input.value, '500000');
-    assert.equal(event.currentTarget.disabled, false);
-    assert.equal(stale.hidden, scenario !== 'stale');
+    assert.strictEqual(reloads, 0);
+    assert.strictEqual(storage.size, 0);
+    assert.strictEqual(input.value, '500000');
+    assert.strictEqual(event.currentTarget.disabled, false);
+    assert.strictEqual(stale.hidden, scenario !== 'stale');
     await vm.runInContext(action, context);
-    assert.equal(requests.length, 2, 'retry is available after a failure');
+    assert.strictEqual(requests.length, 2, 'retry is available after a failure');
     return;
   }
-  assert.equal(reloads, 1);
-  if(scenario === 'storage'){ assert.equal(storage.size, 0); return; }
+  assert.strictEqual(reloads, 1);
+  if(scenario === 'storage'){ assert.strictEqual(storage.size, 0); return; }
   const key = [...storage.keys()][0];
    assert.ok(key.startsWith('review-continuity:'));
   const saved = JSON.parse(storage.get(key));
-  assert.deepEqual(saved.next, ['c', 'a', 'b']);
-  assert.equal(saved.scrollY, 420);
-  assert.equal(storage.get(key).includes('500000'), false, 'no fact values in storage');
+  assert.deepStrictEqual(saved.next, ['c', 'a', 'b']);
+  assert.strictEqual(saved.scrollY, 420);
+  assert.strictEqual(storage.get(key).includes('500000'), false, 'no fact values in storage');
   if(scenario === 'invalid'){
-    storage.set(key, '{invalid'); onload(); assert.equal(focused, null); return;
+    storage.set(key, '{invalid'); onload(); assert.strictEqual(focused, null); return;
   }
   // Simulate authoritative HTML after the save, including another reviewer's update.
   pendingIds = scenario === 'complete' ? [] : scenario === 'correct' ? ['a'] : ['a', 'c'];
   if(scenario === 'reject') cards = ['a', 'c'];
   onload();
-  assert.equal(focused, scenario === 'complete' ? 'summary' : scenario === 'correct' ? 'a' : 'c');
-  assert.equal(scroll, 420);
-  assert.equal(centered, scenario === 'reject' ? 'c' : null);
-  assert.equal(storage.size, 0, 'continuity is consumed once');
-  assert.equal(toast.textContent, 'Tersimpan');
-  focused = null; onload(); assert.equal(focused, null);
+  assert.strictEqual(focused, scenario === 'complete' ? 'summary' : scenario === 'correct' ? 'a' : 'c');
+  assert.strictEqual(scroll, 420);
+  assert.strictEqual(centered, scenario === 'reject' ? 'c' : null);
+  assert.strictEqual(storage.size, 0, 'continuity is consumed once');
+  assert.strictEqual(toast.textContent, 'Tersimpan');
+  focused = null; onload(); assert.strictEqual(focused, null);
 })().catch(error => { console.error(error); process.exitCode = 1; });
 """
     result = subprocess.run(
