@@ -13,4 +13,14 @@ if [[ -x /home/hermes/.local/bin/hermes ]]; then
     PATH=/home/hermes/.local/bin:/usr/bin:/bin \
     /home/hermes/.local/bin/hermes --version
 fi
-.venv/bin/python scripts/smoke_hermes.py
+if id tanggap60 >/dev/null 2>&1 && [[ -n "${HERMES_BIN:-}" ]]; then
+  sudo -u tanggap60 -H env \
+    HOME=/home/hermes \
+    HERMES_HOME="${HERMES_HOME:-/home/hermes/.hermes}" \
+    HERMES_BIN="${HERMES_BIN}" \
+    PATH=/home/hermes/.local/bin:/home/hermes/.hermes/bin:/usr/bin:/bin \
+    SECRET_KEY="$(printf 'smoke-%032d' 0)" \
+    .venv/bin/python scripts/smoke_hermes.py
+else
+  .venv/bin/python scripts/smoke_hermes.py
+fi

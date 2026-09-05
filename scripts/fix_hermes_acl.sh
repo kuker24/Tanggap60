@@ -7,12 +7,15 @@ fi
 chmod 0750 /home/hermes /home/hermes/.hermes
 setfacl -m u:tanggap60:--x /home/hermes
 setfacl -m m::rwx -m u:tanggap60:rwx /home/hermes/.hermes
-# state.db must be writable by tanggap60 for Hermes CLI (no fallback)
-if [[ -f /home/hermes/.hermes/state.db ]]; then
-  chown hermes:hermes /home/hermes/.hermes/state.db || true
-  chmod 0660 /home/hermes/.hermes/state.db || true
-  setfacl -m u:tanggap60:rw- -m m::rw- /home/hermes/.hermes/state.db || true
-fi
+# Hermes updates both files while the worker invokes the CLI.
+for file in state.db auth.json; do
+  path="/home/hermes/.hermes/${file}"
+  if [[ -f "${path}" ]]; then
+    chown hermes:hermes "${path}" || true
+    chmod 0660 "${path}" || true
+    setfacl -m u:tanggap60:rw- -m m::rw- "${path}" || true
+  fi
+done
 if [[ -d /home/hermes/.local ]]; then
   setfacl -R -m u:tanggap60:r-x -m m::rx /home/hermes/.local
 fi

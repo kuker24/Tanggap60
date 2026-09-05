@@ -26,3 +26,11 @@ def test_hermes_tunnel_unit_does_not_start_cloudflared() -> None:
     text = (ROOT / "deploy/hermes-tunnel.service").read_text(encoding="utf-8")
     assert "cloudflared" not in text
     assert "9119" in text
+
+
+def test_hermes_cli_credentials_remain_accessible_to_worker() -> None:
+    acl = (ROOT / "scripts/fix_hermes_acl.sh").read_text(encoding="utf-8")
+    smoke = (ROOT / "scripts/smoke_hermes.sh").read_text(encoding="utf-8")
+    assert "state.db auth.json" in acl
+    assert "u:tanggap60:rw-" in acl
+    assert "sudo -u tanggap60" in smoke
