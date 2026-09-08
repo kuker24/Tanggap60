@@ -1,0 +1,10 @@
+<section class="case-data-note" aria-labelledby="case-data-title">
+  <p id="case-data-title"><strong>Data kasus ini hanya bisa dibuka selama 60 menit.</strong> Data lama dihapus otomatis secara berkala.</p>
+  <details class="case-data-actions">
+    <summary>Hapus data sekarang</summary>
+    <p>Foto, teks, hasil pemeriksaan, dan dokumen kasus ini akan hilang dan tidak bisa dikembalikan.</p>
+    <form method="post" action="/cases/{{ case.case_id }}/baru" id="purge-browser-form">
+      <button class="btn danger" type="submit" disabled>Hapus data dan kembali ke awal</button>
+    </form>
+  </details>
+</section>

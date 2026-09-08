@@ -50,9 +50,11 @@ def test_agent_and_receipt_clear_browser_storage() -> None:
     agent = (root / "app/web/static/agent.js").read_text(encoding="utf-8")
     app = (root / "app/web/static/app.js").read_text(encoding="utf-8")
     base = (root / "app/web/templates/base.html").read_text(encoding="utf-8")
+    data_controls = (root / "app/web/templates/_data_controls.html").read_text(encoding="utf-8")
     assert "sessionStorage.removeItem(HIST_KEY)" in agent
     assert "sessionStorage.removeItem(PLAN_KEY)" in agent
     assert "window.t60Purge" in app
     assert 'sessionStorage.removeItem("t60agent:" + id)' in app
     assert 'sessionStorage.removeItem("t60plan:" + id)' in app
-    assert 'id="purge-browser-form"' in base
+    assert '{% include "_data_controls.html" %}' in base
+    assert 'id="purge-browser-form"' in data_controls

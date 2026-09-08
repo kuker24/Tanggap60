@@ -2,11 +2,12 @@
 {% from "_stepper.html" import stepper %}
 {% block title %}Kirim bukti — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(1, "Langkah 1 dari 4: Bukti", progress) }}{% endblock %}
+{% block footer_case_data %}{% endblock %}
 {% block content %}
 {% set before = case.declared_condition.value == "BEFORE_LOSS" %}
 {% if before %}
 <h1>Cek chat atau link</h1>
-<p class="lede" id="coach-lede">Jangan transfer dulu. Kirim hal yang membuat Anda curiga.</p>
+<p class="lede" id="coach-lede">Tahan transaksi Anda. Kirim link atau teks percakapan yang mencurigakan untuk mendeteksi tanda bahaya sebelum uang keluar.</p>
 {% else %}
 <h1>Kirim bukti yang ada</h1>
 <p class="lede" id="coach-lede">Hubungi bank sekarang lewat nomor resmi. Setelah itu, kirim satu bukti untuk mulai.</p>
@@ -22,72 +23,74 @@
 <p class="notice warn" role="alert">{{ notice_text or "File itu tidak bisa dipakai. Coba foto atau PDF lain." }} <a class="link" href="/cases/{{ case.case_id }}/intake">Coba lagi</a></p>
 {% endif %}
 
-{% if evidence %}
-  {% for item in evidence %}
-  {% if can_delete_evidence %}
-  <form id="del-{{ item.evidence_id }}" method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete"></form>
-  {% endif %}
-  {% endfor %}
-  <section class="saved-evidence" aria-labelledby="saved-evidence-title" data-guide-id="evidence-list">
-    <h2 id="saved-evidence-title">Bukti yang sudah masuk</h2>
-    <div class="file-list pack">
-      {% for item in evidence %}
-      <div class="file-chip">
-        <span><b>{{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Teks chat{% else %}File{% endif %} · sudah masuk</span></span>
-        {% if can_delete_evidence %}
-        <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus</button>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
-  </section>
+{% for item in evidence %}
+{% if can_delete_evidence %}
+<form id="del-{{ item.evidence_id }}" method="post" action="/cases/{{ case.case_id }}/evidence/{{ item.evidence_id }}/delete"></form>
 {% endif %}
+{% endfor %}
 
-<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" data-default-tab="{% if before %}text{% else %}files{% endif %}" novalidate>
-  <div class="intake-tabs" role="tablist" aria-label="Cara kirim bukti">
-    <button type="button" role="tab" id="tab-files" data-tab="files" aria-selected="true" aria-controls="panel-files">Foto atau PDF</button>
-    <button type="button" role="tab" id="tab-text" data-tab="text" aria-selected="false" aria-controls="panel-text">Teks chat</button>
-    <button type="button" role="tab" id="tab-url" data-tab="url" aria-selected="false" aria-controls="panel-url">Link</button>
-  </div>
-
-  <div class="coach-step is-on" data-step="files" id="panel-files" role="tabpanel" aria-labelledby="tab-files">
-    <div class="drop" id="drop" data-guide-id="upload-evidence">
-      <div class="drop-head">
-        <span class="drop-title">Pilih foto atau PDF</span>
-        <span class="muted small">Maksimal 8 file. Total 25 MB.</span>
-      </div>
-      <input id="files" name="files" type="file" class="file-input" aria-label="Pilih foto atau file bukti" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
-      <p class="muted small">{% if before %}Foto layar chat sudah cukup.{% else %}Foto struk atau chat sudah cukup.{% endif %}</p>
+<form method="post" action="/cases/{{ case.case_id }}/intake" enctype="multipart/form-data" id="intake-form" novalidate>
+  <section class="evidence-composer" data-guide-id="upload-evidence" aria-labelledby="composer-title">
+    <div class="composer-head">
+      <h2 id="composer-title">Kirim yang membuat Anda curiga</h2>
+      <p>Bisa foto, PDF, teks chat, atau link. Anda juga bisa mengirim beberapa jenis sekaligus.</p>
     </div>
+
+    <div class="evidence-actions" aria-label="Pilih jenis bukti">
+      <label class="evidence-action file-action" id="drop" for="files">
+        <span class="evidence-action-title">Pilih foto atau PDF</span>
+        <span class="evidence-action-help">Ambil gambar atau pilih file</span>
+        <input id="files" name="files" type="file" class="file-input" aria-label="Pilih foto atau PDF" accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf" multiple>
+      </label>
+      <button class="evidence-action" type="button" data-input-toggle="text" aria-expanded="false" aria-controls="panel-text">
+        <span class="evidence-action-title">Tempel teks chat</span>
+        <span class="evidence-action-help">Salin percakapan yang mencurigakan</span>
+      </button>
+      <button class="evidence-action" type="button" data-input-toggle="url" aria-expanded="false" aria-controls="panel-url">
+        <span class="evidence-action-title">Masukkan link</span>
+        <span class="evidence-action-help">Pemeriksaan aman tanpa membuka situs</span>
+      </button>
+    </div>
+
     <div id="file-list" class="file-list" aria-live="polite"></div>
-    {% if evidence %}
-    <div class="actions">
-      <button class="btn-text" type="button" id="add-more">Tambah file</button>
-    </div>
-    {% endif %}
-  </div>
 
-  <div class="coach-step" data-step="text" id="panel-text" role="tabpanel" aria-labelledby="tab-text" data-guide-id="case-story">
-    <label for="text">Tempel teks chat{% if before %} yang mencurigakan{% endif %}</label>
-    <div class="field">
-      <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer ke rekening ini, bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
+    <div class="evidence-panel" id="panel-text" data-input-panel="text" data-guide-id="case-story">
+      <label for="text">Teks chat{% if before %} yang mencurigakan{% endif %}</label>
+      <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer dan bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
     </div>
-  </div>
 
-  <div class="coach-step" data-step="url" id="panel-url" role="tabpanel" aria-labelledby="tab-url">
-    <label for="url">Tempel link</label>
-    <div class="field">
+    <div class="evidence-panel" id="panel-url" data-input-panel="url">
+      <label for="url">Link yang ingin diperiksa</label>
       <input id="url" name="url" type="url" placeholder="Contoh: https://toko-contoh.com/barang-abc" inputmode="url" autocomplete="url">
-      <p class="help">Contoh: link toko, profil, atau iklan.</p>
+      <p class="help">Kami memeriksa susunan alamat web secara aman tanpa membuka situsnya di perangkat Anda.</p>
     </div>
-  </div>
 
-  <p class="muted small">Satu bukti saja cukup untuk mulai.</p>
+    {% if evidence %}
+    <section class="saved-evidence" aria-labelledby="saved-evidence-title" data-guide-id="evidence-list">
+      <h3 id="saved-evidence-title">Bukti yang sudah masuk</h3>
+      <div class="file-list pack">
+        {% for item in evidence %}
+        <div class="file-chip">
+          <span><b>{{ item.original_name_display }}</b><br><span class="meta">{% if item.kind == "IMAGE" %}Foto{% elif item.kind == "PDF" %}PDF{% elif item.kind == "URL" %}Link{% elif item.kind == "TEXT" %}Teks chat{% else %}File{% endif %} · sudah masuk</span></span>
+          {% if can_delete_evidence %}
+          <button class="btn-text" form="del-{{ item.evidence_id }}" type="submit">Hapus</button>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+    <p class="composer-limit">Maksimal 8 file, total 25 MB. Satu bukti saja cukup untuk mulai.</p>
+  </section>
+
   <div class="sticky-cta">
-    <button class="btn ember" type="submit" id="submit-intake">Kirim bukti</button>
+    <button class="btn ember" type="submit" id="submit-intake">Periksa bukti</button>
   </div>
 </form>
+
+{% include "_data_controls.html" %}
 <noscript>
-  <p class="notice">JavaScript mati, jadi semua kolom tampil sekaligus. Isi yang Anda punya lalu tekan tombol di bawah.</p>
+  <p class="notice">JavaScript mati, jadi kolom teks dan link langsung ditampilkan. Isi yang Anda punya lalu tekan Periksa bukti.</p>
 </noscript>
 {% endblock %}

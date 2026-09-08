@@ -13,14 +13,18 @@ def test_cancelled_submit_never_locks_button(client: TestClient) -> None:
     assert "if (e.defaultPrevented" in harden
 
 
-def test_intake_tabs_support_arrow_keys(client: TestClient) -> None:
+def test_intake_composer_keeps_each_evidence_type_available(client: TestClient) -> None:
     case_id = create_case(client)
     page = client.get(f"/cases/{case_id}/intake").text
-    assert 'role="tab"' in page
+    assert 'class="evidence-composer"' in page
+    assert 'data-input-toggle="text"' in page
+    assert 'data-input-toggle="url"' in page
+    assert 'id="files"' in page
+    assert 'role="tab"' not in page
     js = client.get("/static/app.js").text
-    assert 'btn.tabIndex = on ? 0 : -1' in js
-    assert '"ArrowRight"' in js and '"ArrowLeft"' in js
-    assert '"Home"' in js and '"End"' in js
+    assert 'btn.setAttribute("aria-expanded", open ? "true" : "false")' in js
+    assert "updateEvidenceCount" in js
+    assert "showTab" not in js
 
 
 def test_help_panel_focus_and_escape_contract(client: TestClient) -> None:

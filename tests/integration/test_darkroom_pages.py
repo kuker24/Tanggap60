@@ -37,10 +37,11 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert 'id="files"' in intake.text
     assert 'id="text"' in intake.text
     assert 'id="url"' in intake.text
-    assert "coach-step" in intake.text
+    assert "evidence-composer" in intake.text
+    assert 'role="tab"' not in intake.text
     assert "Pilih foto atau PDF" in intake.text
     assert "Teks chat" in intake.text
-    assert ">Link<" in intake.text
+    assert "Masukkan link" in intake.text
     assert "Kirim bukti yang ada" in intake.text
     empty_proc = client.get(f"/cases/{case_id}/processing", follow_redirects=False)
     assert empty_proc.status_code == 303
@@ -61,7 +62,7 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "#fffefb" not in css.text.lower()
     assert "prefers-reduced-motion" in css.text
     assert "@keyframes spin" in css.text
-    assert "coach-enabled" in css.text
+    assert "composer-enabled" in css.text
     assert ".btn-text" in css.text
     assert ".actions" in css.text
     net = client.get("/static/landing/network.svg")

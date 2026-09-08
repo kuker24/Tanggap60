@@ -1,4 +1,5 @@
 .impeccable/
+.scratch/
 .venv/
 __pycache__/
 *.py[cod]

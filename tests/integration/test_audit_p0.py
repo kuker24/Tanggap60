@@ -87,12 +87,16 @@ def test_bad_url_is_validation_not_500(client: TestClient) -> None:
     assert run.status_code != 500
 
 
-def test_kelola_data_and_intake_copy(client: TestClient) -> None:
+def test_plain_data_controls_and_intake_copy(client: TestClient) -> None:
     case_id = create_case(client)
     page = client.get(f"/cases/{case_id}/intake")
     assert page.status_code == 200
-    assert "Kelola data" in page.text
+    assert "Data kasus ini hanya bisa dibuka selama 60 menit" in page.text
+    assert "Hapus data sekarang" in page.text
+    assert "Kelola data" not in page.text
+    assert page.text.index('id="intake-form"') < page.text.index("Data kasus ini hanya bisa dibuka")
     assert "Satu bukti saja cukup untuk mulai" in page.text
+    assert "Periksa bukti" in page.text
     assert "(boleh kosong)" not in page.text
 
 
@@ -166,11 +170,13 @@ def test_ocr_does_not_hold_sqlite_write_lock(client: TestClient, ocr: ScriptedOc
     assert blocked is False
 
 
-def test_before_loss_intake_defaults_to_chat_tab(client: TestClient) -> None:
+def test_before_loss_intake_offers_chat_and_link_without_default_mode(client: TestClient) -> None:
     started = client.post("/start", data={"declared_condition": "BEFORE_LOSS", "mode": "DEMO"}, follow_redirects=False)
     page = client.get(started.headers["location"])
     assert page.status_code == 200
-    assert 'data-default-tab="text"' in page.text
+    assert 'data-input-toggle="text"' in page.text
+    assert 'data-input-toggle="url"' in page.text
+    assert "data-default-tab" not in page.text
 
 
 def test_review_lists_one_candidate_at_a_time(client: TestClient, ocr: ScriptedOcr) -> None:

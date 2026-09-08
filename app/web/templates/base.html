@@ -54,16 +54,7 @@
   <footer class="foot">
     <span>Tanggap60 menyiapkan data. Anda sendiri yang mengirim laporan. <a class="link" href="https://iasc.ojk.go.id/" rel="noopener" target="_blank">Situs IASC (tab baru)</a></span>
     {% if case is defined %}
-    <details class="tech-lite kelola-data">
-      <summary>Kelola data</summary>
-      <p class="muted small">Kasus tidak bisa dibuka setelah 60 menit.</p>
-      <form method="post" action="/cases/{{ case.case_id }}/baru" data-confirm-message="Hapus data ini dan mulai kasus baru? Data tidak bisa dikembalikan.">
-        <button class="btn-text" type="submit">Hapus data dan mulai lagi</button>
-      </form>
-      <form method="post" action="#" id="purge-browser-form">
-        <button class="btn-text danger-link" type="submit">Hapus semua data</button>
-      </form>
-    </details>
+    {% block footer_case_data %}{% include "_data_controls.html" %}{% endblock %}
     {% endif %}
   </footer>
 

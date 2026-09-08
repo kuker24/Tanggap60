@@ -31,12 +31,12 @@ def test_empty_review_and_approval_do_not_pretend_progress(client: TestClient) -
     assert "Buat paket untuk 0" not in ready.text
 
 
-def test_intake_tabs_and_path_titles(client: TestClient) -> None:
+def test_intake_composer_and_path_titles(client: TestClient) -> None:
     after = create_case(client)
     page = client.get(f"/cases/{after}/intake")
     assert "Kirim bukti yang ada" in page.text
     assert "Teks chat" in page.text
-    assert ">Link<" in page.text
+    assert "Masukkan link" in page.text
     assert "Saya tidak punya file" not in page.text
 
     started = client.post("/start", data={"declared_condition": "BEFORE_LOSS", "mode": "DEMO"}, follow_redirects=False)

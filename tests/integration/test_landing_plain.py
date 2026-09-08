@@ -50,7 +50,8 @@ def test_landing_start_forms_keep_both_paths(client: TestClient, condition: str)
     intake = client.get(started.headers["location"])
     assert intake.status_code == 200
     if condition == "BEFORE_LOSS":
-        assert 'data-default-tab="text"' in intake.text
+        assert 'data-input-toggle="text"' in intake.text
+        assert 'data-input-toggle="url"' in intake.text
 
 
 def test_styles_remove_landing_decorations_and_reduce_control_motion(client: TestClient) -> None:

@@ -2,23 +2,42 @@
 {% from "_stepper.html" import stepper %}
 {% block body_mod %}{% if not actions %}is-void{% endif %}{% endblock %}
 {% block body_attrs %}{% if not actions %} data-page="wait" data-wait="plan"{% endif %}{% endblock %}
-{% block title %}Jangan transfer dulu — Tanggap60{% endblock %}
+{% block title %}{% if url_indicators %}Sebaiknya tahan transaksi{% else %}Hasil pemeriksaan awal{% endif %} — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
 {% if actions %}
-<h1>Jangan transfer dulu</h1>
-<p class="lede">Kami hanya memeriksa bentuk link. Kami tidak membuka situsnya.</p>
-<section class="decision-panel" data-guide-id="next-best-action">
+<div class="result-hero">
+  {% if url_indicators %}
+  <div class="status-pill warn" role="status">
+    <span class="status-dot"></span> Perlu diwaspadai
+  </div>
+  <h1>Sebaiknya tahan transaksi Anda</h1>
+  <p class="lede">Kami menemukan indikasi yang tidak lazim pada link ini. Kami hanya memeriksa bentuk link. Kami tidak membuka link tersebut secara langsung demi keamanan perangkat Anda.</p>
+  {% else %}
+  <div class="status-pill info" role="status">
+    <span class="status-dot"></span> Hasil pemeriksaan awal
+  </div>
+  <h1>Hasil pemeriksaan awal</h1>
+  <p class="lede">Kami hanya memeriksa bentuk link. Kami tidak membuka link tersebut secara langsung demi keamanan perangkat Anda.</p>
+  {% endif %}
+</div>
+
+<section class="decision-panel result-findings" data-guide-id="next-best-action">
   <h2>Yang terlihat</h2>
   {% if url_indicators %}
-  <ul class="simple-list">{% for item in url_indicators %}<li>{{ item }}</li>{% endfor %}</ul>
+  <ul class="simple-list indicator-list">
+    {% for item in url_indicators %}
+    <li class="indicator-item">{{ item }}</li>
+    {% endfor %}
+  </ul>
   {% else %}
-  <p>Tidak ada tanda sederhana dari bentuk link. Ini tidak berarti link aman.</p>
+  <p>Tidak ada tanda sederhana dari bentuk link. Ini tidak berarti link aman karena penipu tetap bisa meniru situs resmi.</p>
   {% endif %}
 </section>
+
 <details class="task-details">
   <summary>Yang tidak kami periksa</summary>
-  <p>Kami tidak membuka link dan tidak memeriksa laporan orang lain.</p>
+  <p>Demi perlindungan dari ancaman malware, kami tidak membuka link dan tidak memeriksa laporan orang lain.</p>
 </details>
 {% else %}
 <div class="stage-void">
@@ -32,12 +51,24 @@
 {% endif %}
 
 {% if case.route.value == "PRE_INCIDENT_CHECK" and actions %}
-<section class="decision-panel" id="decision-card">
-  <h2>Apa yang akan Anda lakukan?</h2>
-  <form class="actions" id="decision">
-    <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kontak resmi</button>
-    <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Batal</button>
-    <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Tetap lanjut sendiri</button>
+<section class="decision-panel action-guide-panel" id="decision-card">
+  <h2>Langkah yang disarankan</h2>
+  <p class="panel-sublede">Pilih langkah aman yang sebaiknya Anda lakukan sekarang:</p>
+  <form class="actions suggested-actions" id="decision">
+    <div class="action-card featured-action">
+      <button class="btn ember" type="button" data-d="VERIFY_VIA_OFFICIAL_CHANNEL">Cek lewat kontak resmi</button>
+      <p class="action-subtext">Langkah paling disarankan: cari nomor atau situs resmi sendiri (misal lewat Google). Jangan pakai kontak dari chat atau link yang mencurigakan.</p>
+    </div>
+    <div class="action-row">
+      <div class="action-card-mini">
+        <button class="btn-text" type="button" data-d="CANCELLED_ACTION">Batal</button>
+        <p class="action-subtext">Langkah teraman jika Anda merasa ragu atau tidak yakin.</p>
+      </div>
+      <div class="action-card-mini">
+        <button class="btn-text" type="button" data-d="PROCEED_BY_USER">Tetap lanjut sendiri</button>
+        <p class="action-subtext">Hanya jika Anda telah memastikan sendiri keaslian pihak penerima.</p>
+      </div>
+    </div>
   </form>
   <div id="decision-next" class="notice" role="status" hidden></div>
 </section>
