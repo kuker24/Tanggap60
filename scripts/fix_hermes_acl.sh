@@ -23,10 +23,12 @@ if [[ -d /home/hermes/.hermes/hermes-agent ]]; then
   setfacl -R -m u:tanggap60:r-x -m m::rx /home/hermes/.hermes/hermes-agent
 fi
 if [[ -f /home/hermes/.hermes/config.yaml ]]; then
-  setfacl -m u:tanggap60:r-- /home/hermes/.hermes/config.yaml
+  chmod 0640 /home/hermes/.hermes/config.yaml || true
+  setfacl -m u:tanggap60:r-- -m m::r-- /home/hermes/.hermes/config.yaml || true
 fi
 if [[ -f /home/hermes/.hermes/.env ]]; then
-  setfacl -m u:tanggap60:r-- /home/hermes/.hermes/.env
+  chmod 0640 /home/hermes/.hermes/.env || true
+  setfacl -m u:tanggap60:r-- -m m::r-- /home/hermes/.hermes/.env || true
 fi
 for d in logs sessions tmp cache; do
   install -d -o hermes -g hermes "/home/hermes/.hermes/${d}"

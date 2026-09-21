@@ -493,7 +493,6 @@ def _cli_command(binary: str) -> list[str]:
     return [
         binary,
         "chat",
-        "--oneshot",
         "--quiet",
         "--max-turns",
         "1",
@@ -513,6 +512,8 @@ def _cli_env(settings: Settings) -> dict[str, str]:
     env["HERMES_HOME"] = home
     env["HOME"] = "/home/hermes" if home.startswith("/home/hermes") else env.get("HOME", home)
     env["PATH"] = f"/home/hermes/.local/bin:/home/hermes/.hermes/bin:{env.get('PATH', '')}"
+    env["HERMES_HOME_MODE"] = "0750"
+    env["HERMES_SKIP_CHMOD"] = "1"
     return env
 
 
