@@ -9,10 +9,10 @@ web
 P1 Korban panik (baru transfer, bukti berantakan), P2 Pengguna ragu (belum rugi, ingin cek URL/rekening), P3 Pendamping (keluarga/teman yang membantu). Semua di Indonesia, mobile-first, butuh langkah jelas tanpa jargon hukum.
 
 ## Product Purpose
-SatuAman Tanggap60 mengubah bukti berantakan menjadi kasus siap handoff resmi. Intake → ekstraksi → review fakta/konflik → preflight kesiapan per kanal (BANK_PJP, IASC, POLICE) → approval snapshot-bound → artefak ZIP terverifikasi → handoff manual → receipt. Tidak mengirim laporan, tidak menjamin dana kembali, status resmi selalu NOT_VERIFIED.
+SatuAman Tanggap60 adalah AI Golden Window Rescue Engine yang mengubah bukti berantakan menjadi satu tindakan paling bernilai dan kasus siap handoff resmi. Intake → ekstraksi → review fakta/konflik → prioritas containment → stress-test kesiapan per kanal (BANK_PJP, IASC, POLICE) → approval snapshot-bound → artefak ZIP terverifikasi → handoff manual → receipt. Tidak mengirim laporan, tidak memblokir akun, tidak menjamin dana kembali, status resmi selalu NOT_VERIFIED.
 
 ## Positioning
-SatuAman Tanggap60 — AI Rescue Agent / Native Co-pilot: AI pendamping insiden digital yang menemani korban dari bukti berantakan sampai siap handoff ke kanal resmi. Setiap klaim terikat sumber bukti; konflik ditampilkan sebelum laporan; paket Bank/IASC hanya bila channel READY, dengan manifest SHA-256. Bukan chatbot jawaban atau daftar tautan. Native Action (lihat AGENT_ARCHITECTURE.md): bicara atau ketik, AI bertindak di halaman, prefill draf, minta persetujuan, berhenti sebelum kredensial/OTP/submit final.
+SatuAman Tanggap60 — AI Golden Window Rescue Engine / Native Co-pilot: AI pendamping insiden digital yang membantu korban bertindak benar ketika waktu, bukti, dan kondisi mental sedang melawan mereka. Fitur "Belum Yakin, Tetap Amankan" memberi containment tanpa memaksa vonis; Golden Window menghitung ulang prioritas dari fakta yang ditinjau; stress-test paket memperlihatkan pertanyaan yang mungkin muncul saat intake tanpa mengatasnamakan keputusan lembaga. Setiap klaim terikat sumber bukti; konflik ditampilkan sebelum laporan; paket Bank/IASC hanya bila channel READY, dengan manifest SHA-256. Native Action berhenti sebelum kredensial/OTP/submit final.
 
 ## Operating Context
 VPS 4 vCPU / 4 GB / 20 GB, 1 web + 1 heavy worker, Nginx, SQLite WAL, Hermes Agent CLI sebagai orkestrator tool (allowlist per state). Fallback deterministik jika model tidak tersedia. Klaim durasi demo diukur lokal, bukan jaminan.

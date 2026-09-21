@@ -181,6 +181,10 @@ def test_dashboard_evidence_path_and_informed_bypass(client: TestClient, ocr: Sc
     assert mapped.status_code == 200
     page = client.get(f"/cases/{case_id}/readiness")
     assert page.status_code == 200
+    assert "Yang paling penting sekarang" in page.text
+    assert "Golden Window" not in page.text
+    assert "Belum yakin? Tetap amankan" in page.text
+    assert "Apakah data ini mungkin dipertanyakan?" in page.text
     assert "Lakukan ini sekarang" in page.text
     assert "Tambah bukti" in page.text
     assert "Lanjut ke paket" not in page.text

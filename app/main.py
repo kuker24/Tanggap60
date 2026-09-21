@@ -36,7 +36,7 @@ def _web_error_context(request: Request, exc: AppError, request_id: str) -> dict
     if exc.code == "CASE_EXPIRED":
         return {
             "title": "Kasus ini sudah berakhir",
-            "message": "Kasus tidak bisa dibuka lagi setelah 60 menit. Mulai kasus baru jika masih perlu bantuan.",
+            "message": "Batas waktu kasus ini sudah lewat, jadi datanya tidak bisa dibuka lagi. Mulai kasus baru jika masih perlu bantuan.",
             "cta_url": "/",
             "cta_label": "Mulai kasus baru",
             "secondary_url": None,

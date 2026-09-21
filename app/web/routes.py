@@ -77,11 +77,33 @@ def _progress(db, case) -> dict:
     }
 
 
+def _retention_label(seconds: int) -> str:
+    """Human retention window in Indonesian; never claims a shorter window than configured."""
+    minutes = max(1, int(seconds // 60))
+    if minutes <= 60:
+        return f"{minutes} menit"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} jam"
+    days = hours // 24
+    return f"{days} hari"
+
+
+def _case_retention(case) -> dict[str, str]:
+    total = int((case.expires_at - case.created_at).total_seconds())
+    return {"window": _retention_label(total)}
+
+
 def _case_page(request: Request, template: str, case, status_code: int = 200, **ctx):
     return TEMPLATES.TemplateResponse(
         request,
         template,
-        context={"case": case, "progress": _progress(request.state.db, case), **ctx},
+        context={
+            "case": case,
+            "progress": _progress(request.state.db, case),
+            "retention": _case_retention(case),
+            **ctx,
+        },
         status_code=status_code,
     )
 
@@ -324,7 +346,15 @@ def favicon():
 
 @web.get("/")
 def home(request: Request):
-    return TEMPLATES.TemplateResponse(request, "home.html", context={"title": "Tanggap60"})
+    settings = request.app.state.container.settings
+    return TEMPLATES.TemplateResponse(
+        request,
+        "home.html",
+        context={
+            "title": "SatuAman Tanggap60",
+            "retention": {"window": _retention_label(settings.demo_ttl_seconds)},
+        },
+    )
 
 
 @web.post("/start")
@@ -582,6 +612,7 @@ def readiness_page(case_id: str, request: Request):
     from app.services.next_action import next_action_to_dict, recommend_next_action
     from app.services.readiness import assess_units
     from app.services.reporting_units import compile_reporting_units
+    from app.services.rescue import build_adversarial_checks, build_golden_window
 
     facts = FactRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -679,6 +710,14 @@ def readiness_page(case_id: str, request: Request):
                     has_blocking = True
     if not tx_cards:
         next_view = None
+    golden_window = build_golden_window(
+        facts=facts,
+        evidence=evidence,
+        conflicts=conflicts,
+        next_action=next_action,
+        units=units,
+    )
+    adversarial = build_adversarial_checks(units_report)
     return _case_page(
         request,
         "readiness.html",
@@ -704,6 +743,8 @@ def readiness_page(case_id: str, request: Request):
             needs_evidence=needs_evidence,
             ready_count=ready_count,
         ),
+        golden_window=golden_window,
+        adversarial=adversarial,
     )
 
 

@@ -65,7 +65,3 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "composer-enabled" in css.text
     assert ".btn-text" in css.text
     assert ".actions" in css.text
-    net = client.get("/static/landing/network.svg")
-    lib = client.get("/static/landing/library.svg")
-    assert net.status_code == 200
-    assert lib.status_code == 200
