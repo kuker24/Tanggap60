@@ -103,6 +103,8 @@
   }
   if (form && submitBtn) {
     form.addEventListener("submit", (e) => {
+      const submitter = e.submitter || document.activeElement;
+      if (submitter && submitter.id === "btn-demo-two-amounts") return;
       const text = (document.getElementById("text") || {}).value || "";
       const url = (document.getElementById("url") || {}).value || "";
       const hasFile = filesInput && filesInput.files && filesInput.files.length;

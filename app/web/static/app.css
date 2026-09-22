@@ -146,6 +146,9 @@ h3{font:600 16px/1.25 var(--sans);margin:0 0 10px}
 .file-input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
 .evidence-panel{margin-top:18px;padding-top:18px;border-top:1px solid var(--line)}
 .composer-enabled .evidence-panel:not(.is-open){display:none}
+.demo-fixture{margin-top:16px;padding:14px 16px;border:1px solid var(--amber);border-radius:var(--radius-ghost);background:var(--amber-soft)}
+.demo-fixture p{margin:0 0 10px;color:var(--ink);font:500 14px/1.4 var(--sans)}
+.demo-fixture .btn{width:100%}
 .evidence-panel label{margin-top:0}
 .composer-limit{margin:18px 0 0;color:var(--muted);font:400 13px/1.5 var(--sans)}
 .file-list{margin-top:12px;display:grid;gap:8px;padding:0;list-style:none}
