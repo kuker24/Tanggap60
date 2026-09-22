@@ -136,7 +136,7 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
                 )
         finally:
             db.close()
-        set_session_cookie(response, app.state.container.settings, request.state.session_id)
+        set_session_cookie(response, app.state.container.settings, request.state.session_id, request=request)
         response.headers["X-Request-Id"] = request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -146,11 +146,11 @@ def create_app(container: AppContainer | None = None) -> FastAPI:
             response.headers["Cache-Control"] = "no-store"
         return response
 
-    @app.get("/health/live")
+    @app.api_route("/health/live", methods=["GET", "HEAD"])
     def live() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/health/ready")
+    @app.api_route("/health/ready", methods=["GET", "HEAD"])
     def ready() -> JSONResponse:
         session = app.state.container.sessions()
         try:

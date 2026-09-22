@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import secrets
 from typing import Any
 
@@ -9,6 +10,7 @@ from itsdangerous import BadSignature, URLSafeSerializer
 from app.config import Settings
 
 COOKIE = "t60_sid"
+LOGGER = logging.getLogger("tanggap60.session")
 
 
 def serializer(settings: Settings) -> URLSafeSerializer:
@@ -28,13 +30,48 @@ def get_session_id(request: Request, settings: Settings) -> str:
     return secrets.token_hex(16)
 
 
-def set_session_cookie(response: Response, settings: Settings, session_id: str) -> None:
+def is_request_secure(request: Request | None) -> bool:
+    if request is None:
+        return False
+    if request.url.scheme == "https":
+        return True
+    proto = request.headers.get("x-forwarded-proto", "").lower()
+    if proto == "https":
+        return True
+    cf_visitor = request.headers.get("cf-visitor", "")
+    if '"scheme":"https"' in cf_visitor.lower():
+        return True
+    return False
+
+
+def set_session_cookie(
+    response: Response,
+    settings: Settings,
+    session_id: str,
+    request: Request | None = None,
+) -> None:
+    if request is not None:
+        if is_request_secure(request):
+            cookie_secure = True
+        elif settings.app_env in {"competition", "production"}:
+            cookie_secure = False
+            path = str(request.url.path)
+            LOGGER.warning(
+                "insecure_session_cookie: request to %s over non-TLS HTTP in %s environment; session cookie set with secure=False",
+                path,
+                settings.app_env,
+            )
+        else:
+            cookie_secure = False
+    else:
+        cookie_secure = settings.app_env in {"competition", "production"}
+
     response.set_cookie(
         COOKIE,
         serializer(settings).dumps(session_id),
         httponly=True,
         samesite="lax",
-        secure=settings.app_env in {"competition", "production"},
+        secure=cookie_secure,
         max_age=60 * 60 * 24,
     )
 
