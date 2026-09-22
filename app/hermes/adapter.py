@@ -269,7 +269,7 @@ class CliHermes:
         self,
         command: list[str],
         env: dict[str, str] | None = None,
-        timeout: float = 22.0,
+        timeout: float = 45.0,
         runner: Runner = subprocess.run,
     ) -> None:
         self.command = command
@@ -493,7 +493,6 @@ def _cli_command(binary: str) -> list[str]:
     return [
         binary,
         "chat",
-        "--oneshot",
         "--quiet",
         "--max-turns",
         "1",
@@ -513,6 +512,8 @@ def _cli_env(settings: Settings) -> dict[str, str]:
     env["HERMES_HOME"] = home
     env["HOME"] = "/home/hermes" if home.startswith("/home/hermes") else env.get("HOME", home)
     env["PATH"] = f"/home/hermes/.local/bin:/home/hermes/.hermes/bin:{env.get('PATH', '')}"
+    env["HERMES_HOME_MODE"] = "0750"
+    env["HERMES_SKIP_CHMOD"] = "1"
     return env
 
 
@@ -521,8 +522,9 @@ def build_hermes(settings: Settings) -> HermesPort:
     if settings.hermes_endpoint:
         return FallbackHermes(HttpHermes(settings.hermes_endpoint), fallback)
     if settings.hermes_bin:
+        timeout = float(os.getenv("HERMES_TIMEOUT", "45.0"))
         return FallbackHermes(
-            CliHermes(_cli_command(settings.hermes_bin), env=_cli_env(settings)),
+            CliHermes(_cli_command(settings.hermes_bin), env=_cli_env(settings), timeout=timeout),
             fallback,
         )
     return fallback

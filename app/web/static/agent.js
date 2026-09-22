@@ -1,4 +1,4 @@
-/* Tanggap60 Rescue Agent — chat panel, guided pointer, approval, voice bonus.
+/* Tanggap60 Rescue Agent: chat panel, guided pointer, approval, voice bonus.
    Progressive enhancement: core flow works without this file. All text
    inserted via textContent (no raw HTML from server). */
 (function () {
@@ -18,12 +18,14 @@
   const toast = document.getElementById("agent-toast");
   const sendBtn = form.querySelector('button[type="submit"]');
   const HIST_KEY = "t60agent:" + CASE;
+  const AUTO_KEY = "t60autopilot";
   const HIST_TTL = 60 * 60 * 1000;
   let pendingAction = null;
   let speakOn = false;
   let greeted = false;
   let inFlight = false;
-  const GUIDANCE_OFF = true;
+  let guidanceOn = false;
+  try { guidanceOn = localStorage.getItem(AUTO_KEY) === "1"; } catch (e) {}
   let fetchCtl = null;
   let gen = 0;
   let savedScroll = 0;
@@ -71,7 +73,7 @@
       ul.className = "tech-body";
       tools.forEach(t => {
         const li = document.createElement("li");
-        li.textContent = t.tool + " · " + t.planner + " · " + t.duration_ms + " ms";
+      li.textContent = t.tool + " · " + t.planner + " · " + t.duration_ms + " ms";
         ul.appendChild(li);
       });
       det.appendChild(ul);
@@ -88,7 +90,7 @@
 
   function renderQuick(actions) {
     quick.innerHTML = "";
-    (actions || []).slice(0, 3).forEach(label => {
+    (actions || []).slice(0, 2).forEach(label => {
       const b = document.createElement("button");
       b.type = "button";
       b.textContent = label;
@@ -120,8 +122,8 @@
     if (text) addMsg("user", text, null, false);
     input.value = "";
     setBusy(true);
-    setStatus("Membaca kondisi kasus…");
-    setHud("Membaca kondisi kasus…", "working");
+    setStatus("Membaca kasus…");
+    setHud("Membaca kasus…", "working");
     renderQuick([]);
     gen += 1;
     const myGen = gen;
@@ -165,10 +167,10 @@
         window.open(data.open_url, "_blank", "noopener");
         return;
       }
-      if (!GUIDANCE_OFF && data.guidance_plan && data.guidance_plan.length) {
+      if (guidanceOn && data.guidance_plan && data.guidance_plan.length) {
         setHud("Menyiapkan panduan…", "working");
         if (!RT.run(data.guidance_plan)) setHud(null);
-      } else if (!GUIDANCE_OFF && data.guidance) {
+      } else if (guidanceOn && data.guidance) {
         setHud(null);
         guide(data.guidance);
       } else {
@@ -178,7 +180,7 @@
     } catch (e) {
       setStatus("Siap membantu");
       setHud(null);
-      addMsg("ai", "Pendamping sedang tidak tersedia. Anda tetap bisa lanjut sendiri.", null, false);
+      addMsg("ai", "Bantuan sedang tidak tersedia. Anda tetap bisa lanjut sendiri.", null, false);
     } finally {
       setBusy(false);
       if (hadInputFocus && !panel.hidden) input.focus({ preventScroll: true });
@@ -189,14 +191,15 @@
     const card = document.createElement("div");
     card.className = "agent-proposal";
     const title = document.createElement("strong");
-    title.textContent = "Simpan pilihan ini?";
+    const openOfficial = prop.action_type === "OPEN_OFFICIAL";
+    title.textContent = openOfficial ? "Buka situs resmi IASC?" : "Simpan pilihan transaksi?";
     card.appendChild(title);
     const dl = document.createElement("dl");
     Object.entries(prop.summary || {}).forEach(([k, v]) => {
       const dt = document.createElement("dt");
-      dt.textContent = k;
+      dt.textContent = ({ amount: "Jumlah uang", destination: "Rekening tujuan", url: "Situs" })[k] || k;
       const dd = document.createElement("dd");
-      dd.textContent = String(v);
+      dd.textContent = openOfficial && k === "url" ? "iasc.ojk.go.id" : String(v);
       dl.appendChild(dt);
       dl.appendChild(dd);
     });
@@ -204,7 +207,7 @@
     const row = document.createElement("div");
     row.className = "row";
     const yes = document.createElement("button");
-    yes.type = "button"; yes.className = "btn ember"; yes.textContent = "Simpan";
+    yes.type = "button"; yes.className = "btn ember"; yes.textContent = openOfficial ? "Buka situs" : "Simpan";
     const no = document.createElement("button");
     no.type = "button"; no.className = "btn-text"; no.textContent = "Batal";
     yes.addEventListener("click", () => decide(prop, true, card, yes));
@@ -249,7 +252,7 @@
       setTimeout(() => location.reload(), 700);
     } catch (e) {
       btn.disabled = false;
-      showToast("Gagal menyimpan. Coba lagi.");
+      showToast("Tindakan gagal. Coba lagi.");
     }
   }
 
@@ -259,7 +262,6 @@
      CALLOUT → WAIT. Tanpa JS/selector/URL arbitrer dari server. */
   const PLAN_KEY = "t60plan:" + CASE;
   const WAIT_KEY = "t60wait:" + CASE;
-  const AUTO_KEY = "t60autopilot";
   const PLAN_TTL = 10 * 60 * 1000;
   const ROUTES = { intake: 1, processing: 1, review: 1, readiness: 1, result: 1, approval: 1, artifacts: 1, receipt: 1, workspace: 1 };
   const TARGET_STEP = { SCROLL_TO: 1, SPOTLIGHT: 1, MOVE_POINTER: 1, CALLOUT: 1, OPEN_DISCLOSURE: 1, FOCUS: 1 };
@@ -284,7 +286,8 @@
     document.body.appendChild(hudEl);
   }
   function setHud(text, mode) {
-    if (GUIDANCE_OFF) return;
+    if (!guidanceOn && text) return;
+    if (!hudEl && !text) return;
     ensureHud();
     if (hudTimer) { clearTimeout(hudTimer); hudTimer = 0; }
     if (!text) { hudEl.hidden = true; return; }
@@ -596,7 +599,7 @@
       const badge = document.createElement("p");
       badge.className = "ai-draft";
       badge.setAttribute("role", "status");
-      badge.textContent = "Disiapkan Tanggap60 — " + s.label + ". Belum disimpan.";
+      badge.textContent = "Disiapkan Tanggap60: " + s.label + ". Belum disimpan.";
       anchor.appendChild(badge);
       if (aiDrafts.length) aiDrafts[aiDrafts.length - 1].badge = badge;
     }
@@ -630,6 +633,8 @@
       const box = document.getElementById("agent-autopilot");
       if (box) box.checked = false;
     } catch (e) {}
+    guidanceOn = false;
+    setHud(null);
     showToast("Panduan dihentikan. Draf dibatalkan.");
   }
 
@@ -638,7 +643,7 @@
       panel.hidden = true;
       fab.setAttribute("aria-expanded", "false");
       document.body.classList.remove("agent-open");
-      showToast("Lihat yang ditunjukkan — ketuk Bantu saya untuk kembali.");
+      showToast("Ikuti petunjuk. Ketuk Butuh bantuan? untuk kembali.");
     }
   }
   function saveContinuation(steps) {
@@ -810,7 +815,7 @@
       this.busy = false; this.paused = false;
       clearContinuation(); clearWaiting();
       clearVisuals();
-      hudDone("✓ Panduan selesai");
+      hudDone("Panduan selesai");
       announce("Panduan selesai.");
     },
   };
@@ -857,10 +862,10 @@
   });
 
   async function silentFollowUp(text) {
-    if (GUIDANCE_OFF) return;
+    if (!guidanceOn) return;
     if (inFlight) return;
     inFlight = true;
-    setHud("Membaca kondisi kasus…", "working");
+    setHud("Membaca kasus…", "working");
     gen += 1;
     const myGen = gen;
     if (fetchCtl) fetchCtl.abort();
@@ -882,9 +887,9 @@
       addMsg("ai", data.message, data.tools_used, true);
       renderQuick(data.quick_actions);
       if (data.proposed_action) renderProposal(data.proposed_action);
-      if (!GUIDANCE_OFF && data.guidance_plan && data.guidance_plan.length) {
+      if (guidanceOn && data.guidance_plan && data.guidance_plan.length) {
         if (!RT.run(data.guidance_plan)) setHud(null);
-      } else if (!GUIDANCE_OFF && data.guidance) {
+      } else if (guidanceOn && data.guidance) {
         guide(data.guidance);
         setHud(null);
       } else {
@@ -899,7 +904,7 @@
 
   /* Lanjutan otomatis: sambung plan lintas halaman / lanjut setelah aksi user. */
   (function autoResume() {
-    if (GUIDANCE_OFF) return;
+    if (!guidanceOn) return;
     const cont = loadContinuation();
     if (cont) { clearContinuation(); setTimeout(() => RT.run(cont, 0), 600); return; }
     if (takeWaiting()) { setTimeout(() => silentFollowUp("Lanjut."), 600); return; }
@@ -984,12 +989,13 @@
   (function autopilot() {
     const box = document.getElementById("agent-autopilot");
     if (!box) return;
-    try { box.checked = localStorage.getItem(AUTO_KEY) === "1"; } catch (e) {}
+    box.checked = guidanceOn;
     box.addEventListener("change", () => {
+      guidanceOn = box.checked;
       try { localStorage.setItem(AUTO_KEY, box.checked ? "1" : "0"); } catch (e) {}
       showToast(box.checked ? "Panduan langsung aktif. Saya tunjukkan langkahnya." : "Panduan langsung mati.");
       if (box.checked) silentFollowUp("Bantu saya sampai selesai.");
-      else RT.cancel(false);
+      else { RT.cancel(false); setHud(null); }
     });
   })();
 

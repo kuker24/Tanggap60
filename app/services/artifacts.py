@@ -282,7 +282,7 @@ class ArtifactService:
         lines = [
             "DRAF PENGGUNA — BUKAN DOKUMEN RESMI",
             "STATUS RESMI: NOT_VERIFIED. Belum diverifikasi oleh situs resmi.",
-            "SatuAman membantu menyusun langkah. Tidak ada jaminan dana kembali. Tidak mengirim laporan.",
+            "SatuAman Tanggap60 membantu menyusun langkah. Tidak ada jaminan dana kembali. Tidak mengirim laporan.",
             "## Lakukan sekarang",
         ]
         now = [a for a in actions if a.priority.value == "NOW"]
@@ -364,7 +364,7 @@ class ArtifactService:
                 "- [ ] Jumlah uang dan waktu transaksi terkonfirmasi.",
                 "- [ ] Bukti transaksi tersedia.",
                 "- [ ] Bukti komunikasi tersedia.",
-                "- [ ] Identitas/KTP disiapkan untuk situs resmi, bukan dikirim ke SatuAman.",
+                "- [ ] Identitas/KTP disiapkan untuk situs resmi, bukan dikirim ke SatuAman Tanggap60.",
             ]
         body = "\n".join(rows)
         return (
@@ -695,7 +695,7 @@ class ArtifactService:
         lines = [
             "DRAF PENGGUNA — BUKAN DOKUMEN RESMI",
             "STATUS RESMI: NOT_VERIFIED. Belum diverifikasi oleh situs resmi.",
-            "SatuAman membantu menyusun langkah. Tidak mengirim laporan.",
+            "SatuAman Tanggap60 membantu menyusun langkah. Tidak mengirim laporan.",
             "## Lakukan sekarang",
         ]
         complete = [u for u in units if _mapping(u) == "COMPLETE"]

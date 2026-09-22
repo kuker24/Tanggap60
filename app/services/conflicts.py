@@ -53,7 +53,7 @@ def detect_conflicts(case_id: str, facts: list[FactRecord]) -> list[ConflictReco
     unique_dest = {f.normalized_value or f.raw_value for f in dests}
     if len(amounts) >= 2 and len({f.normalized_value for f in amounts if f.normalized_value}) > 1:
         amount_evid_ids = {f.source_evidence_id for f in amounts}
-        if len(unique_dest) == 1 and len(amount_evid_ids) > 1:
+        if len(unique_dest) <= 1 and len(amount_evid_ids) > 1:
             # check if not already flagged per-evidence
             if not any(c.type == ConflictType.VALUE_MISMATCH for c in conflicts):
                 conflicts.append(

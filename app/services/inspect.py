@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.domain.models import Criticality, EvidenceKind, EvidenceStatus, FactRecord, FactType, ReviewStatus
 from app.domain.policies import sha256_text
-from app.domain.states import State
+from app.domain.states import Route, State
 from app.hermes.model import extract_with_model
 from app.infrastructure.repositories import (
     ActionRepository,
@@ -261,7 +261,12 @@ class InspectService:
         elif case.state == State.REVIEW_REQUIRED:
             from app.domain.policies import blocking_conflicts_open, critical_facts_reviewed
 
-            if not blocking_conflicts_open(detected) and critical_facts_reviewed(facts):
+            has_incident_fact = any(
+                fact.criticality == Criticality.CRITICAL and fact.review_status != ReviewStatus.REJECTED
+                for fact in facts
+            )
+            can_advance = case.route != Route.POST_INCIDENT_RESPONSE or has_incident_fact
+            if can_advance and not blocking_conflicts_open(detected) and critical_facts_reviewed(facts):
                 self.actions.replace_for_case(case_id, actions_for_route(case_id, case.route, facts))
                 self.cases.set_state(case, State.READY_FOR_ACTION, event_type="READY_FOR_ACTION")
             else:

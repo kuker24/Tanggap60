@@ -14,9 +14,9 @@ from app.agent.context import build_agent_context
 from app.agent.formatting import mask_account
 from app.infrastructure.repositories import EvidenceRepository, FactRepository
 
-NOT_AVAILABLE = "Belum tersedia — isi sendiri"
+NOT_AVAILABLE = "Belum tersedia. Isi sendiri."
 
-UNCONFIRMED = "Belum tersedia — perlu dikonfirmasi dulu"
+UNCONFIRMED = "Belum tersedia. Perlu dicek dulu."
 
 
 def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> dict[str, Any]:
@@ -59,15 +59,16 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
                 "date": date or UNCONFIRMED,
                 "time": time or UNCONFIRMED,
                 "unit_id": unit["unit_id"],
+                "ready_to_copy": unit["mapping_status"] == "COMPLETE",
             }
         )
 
     chronology: list[str] = []
-    for index, tx in enumerate(transactions, start=1):
-        if tx["amount"] == UNCONFIRMED:
+    for tx in transactions:
+        if not tx["ready_to_copy"] or tx["amount"] == UNCONFIRMED:
             continue
         when = f"pada {tx['date']} {tx['time']}".strip() if tx["date"] != UNCONFIRMED else "(waktu perlu dikonfirmasi)"
-        chronology.append(f"{index}. Transfer {tx['amount']} ke rekening {tx['destination_account']} {when}.".strip())
+        chronology.append(f"Transfer {tx['amount']} ke rekening {tx['destination_account']} {when}.".strip())
 
     evidence_refs = sorted({evidence_names.get(eid, eid) for u in complete for eid in u["evidence_ids"]})
     # Taksonomi jelas:
@@ -81,9 +82,9 @@ def prepare_workspace(db: Any, case_id: str, mask_destination: bool = False) -> 
     )
     checklist = [
         {
-            "item": "Transaksi teridentifikasi",
+            "item": "Transaksi ditemukan",
             "done": identified_count > 0,
-            "detail": f"{identified_count} transaksi teridentifikasi ({complete_count} terkonfirmasi lengkap)",
+            "detail": f"{identified_count} transaksi ditemukan. {complete_count} datanya lengkap",
         },
         {"item": "Jumlah uang jelas", "done": all(t["amount"] != UNCONFIRMED for t in transactions), "detail": ""},
         {"item": "Waktu jelas", "done": all(t["date"] != UNCONFIRMED for t in transactions), "detail": ""},

@@ -5,8 +5,14 @@ import re
 _UNIT_RE = re.compile(r"\b(?:Unit\s+)?ru_[0-9a-f]+\b", re.I)
 _ID_RE = re.compile(r"\b(?:ev|fact|conf|tx|act|art|case)-[0-9a-f]+\b", re.I)
 _SPACE_RE = re.compile(r"\s+")
+# Stripping an id can leave a preposition pointing at nothing ("... karena X pada .").
+_DANGLING_RE = re.compile(r"\s+(?:pada|di|ke|untuk|dari)\s*(?=[.,;:]|$)", re.I)
 _JARGON = (
     ("AMBIGUOUS_MAPPING", "transaksi yang belum terpasang"),
+    ("paket terverifikasi", "dokumen yang sudah diperiksa"),
+    ("Paket terverifikasi", "Dokumen yang sudah diperiksa"),
+    ("artefak", "file"),
+    ("Artefak", "File"),
     ("SHA-256", "kode cek apakah file berubah"),
     ("Reporting Unit", "Transaksi"),
     ("reporting unit", "transaksi"),
@@ -62,9 +68,9 @@ _TABLES: dict[str, dict[str, str]] = {
         "REVIEW_REQUIRED": "Siap dicek",
         "READY_FOR_ACTION": "Menyusun langkah",
         "WAITING_APPROVAL": "Menunggu persetujuan Anda",
-        "GENERATING": "Membuat paket",
-        "VERIFYING": "Memeriksa paket",
-        "HANDOFF_READY": "Paket siap",
+        "GENERATING": "Membuat dokumen",
+        "VERIFYING": "Memeriksa dokumen",
+        "HANDOFF_READY": "Dokumen siap",
         "RECEIPT_RECORDED": "Nomor tercatat",
         "COMPLETE": "Selesai",
         "FAILED_SAFE": "Perlu isi manual",
@@ -76,9 +82,9 @@ _TABLES: dict[str, dict[str, str]] = {
         "validate_case_facts": "Menyusun data",
         "assess_handoff_readiness": "Cek kelengkapan",
         "compile_action_plan": "Menyusun langkah",
-        "compile_artifacts": "Menyiapkan paket",
-        "verify_artifacts": "Memeriksa paket",
-        "prepare_official_handoff": "Menyiapkan paket",
+        "compile_artifacts": "Menyiapkan dokumen",
+        "verify_artifacts": "Memeriksa dokumen",
+        "prepare_official_handoff": "Menyiapkan dokumen",
         "record_official_receipt": "Mencatat nomor",
         "purge_case": "Menghapus data",
         "resolve_unit_mapping": "Memasangkan transaksi",
@@ -142,7 +148,8 @@ def soften(value: object) -> str:
     text = _ID_RE.sub("", text)
     for src, dst in _JARGON:
         text = text.replace(src, dst)
-    text = _SPACE_RE.sub(" ", text).strip(" —–-")
+    text = _SPACE_RE.sub(" ", text)
+    text = _DANGLING_RE.sub("", text).strip(" —–-")
     if text:
         text = text[0].upper() + text[1:]
     return text

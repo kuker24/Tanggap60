@@ -43,7 +43,7 @@ def test_buat_paket_form_is_clickable(client: TestClient, ocr: ScriptedOcr) -> N
     snap = draft.json()["snapshot_hash"]
     page = client.get(f"/cases/{case_id}/approval")
     assert page.status_code == 200
-    assert ">Buat paket</button>" in page.text
+    assert ">Buat dokumen</button>" in page.text
     assert 'id="go" disabled' not in page.text
     denied = client.post(
         f"/cases/{case_id}/approval",

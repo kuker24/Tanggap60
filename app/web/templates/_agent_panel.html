@@ -1,21 +1,25 @@
-<section id="agent-panel" role="dialog" aria-label="Pendamping Tanggap60" aria-modal="false" hidden>
+<section id="agent-panel" role="dialog" aria-label="Bantuan Tanggap60" aria-modal="false" hidden>
   <header class="agent-head">
     <div>
-      <strong>Pendamping Tanggap60</strong>
+      <strong>Bantuan Tanggap60</strong>
       <span class="agent-status" id="agent-status" role="status">Siap membantu</span>
     </div>
     <div class="agent-head-actions">
+      <label class="agent-auto" for="agent-autopilot">
+        <input id="agent-autopilot" type="checkbox">
+        Panduan langsung
+      </label>
       <button id="agent-close" type="button" class="btn-text" aria-label="Tutup bantuan">Tutup</button>
     </div>
   </header>
-  <div id="agent-messages" aria-live="polite" aria-label="Percakapan dengan pendamping"></div>
+  <div id="agent-messages" aria-live="polite" aria-label="Percakapan dengan bantuan Tanggap60"></div>
   <div id="agent-quick" class="agent-quick" aria-label="Aksi cepat"></div>
   <form id="agent-form" autocomplete="off">
     <button id="agent-mic" type="button" hidden aria-label="Bicara dengan Tanggap60">Mic</button>
-    <label class="sr" for="agent-input">Tulis pesan untuk pendamping</label>
+    <label class="sr" for="agent-input">Tulis pesan untuk bantuan Tanggap60</label>
     <input id="agent-input" type="text" placeholder="Tulis pesan…" maxlength="2000">
     <button id="agent-send" type="submit">Kirim</button>
   </form>
-  <p class="agent-note">Jangan masukkan kata sandi, OTP, PIN, atau captcha di sini. Isi data itu hanya di situs resmi.</p>
+  <p class="agent-note">Jangan kirim kata sandi, OTP, PIN, atau kode “Saya bukan robot”.</p>
 </section>
 <div id="agent-toast" role="status" aria-live="polite"></div>

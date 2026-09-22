@@ -30,7 +30,7 @@ def test_t01_t04_hero(client: TestClient, ocr: ScriptedOcr) -> None:
     locators = [f["source_locator"] for f in client.get(f"/api/v1/cases/{case_id}/facts").json()["facts"]]
     assert all(locators) and any(str(loc).startswith("p") for loc in locators)
     html = client.get(f"/cases/{case_id}/review").text
-    assert "Pakai" in html
+    assert "Mana yang benar?" in html
     assert "2.500.000" in html or "Rp2.500.000" in html
     approval = client.post(
         f"/api/v1/cases/{case_id}/approval",

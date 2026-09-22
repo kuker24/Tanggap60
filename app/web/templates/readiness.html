@@ -1,96 +1,168 @@
 {% extends "base.html" %}
 {% from "_stepper.html" import stepper %}
-{% block title %}Yang perlu Anda lakukan — Tanggap60{% endblock %}
+{% block title %}Langkah berikutnya — Tanggap60{% endblock %}
 {% block stepper %}{{ stepper(4, "Langkah 4 dari 4: Bertindak", progress) }}{% endblock %}
 {% block content %}
-<h1>Yang perlu Anda lakukan</h1>
-<p class="lede">Satu hal dalam satu waktu. Mulai dari yang paling atas.</p>
+<header class="rescue-header">
+  <span class="status-pill warn"><span class="status-dot"></span>{{ golden_window.band }}</span>
+  <h1>Yang paling penting sekarang</h1>
+  <p class="lede">Satu tindakan paling bernilai berdasarkan fakta yang sudah Anda tinjau.</p>
+</header>
+<section class="golden-window" data-guide-id="golden-window">
+  <p class="eyebrow">{{ golden_window.scope }}</p>
+  <h2>{{ golden_window.action }}</h2>
+  <p>{{ golden_window.reason }}</p>
+  <p class="window-timing">{{ golden_window.timing }}</p>
+</section>
 
-{% if next_view %}
-<div class="next-card" id="lakukan" data-guide-id="next-best-action">
-  <h3>Lakukan sekarang: {{ next_view.label }}</h3>
-  {% if next_view.reason %}<p class="muted small">{{ next_view.reason }}</p>{% endif %}
-</div>
-{% endif %}
-
-{% if tx_cards %}
-<h2 id="transaksi" class="muted small" style="margin-top:8px" data-guide-id="transaction-list">Transaksi Anda</h2>
-{% for tx in tx_cards %}
-<article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
-  <div class="tx-top">
-    <h3>Transaksi {{ tx.n }}</h3>
-    {% if not tx.ready %}<p class="tx-when">Perlu dilengkapi</p>{% endif %}
+{% if golden_window.bank_call and golden_window.bank_call.has_data %}
+<section class="emergency-call-card" data-guide-id="emergency-bank-call">
+  <div class="emergency-call-head">
+    <span class="status-pill warn"><span class="status-dot"></span>Tindakan Cepat 60 Detik</span>
+    <h2>Panggil Hotline {{ golden_window.bank_call.bank_name }}</h2>
+    <p class="emergency-subtitle">Minta pembekuan sementara (temporary freeze) rekening penampung sebelum dana ditarik pelaku.</p>
   </div>
-  {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
-  {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">→ {{ tx.dest }}</p>{% endif %}
-  {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
-  {% if tx.missing_review %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_review %}
-    <li>{{ m }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if tx.missing_evidence %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_evidence %}
-    <li>{{ m }}</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-  {% if tx.missing_info %}
-  <ul class="tx-missing">
-    {% for m in tx.missing_info %}
-    <li>{{ m }} (tidak menghentikan — bisa dilengkapi di situs resmi)</li>
-    {% endfor %}
-  </ul>
-  {% endif %}
-</article>
-{% endfor %}
+
+  <div class="emergency-hotline-row">
+    <a class="btn ember hotline-btn" href="tel:{{ golden_window.bank_call.hotline_tel }}">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      Telepon {{ golden_window.bank_call.hotline }}
+    </a>
+    <span class="hotline-badge">Hotline Resmi 24 Jam</span>
+  </div>
+
+  <div class="call-script-box">
+    <div class="script-head">
+      <span class="script-title">Skrip Bacaan 30 Detik (Baca ini saat tersambung ke CS):</span>
+      <button type="button" class="btn ghost btn-sm" id="btn-copy-call-script">
+        Salin Skrip
+      </button>
+    </div>
+    <div class="script-content" id="bank-call-script-text">{{ golden_window.bank_call.script_text }}</div>
+    <div class="script-quick-facts">
+      <span><b>Rekening Tujuan:</b> <code>{{ golden_window.bank_call.destination_account }}</code></span>
+      <span><b>Nama Penerima:</b> {{ golden_window.bank_call.destination_name }}</span>
+      <span><b>Nominal:</b> {{ golden_window.bank_call.amount }}</span>
+    </div>
+    <p class="muted small" id="call-script-copied" style="display:none; color: var(--amber); margin-top: 8px; font-weight: 500;">✓ Skrip berhasil disalin ke papan klip!</p>
+  </div>
+</section>
 {% endif %}
 
 {% if gap_tasks %}
-<div class="gap-tasks" data-guide-id="readiness-summary">
-{% for task in gap_tasks %}
-<article class="card" id="task-{{ task.key }}">
-  <h3>{{ task.title }}</h3>
-  <ul class="gaps">
-    {% for item in task.points %}
-    <li>{{ item }}</li>
-    {% endfor %}
+{% set task = gap_tasks[0] %}
+<h2 class="section-title">Lakukan ini sekarang</h2>
+<section class="next-card" id="lakukan" data-guide-id="next-best-action">
+  <h2>{{ task.title }}</h2>
+  <ul class="simple-list">
+    {% for item in task.points %}<li>{{ item }}</li>{% endfor %}
   </ul>
-  <div class="actions">
-    <a class="{% if loop.first %}btn ember{% else %}btn-text{% endif %}" href="{{ task.href }}">{{ task.cta }}</a>
-  </div>
-</article>
-{% endfor %}
+  <a class="btn ember" href="/{{ task.href.lstrip('/') }}">{{ task.cta }}</a>
+</section>
+{% if gap_tasks|length > 1 %}
+<details class="task-details" data-guide-id="readiness-summary">
+  <summary>Lihat langkah setelah ini</summary>
+  {% for later in gap_tasks[1:] %}<p><b>{{ later.title }}</b><br>{{ later.points[0] }}</p>{% endfor %}
+</details>
+{% endif %}
+{% elif next_view %}
+<h2 class="section-title">Lakukan ini sekarang</h2>
+<section class="next-card" id="lakukan" data-guide-id="next-best-action">
+  <h2>{{ next_view.label }}</h2>
+  {% if next_view.reason %}<p>{{ next_view.reason }}</p>{% endif %}
+  <p class="muted small">Gunakan nomor bank dari aplikasi, kartu, atau situs resminya.</p>
+</section>
+<p class="notice" data-guide-id="official-handoff">Data ini baru diperiksa oleh Tanggap60. Bank, IASC, atau polisi belum memeriksanya.</p>
+<div class="actions">
+  <a class="btn ember" href="/{{ primary.href.lstrip('/') }}">{{ primary.label }}</a>
+  {% if ready_count %}<a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Lihat data untuk disalin</a>{% endif %}
 </div>
+{% else %}
+<h2 class="section-title">Belum ada data</h2>
+<p class="lede">Kirim satu bukti untuk mulai.</p>
+<div class="actions"><a class="btn ember" href="/cases/{{ case.case_id }}/intake">Tambah bukti</a></div>
 {% endif %}
 
-{% if not tx_cards and not gap_tasks %}
-<div class="next-card">
-  <h3>Siap dibawa ke situs resmi</h3>
-  <p class="muted small">Unduh paket, lalu isi laporan di situs mereka.</p>
-</div>
-{% endif %}
+<details class="containment-card" data-guide-id="containment-safe-mode">
+  <summary>Belum yakin? Tetap amankan</summary>
+  <p>Anda tidak perlu memutuskan bahwa ini penipuan untuk menghentikan risiko tambahan.</p>
+  <ol class="simple-list containment-list">
+    {% for item in golden_window.checklist %}<li>{{ item }}</li>{% endfor %}
+  </ol>
+  <p class="muted small">Tanggap60 tidak memblokir akun, menghubungi lembaga, atau mengirim laporan secara otomatis.</p>
+</details>
+
+<section class="stress-check" data-guide-id="adversarial-readiness">
+  <div class="stress-head">
+    <div>
+      <p class="eyebrow">Stress-test paket</p>
+      <h2>Apakah data ini mungkin dipertanyakan?</h2>
+    </div>
+    {% if adversarial.passed %}<span class="status-pill info"><span class="status-dot"></span>Tidak ada celah utama</span>{% endif %}
+  </div>
+  {% if adversarial.findings %}
+  <p class="muted">Tanggap60 menemukan pertanyaan yang paling mungkin menghambat persiapan. Selesaikan yang berdampak terbesar lebih dahulu.</p>
+  <ol class="stress-list">
+    {% for finding in adversarial.findings %}
+    <li>
+      <b>{{ finding.question | soften }}</b>
+      <span>{{ finding.challenge | soften }}</span>
+    </li>
+    {% endfor %}
+  </ol>
+  {% if adversarial.remaining_count %}<p class="muted small">{{ adversarial.remaining_count }} pemeriksaan lain tetap tersimpan dalam ringkasan kesiapan.</p>{% endif %}
+  {% else %}
+  <p>Tidak ada data wajib yang hilang menurut profil kesiapan saat ini. Anda tetap perlu memeriksanya sebelum handoff.</p>
+  {% endif %}
+  <p class="muted small">{{ adversarial.disclaimer }}</p>
+</section>
 
 {% if tx_cards %}
-<div class="next-card" data-guide-id="official-handoff">
-  <h3>Bawa ke situs resmi</h3>
-  <ol class="plan">
-    <li>Unduh ringkasan PDF dari <a class="link" href="/cases/{{ case.case_id }}/artifacts">halaman paket</a>, lalu periksa isinya.</li>
-    <li>Buka situs resmi IASC.</li>
-    <li><a class="link" href="/cases/{{ case.case_id }}/workspace">Salin data dan kronologi</a>, isi identitas sendiri, lalu lampirkan bukti sesuai aturan formulir. Ringkasan tidak menggantikan bukti asli.</li>
-  </ol>
-  <p class="muted small">ZIP hanya arsip opsional. Buka aplikasi File atau folder Downloads (Unduhan), pilih ZIP, lalu Ekstrak. Tanggap60 tidak mengirim laporan.</p>
-</div>
+<details class="task-details transaction-details" data-guide-id="transaction-list">
+  <summary>Lihat rincian transaksi ({{ tx_cards|length }})</summary>
+  {% for tx in tx_cards %}
+  <article class="tx" id="tx-{{ tx.unit_id }}" data-guide-id="transaction-{{ tx.unit_id }}">
+    <div class="tx-top"><h3>Transaksi {{ tx.n }}</h3>{% if not tx.ready %}<span class="tx-when">Belum lengkap</span>{% endif %}</div>
+    {% if tx.amount %}<p class="tx-amount" data-guide-id="transaction-{{ tx.unit_id }}-amount">{{ tx.amount }}</p>{% endif %}
+    {% if tx.dest %}<p class="tx-route" data-guide-id="transaction-{{ tx.unit_id }}-destination">ke {{ tx.dest }}</p>{% endif %}
+    {% if tx.when %}<p class="tx-when" data-guide-id="transaction-{{ tx.unit_id }}-datetime">{{ tx.when }}</p>{% endif %}
+    {% set missing = tx.missing_review + tx.missing_evidence + tx.missing_info %}
+    {% if missing %}<ul class="tx-missing">{% for m in missing %}<li>{{ m }}</li>{% endfor %}</ul>{% endif %}
+  </article>
+  {% endfor %}
+</details>
 {% endif %}
-{% if not gap_tasks %}
-<div class="actions">
-  <a class="btn ember" href="{{ primary.href }}">{{ primary.label }}</a>
-  {% if ready_count %}
-  <a class="btn-text" href="/cases/{{ case.case_id }}/workspace" data-guide-id="workspace-open">Data untuk disalin ›</a>
-  {% endif %}
-</div>
-{% endif %}
+<script>
+(function() {
+  const btn = document.getElementById("btn-copy-call-script");
+  const scriptEl = document.getElementById("bank-call-script-text");
+  const copiedEl = document.getElementById("call-script-copied");
+  if (!btn || !scriptEl) return;
+  btn.addEventListener("click", async function() {
+    const text = scriptEl.textContent || "";
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      if (copiedEl) {
+        copiedEl.style.display = "block";
+        btn.textContent = "Tersalin ✓";
+        setTimeout(() => {
+          copiedEl.style.display = "none";
+          btn.textContent = "Salin Skrip";
+        }, 3000);
+      }
+    } catch (_) {
+      if (window._toast) window._toast("Salin manual: pilih teks di atas.", true);
+    }
+  });
+})();
+</script>
 {% endblock %}

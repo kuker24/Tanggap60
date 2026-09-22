@@ -11,7 +11,10 @@
   function renderFiles(list) {
     if (!fileList) return;
     fileList.innerHTML = "";
-    if (!list || !list.length) return;
+    if (!list || !list.length) {
+      updateEvidenceCount();
+      return;
+    }
     Array.from(list).forEach((f, i) => {
       const el = document.createElement("div");
       el.className = "file-chip";
@@ -24,6 +27,7 @@
       el.appendChild(rm);
       fileList.appendChild(el);
     });
+    updateEvidenceCount();
   }
   function removePending(index) {
     if (!filesInput || !filesInput.files) return;
@@ -32,60 +36,47 @@
     filesInput.files = dt.files;
     renderFiles(filesInput.files);
   }
-  function showTab(name) {
-    const steps = document.querySelectorAll(".coach-step");
-    if (!steps.length) return;
-    document.body.classList.add("coach-enabled");
-    steps.forEach((el) => {
-      const on = el.getAttribute("data-step") === name;
-      el.classList.toggle("is-on", on);
-      if (el.hasAttribute("role")) el.hidden = !on;
-    });
-    document.querySelectorAll(".intake-tabs [role='tab']").forEach((btn) => {
-      const on = btn.getAttribute("data-tab") === name;
-      btn.classList.toggle("is-on", on);
-      btn.setAttribute("aria-selected", on ? "true" : "false");
-      btn.tabIndex = on ? 0 : -1;
-    });
-    const dropEl = document.getElementById("drop");
-    if (dropEl) dropEl.classList.toggle("is-focus", name === "files");
+  function updateEvidenceCount() {
+    if (!submitBtn) return;
+    const text = (document.getElementById("text") || {}).value || "";
+    const url = (document.getElementById("url") || {}).value || "";
+    const fileCount = filesInput && filesInput.files ? filesInput.files.length : 0;
+    const count = fileCount + (String(text).trim() ? 1 : 0) + (String(url).trim() ? 1 : 0);
+    submitBtn.disabled = count === 0;
+    submitBtn.textContent = count ? "Periksa " + count + " bukti" : "Periksa bukti";
   }
   if (document.getElementById("intake-form")) {
-    const formEl = document.getElementById("intake-form");
-    showTab((formEl && formEl.getAttribute("data-default-tab")) || "files");
-    const tabs = Array.from(document.querySelectorAll(".intake-tabs [role='tab']"));
-    tabs.forEach((btn) => {
-      btn.addEventListener("click", () => showTab(btn.getAttribute("data-tab")));
-      btn.addEventListener("keydown", (ev) => {
-        const i = tabs.indexOf(btn);
-        let next = -1;
-        if (ev.key === "ArrowRight" || ev.key === "ArrowDown") next = (i + 1) % tabs.length;
-        else if (ev.key === "ArrowLeft" || ev.key === "ArrowUp") next = (i - 1 + tabs.length) % tabs.length;
-        else if (ev.key === "Home") next = 0;
-        else if (ev.key === "End") next = tabs.length - 1;
-        else return;
-        ev.preventDefault();
-        tabs[next].focus();
-        showTab(tabs[next].getAttribute("data-tab"));
+    document.body.classList.add("composer-enabled");
+    document.querySelectorAll("[data-input-toggle]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const name = btn.getAttribute("data-input-toggle");
+        const panel = document.querySelector('[data-input-panel="' + name + '"]');
+        if (!panel) return;
+        const open = !panel.classList.contains("is-open");
+        panel.classList.toggle("is-open", open);
+        btn.classList.toggle("is-open", open);
+        btn.setAttribute("aria-expanded", open ? "true" : "false");
+        if (open) {
+          const input = panel.querySelector("input, textarea");
+          if (input) input.focus();
+        }
       });
     });
-    const pickFiles = document.getElementById("pick-files");
-    if (pickFiles && filesInput) pickFiles.addEventListener("click", () => filesInput.click());
-    const addMore = document.getElementById("add-more");
-    if (addMore) addMore.addEventListener("click", () => {
-      showTab("files");
-      if (filesInput) filesInput.click();
+    [document.getElementById("text"), document.getElementById("url")].forEach((input) => {
+      if (!input) return;
+      input.addEventListener("input", () => {
+        const btn = document.querySelector('[data-input-toggle="' + input.id + '"]');
+        if (btn) btn.classList.toggle("is-filled", Boolean(String(input.value).trim()));
+        updateEvidenceCount();
+      });
     });
+    updateEvidenceCount();
   }
   if (filesInput) filesInput.addEventListener("change", () => {
     renderFiles(filesInput.files);
-    if (filesInput.files && filesInput.files.length) showTab("files");
+    if (drop) drop.classList.toggle("is-filled", Boolean(filesInput.files && filesInput.files.length));
   });
   if (drop && filesInput) {
-    drop.addEventListener("click", (e) => {
-      if (e.target === filesInput) return;
-      filesInput.click();
-    });
     ["dragenter", "dragover"].forEach((ev) =>
       drop.addEventListener(ev, (e) => {
         e.preventDefault();
@@ -104,17 +95,11 @@
             return;
           }
           renderFiles(filesInput.files);
-          if (filesInput.files && filesInput.files.length) showTab("files");
+          drop.classList.toggle("is-filled", Boolean(filesInput.files && filesInput.files.length));
         }
         drop.classList.remove("drag");
       })
     );
-    drop.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") {
-        e.preventDefault();
-        filesInput.click();
-      }
-    });
   }
   if (form && submitBtn) {
     form.addEventListener("submit", (e) => {
@@ -123,11 +108,11 @@
       const hasFile = filesInput && filesInput.files && filesInput.files.length;
       if (!hasFile && !String(text).trim() && !String(url).trim()) {
         e.preventDefault();
-        window._toast("Isi dulu salah satu: foto, cerita, atau link.", true);
+        window._toast("Kirim foto, teks chat, atau link.", true);
         return;
       }
       submitBtn.disabled = true;
-      submitBtn.textContent = "Mengirim…";
+      submitBtn.textContent = "Memeriksa bukti…";
     });
   }
 
@@ -138,13 +123,13 @@
     REVIEW_REQUIRED: "Siap dicek",
     READY_FOR_ACTION: "Menyusun langkah…",
     WAITING_APPROVAL: "Menunggu persetujuan Anda…",
-    GENERATING: "Membuat paket…",
-    VERIFYING: "Memeriksa paket…",
-    HANDOFF_READY: "Paket siap",
-    FAILED_SAFE: "Perlu isi manual. Buka halaman koreksi.",
+    GENERATING: "Membuat dokumen…",
+    VERIFYING: "Memeriksa dokumen…",
+    HANDOFF_READY: "Dokumen siap",
+    FAILED_SAFE: "Bukti belum terbaca. Tulis datanya sendiri.",
   };
-  const FALLBACK = "Masih berjalan. Tunggu di halaman ini — pindah sendiri.";
-  const caseId = document.body.getAttribute("data-case");
+  const FALLBACK = "Masih berjalan. Tunggu di halaman ini. Halaman akan pindah sendiri.";
+  const caseId = document.body.getAttribute("data-case-id");
   const page = document.body.getAttribute("data-page");
   const waitKind = document.body.getAttribute("data-wait");
   let lastState = "";
@@ -174,7 +159,7 @@
         const el = document.createElement("div");
         el.className = "alert warning";
         el.setAttribute("role", "alert");
-        el.innerHTML = "<b>Pemeriksaan terlalu lama</b><p>Status tidak berubah. Muat ulang, atau isi data manual.</p>";
+        el.innerHTML = "<b>Pemeriksaan terlalu lama</b><p>Status tidak berubah. Muat ulang, atau tulis datanya sendiri.</p>";
         const row = document.createElement("div");
         row.className = "actions";
         const reload = document.createElement("button");
@@ -187,7 +172,7 @@
           const manual = document.createElement("a");
           manual.className = "btn ember";
           manual.href = "/cases/" + caseId + "/review";
-          manual.textContent = "Isi manual";
+          manual.textContent = "Tulis data";
           row.appendChild(manual);
         }
         el.appendChild(row);
@@ -223,7 +208,7 @@
     const b = document.createElement("b");
     b.textContent = "Koneksi terputus-putus";
     const p = document.createElement("p");
-    p.textContent = "Halaman tidak bisa mengecek status. Bukti Anda tetap tersimpan — tekan Coba lagi.";
+    p.textContent = "Halaman tidak bisa mengecek status. Bukti Anda tetap tersimpan. Tekan Coba lagi.";
     const row = document.createElement("div");
     row.className = "actions";
     const btn = document.createElement("button");
@@ -367,7 +352,7 @@
     if (ev && ev.preventDefault) ev.preventDefault();
     const id = document.body.getAttribute("data-case-id");
     if (!id) return false;
-    if (!confirm("Hapus semua data kasus ini? Foto, data, dan paket ikut hilang dan tidak bisa dikembalikan.")) return false;
+    if (!confirm("Hapus semua data kasus ini? Foto, data, dan dokumen ikut hilang dan tidak bisa dikembalikan.")) return false;
     let res;
     try {
       res = await fetch("/api/v1/cases/" + id, {
@@ -401,4 +386,60 @@
     }
     return false;
   };
+
+  document.querySelectorAll("form[data-confirm-message]").forEach((resetForm) => {
+    resetForm.addEventListener("submit", (event) => {
+      if (!confirm(resetForm.getAttribute("data-confirm-message"))) event.preventDefault();
+    });
+  });
+
+  const purgeForm = document.getElementById("purge-browser-form");
+  if (purgeForm) {
+    const purgeButton = purgeForm.querySelector('[type="submit"]');
+    if (purgeButton) purgeButton.disabled = false;
+    purgeForm.addEventListener("submit", window.t60Purge);
+  }
+
+  const handoffLink = document.querySelector("[data-handoff-opened]");
+  if (handoffLink && caseId) {
+    handoffLink.addEventListener("click", () => {
+      fetch("/api/v1/cases/" + caseId + "/handoff/opened", { method: "POST", keepalive: true }).catch(() => {});
+    });
+  }
+
+  const decision = document.getElementById("decision");
+  if (decision && caseId) {
+    const nextMessage = {
+      VERIFY_VIA_OFFICIAL_CHANNEL: "Langkah tepat. Buka situs atau kontak resmi secara mandiri, lalu tanyakan langsung apakah transaksi ini sah.",
+      CANCELLED_ACTION: "Keputusan bijak. Membatalkan transaksi yang meragukan adalah cara paling aman mencegah kerugian.",
+      PROCEED_BY_USER: "Pilihan dicatat. Tetap berhati-hati dan jangan pernah membagikan kode OTP, PIN, atau kata sandi kepada siapa pun.",
+    };
+    decision.addEventListener("click", async (event) => {
+      const target = event.target;
+      const button = target instanceof Element ? target.closest("[data-d]") : null;
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+      event.preventDefault();
+      const choice = button.getAttribute("data-d");
+      const buttons = document.querySelectorAll("#decision [data-d]");
+      const box = document.getElementById("decision-next");
+      if (!box || !choice) return;
+      buttons.forEach((item) => { item.disabled = true; });
+      box.hidden = false;
+      box.textContent = "Mencatat pilihan...";
+      try {
+        const response = await fetch("/api/v1/cases/" + caseId + "/decision", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ decision: choice }),
+        });
+        box.textContent = response.ok
+          ? "Pilihan tercatat. " + nextMessage[choice]
+          : "Pilihan belum tercatat. Coba tekan pilihan Anda lagi.";
+      } catch (_) {
+        box.textContent = "Koneksi terputus. Penyimpanan pilihan belum dapat dipastikan. Periksa koneksi, lalu tekan pilihan Anda lagi.";
+      } finally {
+        buttons.forEach((item) => { item.disabled = false; });
+      }
+    });
+  }
 })();

@@ -1,8 +1,10 @@
-# Tanggap60 — AI Digital Incident Rescue
+# SatuAman Tanggap60 — AI Golden Window Rescue
 
-Mengubah bukti digital berantakan menjadi **unit kasus yang dapat ditelusuri**, tindakan berikutnya, dan paket handoff terverifikasi.
+SatuAman adalah visi bantuan keselamatan digital satu pintu; **Tanggap60** adalah workflow yang dibangun untuk kompetisi ini. Setelah bagian ini, dokumen menyebut "Tanggap60".
 
-> Tanggap60 bukan scam detector. Ia membantu korban mengubah satu insiden digital menjadi unit kasus yang dapat ditelusuri, menunjukkan apa yang masih salah, lalu menentukan tindakan paling berguna berikutnya sebelum korban berpindah ke kanal resmi.
+Mengubah bukti digital berantakan menjadi **satu tindakan paling bernilai**, unit kasus yang dapat ditelusuri, dan paket handoff terverifikasi.
+
+> Tanggap60 bukan scam detector. Golden Window membantu korban, termasuk yang belum yakin sedang ditipu, mengamankan risiko terlebih dahulu, melihat alasan di balik prioritas, menguji celah paket, lalu berpindah sendiri ke kanal resmi.
 
 Benang merah: `ONE INCIDENT → EVIDENCE → VERIFIED FACTS → REPORTING UNITS → GAPS → NEXT BEST ACTION → UNIT READINESS → HUMAN APPROVAL → VERIFIED HANDOFF PACK`.
 
@@ -41,4 +43,3 @@ sudo RELEASE_SHA=<40-hex-commit> ./scripts/bootstrap_vps.sh
 Jangan clone tanpa pin SHA. Default `main` hanya valid setelah tag `competition-final`.
 
 Tanpa IP publik: `sudo ENABLE_TUNNEL=1 ./scripts/bootstrap_vps.sh`.
-

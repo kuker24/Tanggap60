@@ -13,6 +13,7 @@ from app.domain.states import DeclaredCondition, Mode, State
 from app.infrastructure.repositories import (
     ActionRepository,
     ArtifactRepository,
+    CaseRepository,
     ConflictRepository,
     EvidenceRepository,
     FactRepository,
@@ -20,6 +21,7 @@ from app.infrastructure.repositories import (
     UnitMappingRepository,
 )
 from app.services.ids import new_id
+from app.services.urlcheck import analyze_url
 from app.web.labels import human, soften
 
 web = APIRouter()
@@ -45,6 +47,12 @@ def _svc(request: Request) -> dict:
     return services_from(request.state.db, request.app.state.container)
 
 
+def _needs_incident_evidence(case, facts) -> bool:
+    return case.route.value == "POST_INCIDENT_RESPONSE" and not any(
+        fact.criticality.value == "CRITICAL" and fact.review_status.value != "REJECTED" for fact in facts
+    )
+
+
 def _progress(db, case) -> dict:
     evidence = EvidenceRepository(db).list_for_case(case.case_id)
     facts = FactRepository(db).list_for_case(case.case_id)
@@ -59,20 +67,50 @@ def _progress(db, case) -> dict:
         State.RECEIPT_RECORDED,
         State.COMPLETE,
     }
+    has_facts = bool(facts)
+    periksa_done = has_evidence and (
+        past_ingest
+        or has_facts
+        or st in {State.REVIEW_REQUIRED, State.READY_FOR_ACTION}
+        or packaged
+    )
     return {
         "bukti": has_evidence,
-        "periksa": has_evidence and past_ingest,
-        "konfirmasi": packaged or (bool(facts) and past_extract and st != State.REVIEW_REQUIRED),
+        "periksa": periksa_done,
+        "konfirmasi": packaged or (has_facts and past_extract and st != State.REVIEW_REQUIRED),
         "bertindak": packaged,
         "has_evidence": has_evidence,
-        "has_facts": bool(facts),
+        "has_facts": has_facts,
     }
+
+
+def _retention_label(seconds: int) -> str:
+    """Human retention window in Indonesian; never claims a shorter window than configured."""
+    minutes = max(1, int(seconds // 60))
+    if minutes <= 60:
+        return f"{minutes} menit"
+    hours = minutes // 60
+    if hours < 24:
+        return f"{hours} jam"
+    days = hours // 24
+    return f"{days} hari"
+
+
+def _case_retention(case) -> dict[str, str]:
+    total = int((case.expires_at - case.created_at).total_seconds())
+    return {"window": _retention_label(total)}
 
 
 def _case_page(request: Request, template: str, case, status_code: int = 200, **ctx):
     return TEMPLATES.TemplateResponse(
+        request,
         template,
-        {"request": request, "case": case, "progress": _progress(request.state.db, case), **ctx},
+        context={
+            "case": case,
+            "progress": _progress(request.state.db, case),
+            "retention": _case_retention(case),
+            **ctx,
+        },
         status_code=status_code,
     )
 
@@ -87,17 +125,23 @@ def _primary_cta(
     ready_count: int,
 ) -> dict[str, str]:
     if has_blocking or has_ambiguous:
-        return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+        return {"label": "Pastikan data", "href": f"/cases/{case_id}/review"}
     if not has_tx:
-        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+        return {"label": "Tambah bukti", "href": f"/cases/{case_id}/intake"}
     if needs_evidence:
-        return {"label": "Periksa bukti", "href": f"/cases/{case_id}/intake"}
+        return {"label": "Tambah bukti", "href": f"/cases/{case_id}/intake"}
     if ready_count:
-        return {"label": "Buat paket", "href": f"/cases/{case_id}/approval"}
-    return {"label": "Konfirmasi data", "href": f"/cases/{case_id}/review"}
+        return {"label": "Siapkan data untuk bank", "href": f"/cases/{case_id}/approval"}
+    return {"label": "Pastikan data", "href": f"/cases/{case_id}/review"}
 
 
-def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has_evidence: bool = False) -> list[dict]:
+def _gap_tasks(
+    case_id: str,
+    units_report: dict | None,
+    has_ambiguous: bool,
+    has_evidence: bool = False,
+    has_pending_review: bool = False,
+) -> list[dict]:
     units = (units_report or {}).get("units") or []
     if not units:
         if not has_evidence:
@@ -105,18 +149,28 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
                 {
                     "key": "bukti",
                     "title": "Belum ada data untuk diperiksa",
-                    "points": ["Kirim foto transfer, chat, atau link yang memuat jumlah uang, rekening, dan waktu."],
+                    "points": ["Kirim foto transfer atau chat yang memuat jumlah uang dan rekening."],
                     "href": f"/cases/{case_id}/intake",
-                    "cta": "Periksa bukti",
+                    "cta": "Tambah bukti",
+                }
+            ]
+        if has_pending_review:
+            return [
+                {
+                    "key": "konfirm",
+                    "title": "Pastikan data",
+                    "points": ["Ada data yang perlu Anda cek sebelum membuat dokumen."],
+                    "href": f"/cases/{case_id}/review",
+                    "cta": "Pastikan data",
                 }
             ]
         return [
             {
-                "key": "konfirm",
-                "title": "Konfirmasi data",
-                "points": ["Ada data yang perlu Anda periksa sebelum dokumen dibuat."],
-                "href": f"/cases/{case_id}/review",
-                "cta": "Konfirmasi data",
+                "key": "bukti",
+                "title": "Tambah bukti transaksi",
+                "points": ["Bukti awal sudah tersimpan. Sekarang kirim bukti transfer atau teks chat."],
+                "href": f"/cases/{case_id}/intake?notice=butuh-transaksi",
+                "cta": "Tambah bukti",
             }
         ]
 
@@ -134,6 +188,11 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
         text = soften(item.get("action") or item.get("label") or "")
         cid = str(item.get("check_id") or "")
         if "EVIDENCE" in cid or "COMMUNICATION" in cid or "PROVENANCE" in cid:
+            lowered = text.lower()
+            if "transfer" in lowered:
+                text = "Kirim foto bukti transfer jika ada."
+            elif "chat" in lowered or "komunikasi" in lowered:
+                text = "Kirim foto chat atau percakapan jika ada."
             add(bukti, text)
         elif item.get("blocking") or item.get("status") == "CONFLICT" or any(
             key in cid for key in ("AMOUNT", "DATETIME", "DESTINATION", "MAPPING", "REVIEW")
@@ -156,30 +215,30 @@ def _gap_tasks(case_id: str, units_report: dict | None, has_ambiguous: bool, has
         tasks.append(
             {
                 "key": "bukti",
-                "title": "Lengkapi bukti",
+                "title": "Tambah bukti",
                 "points": bukti[:3],
                 "href": f"/cases/{case_id}/intake",
-                "cta": "Periksa bukti",
+                "cta": "Tambah bukti",
             }
         )
     if konfirm:
         tasks.append(
             {
                 "key": "konfirm",
-                "title": "Konfirmasi data",
+                "title": "Pastikan data",
                 "points": konfirm[:3],
                 "href": f"/cases/{case_id}/review",
-                "cta": "Konfirmasi data",
+                "cta": "Pastikan data",
             }
         )
     if dokumen and len(tasks) < 3:
         tasks.append(
             {
                 "key": "dokumen",
-                "title": "Siapkan dokumen",
+                "title": "Buat dokumen",
                 "points": dokumen[:3],
                 "href": f"/cases/{case_id}/approval",
-                "cta": "Buat paket",
+                "cta": "Buat dokumen",
             }
         )
     return tasks[:3]
@@ -294,7 +353,15 @@ def favicon():
 
 @web.get("/")
 def home(request: Request):
-    return TEMPLATES.TemplateResponse("home.html", {"request": request, "title": "Tanggap60"})
+    settings = request.app.state.container.settings
+    return TEMPLATES.TemplateResponse(
+        request,
+        "home.html",
+        context={
+            "title": "SatuAman Tanggap60",
+            "retention": {"window": _retention_label(settings.demo_ttl_seconds)},
+        },
+    )
 
 
 @web.post("/start")
@@ -329,10 +396,10 @@ def intake(case_id: str, request: Request):
 
 _FILE_ERROR_TEXT = (
     ("tipe berkas tidak diizinkan", "File itu tidak bisa dipakai. Pakai foto (JPG/PNG) atau PDF."),
-    ("PDF lebih dari 20 halaman", "PDF-nya kepanjangan (maks 20 halaman). Kirim halaman yang penting saja."),
-    ("gambar melebihi batas piksel", "Fotonya kegedean. Coba foto dengan resolusi lebih kecil."),
-    ("maksimal 8 berkas", "Kebanyakan. Maksimal 8 file — hapus dulu yang tidak perlu."),
-    ("melebihi 25 MB", "Kegedean. Total file maksimal 25 MB — coba foto yang lebih kecil."),
+    ("PDF lebih dari 20 halaman", "PDF maksimal 20 halaman. Kirim halaman yang penting saja."),
+    ("gambar melebihi batas piksel", "Ukuran foto terlalu besar. Pilih foto yang lebih kecil."),
+    ("maksimal 8 berkas", "Maksimal 8 file. Hapus file yang tidak perlu."),
+    ("melebihi 25 MB", "Total file maksimal 25 MB. Pilih file yang lebih kecil."),
 )
 
 
@@ -350,6 +417,11 @@ async def intake_submit(case_id: str, request: Request):
     files = form.getlist("files")
     text = str(form.get("text") or "").strip()
     url = str(form.get("url") or "").strip()
+    load_fixture = str(form.get("load_fixture") or "").strip()
+    if load_fixture == "two_amounts" and not text:
+        from tests.hero_support import CHAT, TRANSFER
+
+        text = f"{TRANSFER}\n{CHAT}"
     has_file = any(getattr(upload, "filename", None) for upload in files)
     if not has_file and not text and not url:
         return RedirectResponse(f"/cases/{case_id}/intake?notice=kosong", status_code=303)
@@ -365,6 +437,16 @@ async def intake_submit(case_id: str, request: Request):
             intake.add_text(case_id, _sid(request), text)
         if url:
             intake.add_url(case_id, _sid(request), url)
+        case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+        if case.mode == Mode.DEMO:
+            inspect = _svc(request)["inspect"]
+            try:
+                inspect.inspect_evidence(case_id)
+                inspect.extract_candidate_facts(case_id)
+                inspect.validate_case_facts(case_id)
+                request.state.db.commit()
+            except Exception:
+                request.state.db.rollback()
     except AppError as exc:
         case = _svc(request)["cases"].get_owned(case_id, _sid(request))
         evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -459,10 +541,34 @@ def processing(case_id: str, request: Request):
     return _case_page(request, "processing.html", case, has_evidence=has_evidence)
 
 
+@web.get("/cases/{case_id}/confirm")
+def confirm_alias(case_id: str):
+    return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+
+
+@web.get("/cases/{case_id}/act")
+def act_alias(case_id: str):
+    return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
+
+
 @web.get("/cases/{case_id}/review")
 def review(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
+    if evidence and case.state in {State.INGESTING, State.EXTRACTING}:
+        inspect = _svc(request)["inspect"]
+        try:
+            if case.state == State.INGESTING:
+                inspect.inspect_evidence(case_id)
+            if case.state in {State.INGESTING, State.EXTRACTING}:
+                inspect.extract_candidate_facts(case_id)
+                inspect.validate_case_facts(case_id)
+            request.state.db.commit()
+            case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+        except Exception:
+            request.state.db.rollback()
     facts = FactRepository(request.state.db).list_for_case(case_id)
+    needs_incident_evidence = _needs_incident_evidence(case, facts)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
     facts_pub = [fact_public(f) for f in facts]
@@ -494,6 +600,7 @@ def review(case_id: str, request: Request):
         notice=request.query_params.get("notice", ""),
         pairing_key=new_id("pair"),
         evidence_kinds={e.evidence_id: e.kind.value for e in evidence},
+        needs_incident_evidence=needs_incident_evidence,
     )
 
 
@@ -550,6 +657,7 @@ def readiness_page(case_id: str, request: Request):
     from app.services.next_action import next_action_to_dict, recommend_next_action
     from app.services.readiness import assess_units
     from app.services.reporting_units import compile_reporting_units
+    from app.services.rescue import build_adversarial_checks, build_golden_window
 
     facts = FactRepository(request.state.db).list_for_case(case_id)
     evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -647,12 +755,26 @@ def readiness_page(case_id: str, request: Request):
                     has_blocking = True
     if not tx_cards:
         next_view = None
+    golden_window = build_golden_window(
+        facts=facts,
+        evidence=evidence,
+        conflicts=conflicts,
+        next_action=next_action,
+        units=units,
+    )
+    adversarial = build_adversarial_checks(units_report)
     return _case_page(
         request,
         "readiness.html",
         case,
         next_view=next_view,
-        gap_tasks=_gap_tasks(case_id, units_report, has_ambiguous, has_evidence=bool(evidence)),
+        gap_tasks=_gap_tasks(
+            case_id,
+            units_report,
+            has_ambiguous,
+            has_evidence=bool(evidence),
+            has_pending_review=any(f.review_status.value == "CANDIDATE" for f in facts),
+        ),
         tx_cards=tx_cards,
         has_blocking=has_blocking,
         needs_evidence=needs_evidence,
@@ -666,7 +788,27 @@ def readiness_page(case_id: str, request: Request):
             needs_evidence=needs_evidence,
             ready_count=ready_count,
         ),
+        golden_window=golden_window,
+        adversarial=adversarial,
     )
+
+
+@web.post("/cases/{case_id}/continue")
+def continue_case(case_id: str, request: Request):
+    case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    facts = FactRepository(request.state.db).list_for_case(case_id)
+    if case.state == State.REVIEW_REQUIRED and _needs_incident_evidence(case, facts):
+        return RedirectResponse(f"/cases/{case_id}/intake?notice=butuh-transaksi", status_code=303)
+    if case.state == State.REVIEW_REQUIRED:
+        _svc(request)["inspect"].validate_case_facts(case_id)
+        case = CaseRepository(request.state.db).get(case_id)
+    if case.state == State.READY_FOR_ACTION:
+        _svc(request)["orchestrator"].run_until_pause(case_id, new_id("run"))
+        case = CaseRepository(request.state.db).get(case_id)
+    if case.state == State.REVIEW_REQUIRED:
+        return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+    destination = "result" if case.route.value == "PRE_INCIDENT_CHECK" else "readiness"
+    return RedirectResponse(f"/cases/{case_id}/{destination}", status_code=303)
 
 
 @web.get("/cases/{case_id}/result")
@@ -677,12 +819,40 @@ def result(case_id: str, request: Request):
     if case.route.value != "PRE_INCIDENT_CHECK":
         return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
     actions = ActionRepository(request.state.db).list_for_case(case_id)
+    indicator_copy = {
+        "struktur_url": "Link tidak lengkap.",
+        "kredensial_di_url": "Link berisi nama pengguna atau kata sandi.",
+        "punycode": "Nama situs memakai tulisan yang dapat menyamarkan alamat.",
+        "alamat_lokal": "Link menuju alamat perangkat atau jaringan lokal.",
+        "port_tidak_valid": "Link memakai alamat yang tidak bisa dibaca.",
+        "port_tidak_lazim": "Link memakai alamat yang tidak biasa.",
+        "subdomain_berlebih": "Alamat situs sangat panjang dan bertingkat.",
+        "menyerupai_resmi": "Alamat terlihat resmi, tetapi bukan alamat resmi yang kami kenal.",
+        "bukan_domain_resmi": "Alamat memuat nama lembaga, tetapi bukan domain resminya.",
+    }
+    url_indicators: list[str] = []
+    for item in EvidenceRepository(request.state.db).list_for_case(case_id):
+        if item.kind.value != "URL" and item.mime != "text/uri-list":
+            continue
+        raw = request.app.state.container.storage.read_bytes(case_id, item.storage_key).decode("utf-8")
+        found, _ = analyze_url(raw)
+        for indicator in found:
+            text = indicator_copy.get(indicator.name, indicator.finding)
+            if text not in url_indicators:
+                url_indicators.append(text)
     digest = ""
     try:
         _, digest = _svc(request)["approval"].current_snapshot(case_id)
     except Exception:
         digest = ""
-    return _case_page(request, "result.html", case, actions=actions, snapshot_hash=digest)
+    return _case_page(
+        request,
+        "result.html",
+        case,
+        actions=actions,
+        snapshot_hash=digest,
+        url_indicators=url_indicators,
+    )
 
 
 @web.get("/cases/{case_id}/approval")
@@ -782,7 +952,6 @@ def download_pack(case_id: str, request: Request):
 def artifacts_page(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
     items = ArtifactRepository(request.state.db).list_for_case(case_id)
-    url = request.app.state.container.settings.official_iasc_url
     pub = [artifact_public(a) for a in items]
     summary = next(
         (
@@ -803,8 +972,6 @@ def artifacts_page(case_id: str, request: Request):
         summary=summary,
         rest=rest,
         pack=pack,
-        official_url=url,
-        domain="iasc.ojk.go.id",
     )
 
 

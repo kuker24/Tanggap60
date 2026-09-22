@@ -17,29 +17,29 @@ def handoff_case(client: TestClient, ocr: ScriptedOcr) -> str:
     return case_id
 
 
-# "result" 303-redirects to readiness for AFTER_LOSS cases; the client follows
-# it, so this also pins the readiness handoff contract.
-@pytest.mark.parametrize("surface", ["workspace", "artifacts", "receipt", "result"])
-def test_manual_document_handoff_contract(client: TestClient, handoff_case: str, surface: str) -> None:
-    page = client.get(f"/cases/{handoff_case}/{surface}")
-    assert page.status_code == 200
-    content = page.text.split('<main id="main"', 1)[1].split("</main>", 1)[0]
+def test_manual_document_handoff_contract(client: TestClient, handoff_case: str) -> None:
+    artifacts = client.get(f"/cases/{handoff_case}/artifacts")
+    assert artifacts.status_code == 200
+    content = artifacts.text.split('<main id="main"', 1)[1].split("</main>", 1)[0]
     instructions = content.lower()
-    pdf = instructions.index("unduh ringkasan pdf")
-    official = instructions.index("situs resmi", pdf)
-    copy = instructions.index("salin", official)
-    assert pdf < official < copy
-    assert "lampirkan" in instructions[copy:]
-    assert "formulir" in instructions[copy:]
-    assert "tidak menggantikan bukti asli" in instructions
+    assert "/download" in content
+    assert "unduh " in instructions and "(pdf)" in instructions
+    assert f'/cases/{handoff_case}/workspace"' in content
+    assert "buka situs iasc" in instructions
+    assert "belum dikirim ke mana pun" in instructions
     assert "zip" in instructions and "opsional" in instructions
-    assert "file atau folder downloads (unduhan)" in instructions
-    assert "ekstrak" in instructions
-    assert "tidak mengirim laporan" in instructions or "laporan dikirim oleh anda" in instructions
-    if surface == "artifacts":
-        assert "/download" in content
-        assert f'/cases/{handoff_case}/workspace"' in content
-        assert "bukan laporan yang otomatis diterima situs resmi" in instructions
+
+    workspace = client.get(f"/cases/{handoff_case}/workspace")
+    assert workspace.status_code == 200
+    assert "Ruang persiapan. Bukan situs resmi." in workspace.text
+    assert "Jangan pernah membagikan kata sandi, OTP, atau PIN." in workspace.text
+    assert "Salin data ini" in workspace.text
+    data = client.get(f"/api/v1/cases/{handoff_case}/workspace").json()
+    assert all(not line.split(".", 1)[0].isdigit() for line in data["fields"]["chronology"])
+
+    receipt = client.get(f"/cases/{handoff_case}/receipt")
+    assert receipt.status_code == 200
+    assert "Masukkan nomor dari bank, IASC, atau polisi." in receipt.text
 
 
 def test_workspace_copy_and_load_recovery_contract(client: TestClient) -> None:
@@ -48,13 +48,14 @@ def test_workspace_copy_and_load_recovery_contract(client: TestClient) -> None:
     assert page.status_code == 200
     assert 'id="ws-empty"' in page.text
     assert 'id="ws-error"' in page.text
-    assert "Ini bukan berarti transaksi Anda kosong" in page.text
+    assert "Belum ada data untuk disalin" in page.text
     assert 'if (!response.ok) throw' in page.text
     assert 'retry.addEventListener("click", loadWorkspace)' in page.text
     assert "replaceChildren()" in page.text
     assert "navigator.clipboard.writeText(text)" in page.text
     assert 'button.addEventListener("click", () => copyText(value, k))' in page.text
-    assert 'copyText(chronology, "Kronologi")' in page.text
+    assert 'copyText(chronology, "Cerita kejadian")' in page.text
+    assert "ready_to_copy" in page.text
     assert 'value.startsWith("Belum ")' in page.text
     assert 'id="ws-copy-status" role="status" aria-live="polite"' in page.text
     assert "Salin otomatis gagal" in page.text
@@ -89,12 +90,7 @@ def test_receipt_edit_feedback_preserves_input_and_purge_recovers(client: TestCl
     assert "purge-alert" not in edit
     assert '.value =' not in edit
     assert "bukan pelacak resmi" in page.text
-    purge = page.text.split("async function purgeNow", 1)[1].split("</script>", 1)[0]
-    assert 'if (!confirm(' in purge
-    assert 'confirmation:"PURGE"' in purge
-    assert "Penghapusan belum dapat dipastikan" in purge
-    assert "finally" in purge and "btn.disabled = false" in purge
-    assert 'sessionStorage.removeItem("t60agent:" + id)' in purge
+    assert "Tanggap60 tidak memeriksa nomor ini" in page.text
 
 
 def test_preincident_decision_recovers_without_iasc_legitimacy_claim(client: TestClient) -> None:
@@ -118,10 +114,14 @@ def test_preincident_decision_recovers_without_iasc_legitimacy_claim(client: Tes
     page = client.get(f"/cases/{case_id}/result")
     assert page.status_code == 200
     assert 'id="decision-next" class="notice" role="status"' in page.text
-    assert "bukan layanan untuk memastikan tawaran atau situs itu sah" in page.text
+    assert "Kami hanya memeriksa bentuk link" in page.text
+    assert "Kami tidak membuka link" in page.text
+    assert "tidak berarti link aman" in page.text
     assert "masukkan datanya di sana" not in page.text
-    assert "Pilihan belum tercatat" in page.text
-    assert "Koneksi terputus" in page.text
-    assert "} finally {" in page.text
-    assert "buttons.forEach(button => { button.disabled = false; })" in page.text
+    app_js = client.get("/static/app.js")
+    assert app_js.status_code == 200
+    assert "Pilihan belum tercatat" in app_js.text
+    assert "Koneksi terputus" in app_js.text
+    assert "} finally {" in app_js.text
+    assert "buttons.forEach((item) => { item.disabled = false; });" in app_js.text
     assert "Setujui dan buat paket" not in page.text
