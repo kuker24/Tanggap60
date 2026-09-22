@@ -16,8 +16,8 @@ if [[ -d /home/hermes/.hermes ]]; then
   chmod 0644 /home/hermes/.hermes/.managed
 fi
 
-# Hermes updates both files while the worker invokes the CLI.
-for file in state.db auth.json; do
+# Hermes updates both files and lockfiles while the worker invokes the CLI.
+for file in state.db auth.json auth.lock; do
   path="/home/hermes/.hermes/${file}"
   if [[ -f "${path}" ]]; then
     chown hermes:hermes "${path}" || true
@@ -25,7 +25,7 @@ for file in state.db auth.json; do
     setfacl -m u:tanggap60:rw- -m m::rw- "${path}" || true
   fi
 done
-for f in /home/hermes/.hermes/state.db*; do
+for f in /home/hermes/.hermes/*.lock /home/hermes/.hermes/state.db*; do
   if [[ -e "$f" ]]; then
     chmod 0660 "$f" || true
     setfacl -m u:tanggap60:rw- -m m::rw- "$f" || true
