@@ -67,13 +67,20 @@ def _progress(db, case) -> dict:
         State.RECEIPT_RECORDED,
         State.COMPLETE,
     }
+    has_facts = bool(facts)
+    periksa_done = has_evidence and (
+        past_ingest
+        or has_facts
+        or st in {State.REVIEW_REQUIRED, State.READY_FOR_ACTION}
+        or packaged
+    )
     return {
         "bukti": has_evidence,
-        "periksa": has_evidence and past_ingest,
-        "konfirmasi": packaged or (bool(facts) and past_extract and st != State.REVIEW_REQUIRED),
+        "periksa": periksa_done,
+        "konfirmasi": packaged or (has_facts and past_extract and st != State.REVIEW_REQUIRED),
         "bertindak": packaged,
         "has_evidence": has_evidence,
-        "has_facts": bool(facts),
+        "has_facts": has_facts,
     }
 
 
@@ -410,6 +417,11 @@ async def intake_submit(case_id: str, request: Request):
     files = form.getlist("files")
     text = str(form.get("text") or "").strip()
     url = str(form.get("url") or "").strip()
+    load_fixture = str(form.get("load_fixture") or "").strip()
+    if load_fixture == "two_amounts" and not text:
+        from tests.hero_support import CHAT, TRANSFER
+
+        text = f"{TRANSFER}\n{CHAT}"
     has_file = any(getattr(upload, "filename", None) for upload in files)
     if not has_file and not text and not url:
         return RedirectResponse(f"/cases/{case_id}/intake?notice=kosong", status_code=303)
@@ -425,6 +437,16 @@ async def intake_submit(case_id: str, request: Request):
             intake.add_text(case_id, _sid(request), text)
         if url:
             intake.add_url(case_id, _sid(request), url)
+        case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+        if case.mode == Mode.DEMO:
+            inspect = _svc(request)["inspect"]
+            try:
+                inspect.inspect_evidence(case_id)
+                inspect.extract_candidate_facts(case_id)
+                inspect.validate_case_facts(case_id)
+                request.state.db.commit()
+            except Exception:
+                request.state.db.rollback()
     except AppError as exc:
         case = _svc(request)["cases"].get_owned(case_id, _sid(request))
         evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
@@ -519,9 +541,32 @@ def processing(case_id: str, request: Request):
     return _case_page(request, "processing.html", case, has_evidence=has_evidence)
 
 
+@web.get("/cases/{case_id}/confirm")
+def confirm_alias(case_id: str):
+    return RedirectResponse(f"/cases/{case_id}/review", status_code=303)
+
+
+@web.get("/cases/{case_id}/act")
+def act_alias(case_id: str):
+    return RedirectResponse(f"/cases/{case_id}/readiness", status_code=303)
+
+
 @web.get("/cases/{case_id}/review")
 def review(case_id: str, request: Request):
     case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+    evidence = EvidenceRepository(request.state.db).list_for_case(case_id)
+    if evidence and case.state in {State.INGESTING, State.EXTRACTING}:
+        inspect = _svc(request)["inspect"]
+        try:
+            if case.state == State.INGESTING:
+                inspect.inspect_evidence(case_id)
+            if case.state in {State.INGESTING, State.EXTRACTING}:
+                inspect.extract_candidate_facts(case_id)
+                inspect.validate_case_facts(case_id)
+            request.state.db.commit()
+            case = _svc(request)["cases"].get_owned(case_id, _sid(request))
+        except Exception:
+            request.state.db.rollback()
     facts = FactRepository(request.state.db).list_for_case(case_id)
     needs_incident_evidence = _needs_incident_evidence(case, facts)
     conflicts = ConflictRepository(request.state.db).list_for_case(case_id)

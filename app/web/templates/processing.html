@@ -14,12 +14,17 @@
 <div class="wait-ring" aria-hidden="true"></div>
 {% endif %}
 <h1>Sedang membaca bukti</h1>
-<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Bukti sudah dibaca. Sekarang cek datanya.{% else %}<span class="pulse" aria-hidden="true"></span>Halaman akan lanjut sendiri.{% endif %}</p>
+<p class="lede status-line" id="state-live" aria-live="polite">{% if st == "REVIEW_REQUIRED" %}Bukti sudah dibaca. Sekarang cek datanya.{% elif st == "EXTRACTING" %}<span class="pulse" aria-hidden="true"></span>Mengekstrak data transaksi…{% else %}<span class="pulse" aria-hidden="true"></span>Membaca dokumen dan teks…{% endif %}</p>
 <ol class="timeline" aria-label="Tahapan membaca bukti" data-guide-id="processing-status">
   <li><span class="tl-dot {% if has_evidence %}ok{% else %}run{% endif %}" aria-hidden="true">{% if has_evidence %}✓{% else %}1{% endif %}</span><span class="tl-main"><b>Bukti masuk</b></span></li>
   <li><span class="tl-dot {% if not has_evidence %}{% elif st in ['NEW', 'INGESTING'] %}run{% else %}ok{% endif %}" aria-hidden="true">{% if not has_evidence %}2{% elif st in ['NEW', 'INGESTING'] %}…{% else %}✓{% endif %}</span><span class="tl-main"><b>Isi dibaca</b></span></li>
-  <li><span class="tl-dot {% if has_evidence and st == 'REVIEW_REQUIRED' %}ok{% endif %}" aria-hidden="true">{% if has_evidence and st == 'REVIEW_REQUIRED' %}✓{% else %}3{% endif %}</span><span class="tl-main"><b>Pertanyaan disiapkan</b></span></li>
+  <li><span class="tl-dot {% if has_evidence and st in ['REVIEW_REQUIRED', 'READY_FOR_ACTION'] %}ok{% elif st == 'EXTRACTING' %}run{% endif %}" aria-hidden="true">{% if has_evidence and st in ['REVIEW_REQUIRED', 'READY_FOR_ACTION'] %}✓{% elif st == 'EXTRACTING' %}…{% else %}3{% endif %}</span><span class="tl-main"><b>Pertanyaan disiapkan</b></span></li>
 </ol>
+<div class="actions proc-actions" id="proc-actions" style="margin-top:1.5rem">
+  <a class="btn {% if st == 'REVIEW_REQUIRED' %}ember{% else %}ghost{% endif %}" id="btn-to-review" href="/cases/{{ case.case_id }}/review">
+    {% if st == "REVIEW_REQUIRED" %}Periksa data sekarang →{% else %}Lanjut ke periksa data →{% endif %}
+  </a>
+</div>
 <details class="tech-lite" id="trace">
   <summary>Detail teknis</summary>
   <div class="tech-body" id="trace-body" data-case="{{ case.case_id }}">Memuat…</div>

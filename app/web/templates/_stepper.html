@@ -8,7 +8,7 @@
     {% for n, name in names %}
     {% if n == active %}
     <span role="listitem" class="step active" aria-current="step"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>
-    {% elif finished[n] %}
+    {% elif finished[n] or (p.get("has_evidence") and n < active and (n == 1 or (n == 2 and active >= 3))) %}
     <span role="listitem" class="step done"><i aria-hidden="true">✓</i> {{ name }}</span>
     {% elif n < active %}
     <span role="listitem" class="step skipped"><i aria-hidden="true">{{ n }}</i> {{ name }}</span>

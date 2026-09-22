@@ -65,3 +65,49 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "composer-enabled" in css.text
     assert ".btn-text" in css.text
     assert ".actions" in css.text
+
+
+def test_route_aliases_confirm_and_act(client: TestClient) -> None:
+    case_id = create_case(client)
+    res_confirm = client.get(f"/cases/{case_id}/confirm", follow_redirects=False)
+    assert res_confirm.status_code == 303
+    assert res_confirm.headers["location"].endswith(f"/cases/{case_id}/review")
+
+    res_act = client.get(f"/cases/{case_id}/act", follow_redirects=False)
+    assert res_act.status_code == 303
+    assert res_act.headers["location"].endswith(f"/cases/{case_id}/readiness")
+
+
+def test_demo_two_amounts_conflict_flow(client: TestClient) -> None:
+    # 1. Start DEMO case
+    started = client.post("/start", data={"declared_condition": "AFTER_LOSS", "mode": "DEMO"}, follow_redirects=False)
+    assert started.status_code == 303
+    case_url = started.headers["location"]
+    case_id = case_url.split("/cases/")[1].split("/")[0]
+
+    # 2. Intake with demo two amounts
+    intake_res = client.post(
+        f"/cases/{case_id}/intake",
+        data={"load_fixture": "two_amounts"},
+        follow_redirects=False,
+    )
+    assert intake_res.status_code == 303
+    assert intake_res.headers["location"].endswith(f"/cases/{case_id}/processing")
+
+    # 3. Processing page has real status and explicit button
+    proc_page = client.get(f"/cases/{case_id}/processing")
+    assert proc_page.status_code == 200
+    assert "btn-to-review" in proc_page.text
+
+    # 4. Review page immediately contains facts and conflict card
+    review_page = client.get(f"/cases/{case_id}/review")
+    assert review_page.status_code == 200
+    assert "Mana yang benar?" in review_page.text
+    assert "Rp2.750.000" in review_page.text
+    assert "Rp2.500.000" in review_page.text
+    assert "Belum ada data" not in review_page.text
+
+    # 5. Stepper: Step 2 (Periksa) is done (not skipped) when evidence exists
+    assert 'class="step skipped"><i aria-hidden="true">2</i> Periksa' not in review_page.text
+    assert 'Periksa' in review_page.text
+
