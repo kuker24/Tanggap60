@@ -351,7 +351,7 @@ def favicon():
     return RedirectResponse("/static/favicon.svg")
 
 
-@web.get("/")
+@web.api_route("/", methods=["GET", "HEAD"])
 def home(request: Request):
     settings = request.app.state.container.settings
     return TEMPLATES.TemplateResponse(
