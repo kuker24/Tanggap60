@@ -155,7 +155,14 @@ class IntakeService:
         self._reopen_for_new_evidence(case)
         return record
 
-    def add_text(self, case_id: str, session_id: str, text: str) -> EvidenceRecord:
+    def add_text(
+        self,
+        case_id: str,
+        session_id: str,
+        text: str,
+        *,
+        display_name: str | None = None,
+    ) -> EvidenceRecord:
         payload = text.encode("utf-8")
         if len(payload) > MAX_TEXT_BYTES:
             raise UploadLimitExceeded("teks terlalu panjang")
@@ -163,11 +170,12 @@ class IntakeService:
         self._assert_evidence_mutable_and_capacity(case, len(payload))
         storage_key = self.storage.new_key()
         self.storage.write_atomic(case_id, storage_key, payload)
+        label = (display_name or "cerita.txt").strip().replace("/", "").replace("\\", "")[:255] or "cerita.txt"
         record = EvidenceRecord(
             evidence_id=new_id("ev"),
             case_id=case_id,
             kind=EvidenceKind.TEXT,
-            original_name_display="cerita.txt",
+            original_name_display=label,
             storage_key=storage_key,
             mime="text/plain",
             size_bytes=len(payload),

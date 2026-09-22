@@ -418,12 +418,13 @@ async def intake_submit(case_id: str, request: Request):
     text = str(form.get("text") or "").strip()
     url = str(form.get("url") or "").strip()
     load_fixture = str(form.get("load_fixture") or "").strip()
+    fixture_parts: list[tuple[str, str]] = []
     if load_fixture == "two_amounts" and not text:
         from tests.hero_support import CHAT, TRANSFER
 
-        text = f"{TRANSFER}\n{CHAT}"
+        fixture_parts = [(TRANSFER, "struk"), (CHAT, "chat")]
     has_file = any(getattr(upload, "filename", None) for upload in files)
-    if not has_file and not text and not url:
+    if not has_file and not text and not url and not fixture_parts:
         return RedirectResponse(f"/cases/{case_id}/intake?notice=kosong", status_code=303)
     try:
         for upload in files:
@@ -433,6 +434,8 @@ async def intake_submit(case_id: str, request: Request):
                 data = await read_upload_limited(upload, request.app.state.container.settings.max_upload_bytes)
                 if data:
                     intake.upload_bytes(case_id, _sid(request), upload.filename, data)  # type: ignore[union-attr]
+        for body, label in fixture_parts:
+            intake.add_text(case_id, _sid(request), body, display_name=label)
         if text:
             intake.add_text(case_id, _sid(request), text)
         if url:

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi.testclient import TestClient
 
 from tests.hero_support import create_case
@@ -120,6 +122,16 @@ def test_demo_two_amounts_conflict_flow(client: TestClient) -> None:
     assert "Mana yang benar?" in review_page.text
     assert "Rp2.750.000" in review_page.text
     assert "Rp2.500.000" in review_page.text
+    assert "Dari struk" in review_page.text
+    assert "Dari chat" in review_page.text
+    assert "cerita.txt" not in review_page.text
+    sources = re.findall(
+        r"<b>(Rp[\d.]+)</b>.*?<span class=\"muted small\">(Dari [^<]+)</span>",
+        review_page.text,
+        re.S,
+    )
+    assert ("Rp2.750.000", "Dari struk") in sources
+    assert ("Rp2.500.000", "Dari chat") in sources
     assert "Belum ada data" not in review_page.text
 
     # 5. Stepper: Step 2 (Periksa) is done (not skipped) when evidence exists
