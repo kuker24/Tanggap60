@@ -52,18 +52,20 @@
       </button>
     </div>
 
+    {% if case.mode.value == "DEMO" %}
+    <div class="demo-fixture">
+      <p>Untuk demo: dua bukti dengan nominal berbeda.</p>
+      <button type="submit" name="load_fixture" value="two_amounts" class="btn ghost" id="btn-demo-two-amounts">
+        Pakai contoh kasus (2 nominal berbeda: Rp2.750.000 &amp; Rp2.500.000)
+      </button>
+    </div>
+    {% endif %}
+
     <div id="file-list" class="file-list" aria-live="polite"></div>
 
     <div class="evidence-panel" id="panel-text" data-input-panel="text" data-guide-id="case-story">
       <label for="text">Teks chat{% if before %} yang mencurigakan{% endif %}</label>
       <textarea id="text" name="text" placeholder="{% if before %}Contoh: orang tak dikenal minta transfer dan bilang barang sudah disiapkan.{% else %}Contoh: transfer Rp2.750.000 ke BCA tadi pagi, lalu penjual hilang.{% endif %}" rows="4"></textarea>
-      {% if case.mode.value == "DEMO" %}
-      <div style="margin-top:0.5rem">
-        <button type="submit" name="load_fixture" value="two_amounts" class="btn ghost small" id="btn-demo-two-amounts" style="font-size:0.875rem">
-          Pakai contoh kasus (2 nominal berbeda: Rp2.750.000 & Rp2.500.000)
-        </button>
-      </div>
-      {% endif %}
     </div>
 
     <div class="evidence-panel" id="panel-url" data-input-panel="url">

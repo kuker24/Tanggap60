@@ -43,6 +43,11 @@ def test_landing_is_light_and_case_is_calm_light(client: TestClient) -> None:
     assert "Teks chat" in intake.text
     assert "Masukkan link" in intake.text
     assert "Kirim bukti yang ada" in intake.text
+    fixture = intake.text.find('id="btn-demo-two-amounts"')
+    panel = intake.text.find('id="panel-text"')
+    assert fixture != -1 and panel != -1 and fixture < panel
+    assert "demo-fixture" in intake.text
+    assert 'style="font-size:0.875rem"' not in intake.text
     empty_proc = client.get(f"/cases/{case_id}/processing", follow_redirects=False)
     assert empty_proc.status_code == 303
     assert empty_proc.headers["location"].endswith("/intake")
@@ -84,6 +89,16 @@ def test_demo_two_amounts_conflict_flow(client: TestClient) -> None:
     assert started.status_code == 303
     case_url = started.headers["location"]
     case_id = case_url.split("/cases/")[1].split("/")[0]
+
+    intake_page = client.get(f"/cases/{case_id}/intake")
+    assert 'id="btn-demo-two-amounts"' in intake_page.text
+    assert intake_page.text.find('id="btn-demo-two-amounts"') < intake_page.text.find('id="panel-text"')
+
+    standard = client.post("/start", data={"declared_condition": "AFTER_LOSS", "mode": "STANDARD"}, follow_redirects=False)
+    assert standard.status_code == 303
+    standard_id = standard.headers["location"].split("/cases/")[1].split("/")[0]
+    standard_intake = client.get(f"/cases/{standard_id}/intake")
+    assert 'id="btn-demo-two-amounts"' not in standard_intake.text
 
     # 2. Intake with demo two amounts
     intake_res = client.post(
